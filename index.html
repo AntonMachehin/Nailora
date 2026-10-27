@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="ru">
 <head>
+<!-- Nailora v8.35: render only one QR representation; keep qrcodejs fallback image hidden when canvas exists. -->
+<!-- Nailora v8.34: share dialog opens without stacking the account modal; compact QR layout; preserve email redirect fix and account deletion notice. -->
+<!-- Nailora v8.32: share Nailora through a generated QR code, copyable link, and native share sheet. -->
 <!-- Nailora v8.31: mobile double-tap scheduling, appointment cancellation, email confirmation recovery, and complete account deletion. -->
 <!-- Nailora v8.30: profile avatars stored in Supabase Storage and synced across devices. -->
 <!-- Nailora v8.28: role-specific entry panel; master registration returns to explicit email/password login. -->
@@ -9,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<title>Nailora · запись и расписание · версия 8.31</title>
+<title>Nailora · запись и расписание · версия 8.35</title>
 <style>
 :root{font-family:Manrope,"Segoe UI",Arial,sans-serif;color:#292433;background:#f7f5fa}*{box-sizing:border-box}body{margin:0}header{background:#fff;padding:18px 22px;border-bottom:1px solid #e8e2ef}h1{font-size:22px;margin:0 0 6px}header p{margin:0;color:#766d80;font-size:14px}.wrap{max-width:1100px;margin:0 auto;padding:18px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tabs button,.btn{border:0;border-radius:10px;padding:10px 14px;background:#e9e2f1;color:#342742;cursor:pointer;font-weight:600}.tabs button.active,.btn.primary{background:#71529a;color:#fff}.panel{background:white;border:1px solid #e9e3ee;border-radius:14px;padding:16px;margin-bottom:16px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:1}.row .fixed{flex:0 0 auto}input,select,textarea{width:100%;padding:10px;border:1px solid #d9d1e1;border-radius:8px;font:inherit;background:#fff}label{display:block;font-size:13px;color:#655b70;margin:8px 0 5px}.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.day{min-height:75px;border:1px solid #e5dfeb;border-radius:8px;padding:7px;background:#fff;text-align:left;cursor:pointer;touch-action:pan-y;user-select:none;-webkit-user-select:none}.day.today{outline:2px solid #2563eb;outline-offset:1px}.day.today:not(.off){background:#dbeafe;border-color:#2563eb;color:#1e3a8a}.day.has:not(.today):not(.off){background:#dcfce7;border-color:#22c55e;color:#14532d}.day.off{background:#fee2e2!important;border-color:#ef4444!important;color:#991b1b}.day.today.off{outline:3px solid #2563eb}.day.selected{box-shadow:inset 0 0 0 2px #8b5cf6}.day:disabled{opacity:1;cursor:not-allowed}.day .num{font-weight:bold}.day small{display:block;margin-top:5px;color:inherit;font-size:11px}.day .day-legend{display:block;font-size:10px;margin-top:3px;color:inherit}.muted{color:#786e80;font-size:14px}.card{border:1px solid #e9e2ee;border-radius:10px;padding:12px;margin:8px 0}.card h3{margin:0 0 6px;font-size:16px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:#f5f0fa;border-radius:10px;padding:13px}.stat strong{display:block;font-size:21px;margin-top:5px}.hidden{display:none!important}.danger{background:#f9e8e8;color:#8d2525}.small{font-size:12px}@media(max-width:600px){.wrap{padding:10px}.grid{gap:3px}.day{min-height:62px;padding:4px}.day small{font-size:9px}.stats{grid-template-columns:1fr}.dayname{font-size:11px;text-align:center}}
 
@@ -29,6 +32,23 @@ body[data-bg="paper"]{background-image:radial-gradient(rgba(113,82,154,.12) .75p
 body[data-bg="solid"]{background-image:none}
 #settingsDialog{width:min(620px,calc(100% - 24px));max-height:88vh;overflow:auto;border:1px solid #e9e2ee;border-radius:16px;padding:0;background:#fff;color:#292433;box-shadow:0 20px 70px #20142e40}
 #settingsDialog::backdrop{background:rgba(25,18,33,.55)}
+#shareNailoraDialog{box-sizing:border-box;width:min(360px,calc(100vw - 20px));max-width:calc(100vw - 20px);max-height:86vh;max-height:86dvh;overflow-x:hidden;overflow-y:auto;border:1px solid #e9e2ee;border-radius:16px;padding:0;background:#fff;color:#292433;box-shadow:0 20px 70px #20142e40;margin:auto}
+#shareNailoraDialog::backdrop{background:rgba(25,18,33,.58)}
+#shareNailoraDialog *{box-sizing:border-box;min-width:0;max-width:100%}
+#shareNailoraDialog .dialog-head{padding:12px 14px;gap:8px}
+#shareNailoraDialog .dialog-body{padding:10px 14px 12px;overflow-wrap:anywhere}
+#shareNailoraDialog .dialog-body>p:first-child{margin:0 0 7px;line-height:1.35}
+#shareNailoraDialog .share-qr-panel{display:flex;align-items:center;justify-content:center;min-height:0;padding:7px;background:#fff;border:1px solid #e9e2ee;border-radius:12px;margin:7px auto 9px;width:min(100%,180px);overflow:hidden;flex:0 0 auto}
+#shareNailoraDialog #nailoraQrCode{display:flex;align-items:center;justify-content:center;width:164px;height:164px;flex:0 0 164px;min-height:0;max-width:100%;overflow:hidden}
+#shareNailoraDialog #nailoraQrCode canvas{display:block!important;width:164px!important;height:164px!important;max-width:100%!important;max-height:100%!important;object-fit:contain;image-rendering:pixelated}
+#shareNailoraDialog #nailoraQrCode img{display:none!important;width:164px!important;height:164px!important;max-width:100%!important;max-height:100%!important;object-fit:contain;image-rendering:pixelated}
+#shareNailoraDialog input#nailoraShareUrl{display:block;width:100%;min-width:0;font-size:13px;padding:8px 9px}
+#shareNailoraDialog .share-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;margin-top:8px}
+#shareNailoraDialog .share-actions .btn{display:block;width:100%;min-width:0;min-height:34px;padding:7px 10px;font-size:12px;white-space:normal}
+#nailoraShareStatus{min-height:1em;margin:5px 0 0}
+@media(max-width:520px){#shareNailoraDialog{width:calc(100vw - 24px);max-width:calc(100vw - 24px);max-height:82vh;max-height:82dvh}#shareNailoraDialog .dialog-head{padding:11px 12px}#shareNailoraDialog .dialog-body{padding:9px 12px 10px}#shareNailoraDialog .share-qr-panel{width:160px;padding:6px;margin:6px auto 8px}#shareNailoraDialog #nailoraQrCode{width:146px;height:146px;flex-basis:146px}#shareNailoraDialog #nailoraQrCode canvas,#shareNailoraDialog #nailoraQrCode img{width:146px!important;height:146px!important}#shareNailoraDialog .share-actions .btn{min-height:32px;padding:6px 9px}}
+body[data-theme="dark"] #shareNailoraDialog{background:var(--panel-bg);color:var(--text-color);border-color:var(--border-color)}
+body[data-theme="dark"] #shareNailoraDialog .dialog-head{border-color:var(--border-color)}
 .dialog-head{padding:18px 20px;border-bottom:1px solid #e9e2ee;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .dialog-body{padding:18px 20px}.settings-section{border:1px solid #e9e2ee;border-radius:12px;padding:14px;margin-bottom:14px}.settings-section h3{margin:0 0 8px}.account-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .appointment-form-panel{border:2px solid #c4b5fd}.header-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
@@ -335,6 +355,7 @@ body.auth-pending::before{content:"Загружаю Nailora…";position:fixed;i
 <!-- Nailora v8.15: show service price alongside duration in the client booking dialog. -->
 <!-- Nailora v8.10: dashboard client-card count widget removed; client-management tab retained. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body class="auth-pending">
 <section id="welcome" class="wrap" style="max-width:760px;padding-top:8vh">
@@ -396,10 +417,21 @@ body.auth-pending::before{content:"Загружаю Nailora…";position:fixed;i
   <section class="settings-section"><h3>Мой аккаунт</h3><p class="muted small" id="settingsRoleLabel">Тип аккаунта</p><div class="avatar-editor"><img id="settingsAvatarPreview" class="avatar-preview hidden" alt="Аватар профиля"><div id="settingsAvatarPlaceholder" class="avatar-placeholder" aria-hidden="true">👤</div><div style="flex:1"><label for="profileAvatarInput">Аватар профиля</label><input id="profileAvatarInput" type="file" accept="image/*"><p class="photo-picker-help">Выбери фото из галереи. Изображение будет уменьшено для экономии места.</p><button type="button" class="btn danger" id="removeProfileAvatar">Удалить аватар</button></div></div><form id="accountEditForm"><label>Имя</label><input id="settingsName" required maxlength="80"><label>Телефон</label><input id="settingsPhone" type="tel" maxlength="30"><label>Страна *</label><input id="settingsCountry" maxlength="100" required><label>Город / населённый пункт *</label><input id="settingsCity" maxlength="120" required><div id="settingsMasterFields" class="hidden"><label>Район / ориентир</label><input id="settingsArea" maxlength="100"><label>Адрес оказания услуг *</label><input id="settingsAddress" maxlength="180" placeholder="Улица, дом, помещение"><p class="muted small">Этот адрес будет показан клиентам в каталоге мастеров вашего города.</p><label>Услуги и специализация</label><input id="settingsSpecialty" maxlength="120"></div><div class="account-actions"><button class="btn primary" type="submit">Сохранить профиль</button></div></form></section>
   <section class="settings-section hidden" id="masterReminderSettings"><h3>Напоминания о записях</h3><p class="muted small">Настраиваются мастером. Напоминания работают, пока Nailora открыт в этом браузере; при закрытом приложении для автоматических уведомлений потребуется серверный сервис.</p><label class="check-line"><input type="checkbox" id="masterRemindersEnabled"> Включить напоминания мастеру</label><label for="masterReminderLeadTime">За сколько времени до записи напоминать</label><select id="masterReminderLeadTime"><option value="15">За 15 минут</option><option value="30">За 30 минут</option><option value="60">За 1 час</option><option value="120">За 2 часа</option><option value="1440">За 24 часа</option></select><button type="button" class="btn" id="allowBrowserNotifications" style="margin-top:10px">Разрешить уведомления браузера</button><p class="muted small" id="notificationPermissionStatus" role="status" style="margin-bottom:0">Без системного разрешения напоминание появится внутри открытого приложения.</p></section>
   <section class="settings-section hidden" id="masterCurrencySettings"><h3>Валюта цен услуг</h3><p class="muted small">Выбери валюту для цен услуг, записей и финансов. Изменение валюты меняет только отображение, а не пересчитывает суммы.</p><label for="masterCurrencyChoice">Валюта</label><select id="masterCurrencyChoice"><option value="RUB">RUB — ₽</option><option value="EUR">EUR — €</option><option value="USD">USD — $</option><option value="GBP">GBP — £</option><option value="PLN">PLN — zł</option><option value="UAH">UAH — ₴</option><option value="TRY">TRY — ₺</option><option value="KZT">KZT — ₸</option><option value="CZK">CZK — Kč</option><option value="CHF">CHF</option></select><p class="muted small">Валюта применяется ко всем денежным суммам в этом демопрототипе. При смене валюты числовые суммы автоматически не конвертируются.</p></section>
+  <section class="settings-section"><h3>Поделиться Nailora</h3><p class="muted small">Покажи QR-код клиенту или отправь ссылку на Nailora через мессенджер.</p><button type="button" class="btn primary" id="openShareNailora">Поделиться Nailora</button></section>
   <section class="settings-section"><h3>Язык интерфейса</h3><label for="settingsLanguageChoice">Язык этого аккаунта</label><select id="settingsLanguageChoice" aria-label="Язык этого аккаунта"></select></section>
   <section class="settings-section"><h3>Тема</h3><label for="themeChoice">Цветовая тема</label><select id="themeChoice"><option value="light">Светлая сиреневая</option><option value="dark">Тёмная</option><option value="mint">Мятная</option><option value="rose">Розовая</option></select><label for="backgroundChoice">Фон приложения</label><select id="backgroundChoice"><option value="solid">Однотонный</option><option value="gradient">Мягкий градиент</option><option value="paper">Точечный узор</option></select><p class="muted small">Настройки оформления сохраняются в этом браузере и применяются к обоим типам аккаунтов.</p></section>
   <div class="account-actions"><button type="button" class="btn danger" id="settingsDeleteAccount">Удалить аккаунт</button><button type="button" class="btn danger" id="settingsLogout">Выйти из аккаунта</button><button type="button" class="btn" id="settingsDone">Готово</button></div>
- <p class="muted small">Удаление аккаунта безвозвратно удалит ваш профиль и связанные с ним данные Nailora на сервере. После удаления войти в этот аккаунт будет невозможно.</p>
+  <p class="muted small">Удаление аккаунта безвозвратно удалит ваш профиль и связанные с ним данные Nailora на сервере. После удаления войти в этот аккаунт будет невозможно.</p>
+ </div>
+</dialog>
+<dialog id="shareNailoraDialog" aria-labelledby="shareNailoraTitle">
+ <div class="dialog-head"><div><h2 id="shareNailoraTitle" style="margin:0">Поделиться Nailora</h2><p class="muted small" style="margin:5px 0 0">QR-код и ссылка на приложение</p></div><button type="button" class="btn fixed" id="closeShareNailora" aria-label="Закрыть">✕</button></div>
+ <div class="dialog-body">
+  <p class="muted small">Отсканируй QR-код камерой телефона или отправь ссылку другу. Код ведёт на опубликованную версию Nailora.</p>
+  <div class="share-qr-panel"><div id="nailoraQrCode" aria-label="QR-код для открытия Nailora"></div><p id="nailoraQrFallback" class="muted small hidden" role="status">Не удалось загрузить генератор QR-кода. Обнови страницу и попробуй ещё раз.</p></div>
+  <label for="nailoraShareUrl">Ссылка на Nailora</label><input id="nailoraShareUrl" type="url" readonly value="https://antonmachehin.github.io/Nailora/" inputmode="url">
+  <div class="share-actions"><button type="button" class="btn primary" id="shareNailoraSystem">Поделиться ссылкой</button><button type="button" class="btn" id="copyNailoraLink">Копировать ссылку</button><button type="button" class="btn" id="downloadNailoraQr">Скачать QR-код</button><button type="button" class="btn" id="closeShareNailoraBottom">Закрыть</button></div>
+  <p id="nailoraShareStatus" class="muted small" role="status" aria-live="polite"></p>
  </div>
 </dialog>
 <dialog id="clientReminderDialog" aria-labelledby="clientReminderTitle">
@@ -764,7 +796,20 @@ Object.assign(RU_TEXT,{
 'Название услуги *':{en:'Service name *',de:'Name der Leistung *',es:'Nombre del servicio *',fr:'Nom de la prestation *',it:'Nome del servizio *',pt:'Nome do serviço *',tr:'Hizmet adı *',uk:'Назва послуги *'},
 'Изменить услугу':{en:'Edit service',de:'Leistung bearbeiten',es:'Editar servicio',fr:'Modifier la prestation',it:'Modifica servizio',pt:'Editar serviço',tr:'Hizmeti düzenle',uk:'Змінити послугу'},
 'Добавить услугу':{en:'Add service',de:'Leistung hinzufügen',es:'Añadir servicio',fr:'Ajouter une prestation',it:'Aggiungi servizio',pt:'Adicionar serviço',tr:'Hizmet ekle',uk:'Додати послугу'},
-'Сначала настройте услуги у мастера':{en:'The artist must configure services first',de:'Die Fachkraft muss zuerst Leistungen einrichten',es:'El profesional debe configurar los servicios primero',fr:'La professionnelle doit d’abord configurer les prestations',it:'La professionista deve prima configurare i servizi',pt:'O profissional precisa configurar os serviços primeiro',tr:'Önce uzman hizmetleri ayarlamalı',uk:'Спочатку майстер має налаштувати послуги'}
+'Сначала настройте услуги у мастера':{en:'The artist must configure services first',de:'Die Fachkraft muss zuerst Leistungen einrichten',es:'El profesional debe configurar los servicios primero',fr:'La professionnelle doit d’abord configurer les prestations',it:'La professionista deve prima configurare i servizi',pt:'O profissional precisa configurar os serviços primeiro',tr:'Önce uzman hizmetleri ayarlamalı',uk:'Спочатку майстер має налаштувати послуги'},
+'Поделиться Nailora':{en:'Share Nailora',de:'Nailora teilen',es:'Compartir Nailora',fr:'Partager Nailora',it:'Condividi Nailora',pt:'Compartilhar Nailora',tr:'Nailora’yı paylaş',uk:'Поділитися Nailora'},
+'Покажи QR-код клиенту или отправь ссылку на Nailora через мессенджер.':{en:'Show the QR code to a client or send the Nailora link through a messenger.',de:'Zeige den QR-Code oder sende den Nailora-Link über einen Messenger.',es:'Muestra el código QR o envía el enlace de Nailora por mensajería.',fr:'Montrez le QR code ou envoyez le lien Nailora par messagerie.',it:'Mostra il QR code oppure invia il link Nailora tramite messaggio.',pt:'Mostre o código QR ou envie o link do Nailora por mensagem.',tr:'QR kodunu göster veya Nailora bağlantısını mesajla gönder.',uk:'Покажи QR-код або надішли посилання Nailora через месенджер.'},
+'QR-код и ссылка на приложение':{en:'QR code and app link',de:'QR-Code und App-Link',es:'Código QR y enlace a la aplicación',fr:'QR code et lien vers l’application',it:'Codice QR e link all’app',pt:'Código QR e link do aplicativo',tr:'QR kodu ve uygulama bağlantısı',uk:'QR-код і посилання на застосунок'},
+'Отсканируй QR-код камерой телефона или отправь ссылку другу. Код ведёт на опубликованную версию Nailora.':{en:'Scan the QR code with your phone camera or send the link to a friend. It opens the published Nailora website.',de:'Scanne den QR-Code mit der Handykamera oder sende den Link. Er öffnet die veröffentlichte Nailora-Seite.',es:'Escanea el código QR con la cámara o envía el enlace. Abre la web publicada de Nailora.',fr:'Scannez le QR code avec votre téléphone ou envoyez le lien. Il ouvre le site publié de Nailora.',it:'Scansiona il codice QR con la fotocamera o invia il link. Si apre il sito pubblicato di Nailora.',pt:'Leia o QR code com a câmera ou envie o link. Ele abre o site publicado do Nailora.',tr:'QR kodunu telefon kamerasıyla tara veya bağlantıyı gönder. Bağlantı yayımlanmış Nailora sitesini açar.',uk:'Відскануй QR-код камерою або надішли посилання. Воно відкриває опублікований сайт Nailora.'},
+'Ссылка на Nailora':{en:'Nailora link',de:'Nailora-Link',es:'Enlace de Nailora',fr:'Lien Nailora',it:'Link Nailora',pt:'Link do Nailora',tr:'Nailora bağlantısı',uk:'Посилання на Nailora'},
+'Поделиться ссылкой':{en:'Share link',de:'Link teilen',es:'Compartir enlace',fr:'Partager le lien',it:'Condividi link',pt:'Compartilhar link',tr:'Bağlantıyı paylaş',uk:'Поділитися посиланням'},
+'Копировать ссылку':{en:'Copy link',de:'Link kopieren',es:'Copiar enlace',fr:'Copier le lien',it:'Copia link',pt:'Copiar link',tr:'Bağlantıyı kopyala',uk:'Копіювати посилання'},
+'Скачать QR-код':{en:'Download QR code',de:'QR-Code herunterladen',es:'Descargar código QR',fr:'Télécharger le QR code',it:'Scarica il codice QR',pt:'Baixar código QR',tr:'QR kodunu indir',uk:'Завантажити QR-код'},
+'Ссылка скопирована.':{en:'Link copied.',de:'Link kopiert.',es:'Enlace copiado.',fr:'Lien copié.',it:'Link copiato.',pt:'Link copiado.',tr:'Bağlantı kopyalandı.',uk:'Посилання скопійовано.'},
+'Не удалось скопировать автоматически. Выдели ссылку и скопируй её вручную.':{en:'Could not copy automatically. Select the link and copy it manually.',de:'Automatisches Kopieren fehlgeschlagen. Markiere den Link und kopiere ihn manuell.',es:'No se pudo copiar automáticamente. Selecciona el enlace y cópialo manualmente.',fr:'Copie automatique impossible. Sélectionnez et copiez le lien manuellement.',it:'Copia automatica non riuscita. Seleziona e copia il link manualmente.',pt:'Não foi possível copiar automaticamente. Selecione e copie o link manualmente.',tr:'Otomatik kopyalanamadı. Bağlantıyı seçip elle kopyala.',uk:'Не вдалося скопіювати автоматично. Виділи посилання та скопіюй його вручну.'},
+'QR-код не готов.':{en:'QR code is not ready.',de:'QR-Code ist noch nicht bereit.',es:'El código QR no está listo.',fr:'Le QR code n’est pas prêt.',it:'Il codice QR non è pronto.',pt:'O código QR não está pronto.',tr:'QR kodu hazır değil.',uk:'QR-код не готовий.'},
+'QR-код сохранён.':{en:'QR code saved.',de:'QR-Code gespeichert.',es:'Código QR guardado.',fr:'QR code enregistré.',it:'Codice QR salvato.',pt:'Código QR salvo.',tr:'QR kodu kaydedildi.',uk:'QR-код збережено.'},
+'Не удалось загрузить генератор QR-кода. Обнови страницу и попробуй ещё раз.':{en:'Could not load the QR generator. Refresh the page and try again.',de:'Der QR-Code-Generator konnte nicht geladen werden. Aktualisiere die Seite und versuche es erneut.',es:'No se pudo cargar el generador QR. Actualiza la página e inténtalo de nuevo.',fr:'Impossible de charger le générateur QR. Actualisez la page et réessayez.',it:'Impossibile caricare il generatore QR. Aggiorna la pagina e riprova.',pt:'Não foi possível carregar o gerador QR. Atualize a página e tente novamente.',tr:'QR oluşturucu yüklenemedi. Sayfayı yenileyip tekrar dene.',uk:'Не вдалося завантажити генератор QR-коду. Онови сторінку та спробуй ще раз.'},
 });
 function t(source){const row=RU_TEXT[source]||EXTRA_TEXT[source];return currentLanguage==='ru'||!row?source:(row[currentLanguage]||row.en||source)}
 function setupLanguageSelect(select){if(!select)return;const current=select.value;select.innerHTML='';LANGUAGE_OPTIONS.forEach(([value,label])=>{const o=document.createElement('option');o.value=value;o.textContent=label;select.append(o)});select.value=LANGUAGESAFE(current)?current:currentLanguage}
@@ -1064,6 +1109,63 @@ async function logout(){
 function openSettings(){if(!activeRole)return;const p=profiles[activeRole]||{};renderProfileAvatar(activeRole);$('settingsLanguageChoice').value=p.language||currentLanguage;$('settingsRoleLabel').textContent=t(activeRole==='master'?'Тип аккаунта: Мастер':'Тип аккаунта: Клиент');$('settingsName').value=p.name||'';$('settingsPhone').value=p.phone||'';$('settingsCountry').value=p.country||'';$('settingsCity').value=p.city||p.area||'';$('settingsMasterFields').classList.toggle('hidden',activeRole!=='master');$('masterReminderSettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencySettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencyChoice').value=CURRENCY_CODES.includes(String((profiles.master||{}).currency||'RUB').toUpperCase())?String((profiles.master||{}).currency||'RUB').toUpperCase():'RUB';$('settingsAddress').required=activeRole==='master';$('settingsArea').value=p.area||'';$('settingsAddress').value=p.address||'';$('settingsSpecialty').value=p.specialty||'';const reminderPrefs=getMasterReminderPrefs();$('masterRemindersEnabled').checked=!!reminderPrefs.enabled;$('masterReminderLeadTime').value=String(reminderPrefs.minutes||60);$('masterReminderLeadTime').disabled=!reminderPrefs.enabled;refreshNotificationPermissionStatus();applyUiSettings();if(typeof $('settingsDialog').showModal==='function')$('settingsDialog').showModal();else $('settingsDialog').setAttribute('open','')}
 $('masterAccount').onclick=openSettings;$('clientAccount').onclick=openSettings;
 $('closeSettings').onclick=()=>$('settingsDialog').close();$('settingsDone').onclick=()=>$('settingsDialog').close();$('settingsLogout').onclick=logout;
+// Share one stable public URL. Never derive it from a local file:// or localhost origin.
+const NAILORA_PUBLIC_URL='https://antonmachehin.github.io/Nailora/';
+let shareReturnToSettings=false;
+function openNailoraShare(){
+ const dialog=$('shareNailoraDialog'),settings=$('settingsDialog'),qrRoot=$('nailoraQrCode'),fallback=$('nailoraQrFallback');
+ // Do not open two native dialogs on top of each other. Return to Settings when Share closes.
+ shareReturnToSettings=!!(settings&&settings.open);
+ if(shareReturnToSettings)settings.close();
+ $('nailoraShareUrl').value=NAILORA_PUBLIC_URL;$('nailoraShareStatus').textContent='';
+ qrRoot.replaceChildren();fallback.classList.add('hidden');
+ if(typeof window.QRCode==='function'){
+  try{
+   new window.QRCode(qrRoot,{text:NAILORA_PUBLIC_URL,width:164,height:164,colorDark:'#111111',colorLight:'#ffffff',correctLevel:window.QRCode.CorrectLevel.M});
+   // qrcodejs may create both a canvas and a fallback image for the same QR.
+   // Show the canvas when available; only show the image on canvas-less browsers.
+   const qrCanvas=qrRoot.querySelector('canvas');
+   const qrImage=qrRoot.querySelector('img');
+   if(qrCanvas){qrCanvas.style.setProperty('display','block','important');if(qrImage)qrImage.style.setProperty('display','none','important')}
+   else if(qrImage){qrImage.style.setProperty('display','block','important')}
+  }
+  catch(err){console.error('Nailora QR generation failed',err);fallback.classList.remove('hidden')}
+ }else{fallback.classList.remove('hidden')}
+ if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');
+ translatePage();
+}
+function closeNailoraShare(){const dialog=$('shareNailoraDialog');if(dialog.open&&typeof dialog.close==='function')dialog.close();else{dialog.removeAttribute('open');if(shareReturnToSettings){shareReturnToSettings=false;const settings=$('settingsDialog');if(settings&&typeof settings.showModal==='function')settings.showModal();else settings?.setAttribute('open','')}}}
+$('shareNailoraDialog').addEventListener('close',()=>{if(!shareReturnToSettings)return;shareReturnToSettings=false;const settings=$('settingsDialog');if(settings&&typeof settings.showModal==='function'&&!settings.open)settings.showModal();else if(settings&&!settings.open)settings.setAttribute('open','')});
+async function copyNailoraPublicLink(){
+ const field=$('nailoraShareUrl');field.value=NAILORA_PUBLIC_URL;
+ try{
+  if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(NAILORA_PUBLIC_URL)}
+  else{throw new Error('Clipboard API unavailable')}
+  $('nailoraShareStatus').textContent=t('Ссылка скопирована.');
+ }catch(err){
+  field.focus();field.select();let copied=false;try{copied=document.execCommand('copy')}catch(_){}
+  $('nailoraShareStatus').textContent=copied?t('Ссылка скопирована.'):t('Не удалось скопировать автоматически. Выдели ссылку и скопируй её вручную.');
+ }
+}
+$('openShareNailora').onclick=openNailoraShare;
+$('closeShareNailora').onclick=closeNailoraShare;
+$('closeShareNailoraBottom').onclick=closeNailoraShare;
+$('shareNailoraDialog').addEventListener('click',e=>{if(e.target===$('shareNailoraDialog'))closeNailoraShare()});
+$('copyNailoraLink').onclick=copyNailoraPublicLink;
+$('shareNailoraSystem').onclick=async()=>{
+ try{
+  if(typeof navigator.share==='function'){
+   await navigator.share({title:'Nailora',text:'Nailora — запись и расписание для мастеров маникюра',url:NAILORA_PUBLIC_URL});
+   $('nailoraShareStatus').textContent='';
+  }else{await copyNailoraPublicLink()}
+ }catch(err){if(err?.name==='AbortError')return;console.warn('Native share unavailable',err);await copyNailoraPublicLink()}
+};
+$('downloadNailoraQr').onclick=()=>{
+ const root=$('nailoraQrCode');let canvas=root.querySelector('canvas');
+ if(!canvas){const img=root.querySelector('img');if(img?.src){canvas=document.createElement('canvas');canvas.width=180;canvas.height=180;const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,180,180);try{ctx.drawImage(img,0,0,180,180)}catch(_){canvas=null}}}
+ if(!canvas){$('nailoraShareStatus').textContent=t('QR-код не готов.');return}
+ try{const link=document.createElement('a');link.href=canvas.toDataURL('image/png');link.download='Nailora-QR.png';document.body.append(link);link.click();link.remove();$('nailoraShareStatus').textContent=t('QR-код сохранён.')}catch(err){console.error('QR download failed',err);$('nailoraShareStatus').textContent=t('QR-код не готов.')}
+};
 $('settingsDeleteAccount').onclick=async()=>{
  if(!activeRole)return;
  const confirmText='Удалить аккаунт Nailora ПОЛНОСТЬЮ? Будут безвозвратно удалены профиль мастера/клиента, все связанные записи, уведомления и расписание в Supabase, а также локальные данные Nailora в этом браузере. Восстановить их будет нельзя.';
@@ -1083,7 +1185,7 @@ $('settingsDeleteAccount').onclick=async()=>{
   $('settingsDialog').close();showOnly('welcome');setCloudStatus('Аккаунт и связанные данные удалены.');
   alert('Аккаунт Nailora и связанные с ним данные в Supabase удалены. Локальные данные этого приложения также очищены.');
   window.location.reload();
- }catch(err){console.error('Full account deletion failed',err);alert('Не удалось полностью удалить аккаунт: '+(err?.message||'ошибка Supabase')+'\nАккаунт не считается удалённым. Проверь SQL-настройку и серверную функцию Nailora v8.31, затем повтори попытку.');}
+ }catch(err){console.error('Full account deletion failed',err);alert('Не удалось полностью удалить аккаунт: '+(err?.message||'ошибка Supabase')+'\nАккаунт не считается удалённым. Проверь SQL-настройку и серверную функцию Nailora, затем повтори попытку.');}
  finally{button.disabled=false}
 };
 $('settingsDialog').addEventListener('click',e=>{if(e.target===$('settingsDialog'))$('settingsDialog').close()});
