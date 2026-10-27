@@ -835,7 +835,7 @@ const NAILORA_SUPABASE_KEY='sb_publishable_-1TkkaMKrUdXmKfApv_8ew_Ao4e2GVk';
 let cloud=null,cloudUser=null,cloudMasterDirectory=[],selectedCloudMasterId='',cloudScheduleData=null,cloudBookedSlots=[],cloudNotifications=[],cloudPollTimer=null,cloudScheduleLoading=false,cloudScheduleLoadError='',cloudScheduleWarning='';
 let editingAvailabilityDate='';
 try{if(window.supabase?.createClient){cloud=window.supabase.createClient(NAILORA_SUPABASE_URL,NAILORA_SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});$('cloudStatus').textContent='Supabase SDK загружен';}else $('cloudStatus').textContent='Supabase SDK не загрузился. Проверь интернет.'}catch(err){$('cloudStatus').textContent='Ошибка подключения к Supabase';}
-function getEmailRedirectUrl(){try{if(window.location.protocol!=='http:'&&window.location.protocol!=='https:')return null;const url=new URL(window.location.href);url.search='';url.hash='';return url.href}catch(_){return null}}
+function getEmailRedirectUrl(){return 'https://antonmachehin.github.io/Nailora/'}
 function getAuthLinkErrorCode(){try{const query=new URLSearchParams(window.location.search||'');const hash=new URLSearchParams(String(window.location.hash||'').replace(/^#/,'') );return query.get('error_code')||hash.get('error_code')||''}catch(_){return ''}}
 function cloudReady(){return !!(cloud&&cloudUser&&profiles[activeRole]?.cloudId)}
 function setCloudStatus(message){const el=$('cloudStatus');if(el)el.textContent=message}
