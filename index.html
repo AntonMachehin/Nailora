@@ -1121,6 +1121,12 @@ $('closeNotifications').onclick=()=>$('notificationsDialog').close();$('notifica
 function openCloudNotifications(){refreshCloudNotifications(false).then(()=>{if(typeof $('notificationsDialog').showModal==='function')$('notificationsDialog').showModal();else $('notificationsDialog').setAttribute('open','')})}
 const _masterAccountOriginal=$('masterAccount').innerHTML,_clientAccountOriginal=$('clientAccount').innerHTML;const masterNotifButton=document.createElement('button');masterNotifButton.type='button';masterNotifButton.className='btn fixed';masterNotifButton.textContent='🔔 Уведомления';masterNotifButton.onclick=openCloudNotifications;$('masterAccount').parentElement.insertBefore(masterNotifButton,$('masterAccount'));const clientNotifButton=masterNotifButton.cloneNode(true);clientNotifButton.onclick=openCloudNotifications;$('clientAccount').parentElement.insertBefore(clientNotifButton,$('clientAccount'));
 function startCloudPolling(){if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=setInterval(()=>{if(cloudReady())refreshCloudNotifications(true)},30000)}
+// Initialize calendar state before any asynchronous auth restoration can render the app.
+let cursor=new Date();cursor.setDate(1);
+let selectedDate=iso(new Date());
+let clientCursor=new Date();clientCursor.setDate(1);
+let clientSelectedDate=iso(new Date());
+
 async function bootCloudAuth(){
   const finishLoading=()=>document.body.classList.remove('auth-pending');
   if(!cloud){setCloudStatus('Supabase SDK не загрузился');showOnly('welcome');finishLoading();return;}
@@ -1284,10 +1290,6 @@ $('clientCalendarView').onchange=()=>{if($('clientCalendarView').value==='week')
 $('clientPrev').onclick=()=>moveClientMonth(-1);
 $('clientNext').onclick=()=>moveClientMonth(1);
 function nextAvailableDate(from){let d=new Date(from+'T12:00:00');for(let i=0;i<370;i++){const ds=iso(d);if(!isDayOff(ds))return ds;d.setDate(d.getDate()+1)}return ''}
-let cursor=new Date();cursor.setDate(1);
-let selectedDate=iso(new Date());
-let clientCursor=new Date();clientCursor.setDate(1);
-let clientSelectedDate=iso(new Date());
 // Client calendar stays empty until a specific artist is explicitly selected.
 let selectedClientMasterKey='';
 function iso(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
