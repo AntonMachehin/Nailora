@@ -1,11 +1,14 @@
 <!doctype html>
 <html lang="ru">
 <head>
+<!-- Nailora v8.61: smoothly drag and slide the complete calendar view when changing months. -->
+<!-- Nailora v8.60: save Tetris progress and resume after closing the game or reopening Nailora. -->
 <!-- Nailora v8.57: tap-field start/pause/resume/restart and larger mobile controls. -->
 <!-- Nailora v8.55: fix Tetris launch, controls, scoring, pause, and restart. -->
 <!-- Nailora v8.54: add standalone Tetris mini-game to account settings; based on v8.53 mobile-hours fix. -->
 <!-- Nailora v8.58: swipe calendars, preserve selected-day marker, and auto-scroll to daily schedule. -->
 <!-- Nailora v8.52: contain finance/date/time inputs on iPhone and align their values vertically. -->
+<!-- Nailora v8.59: move monthly working-hours panel above calendar controls and place month navigation below calendar view selection. -->
 <!-- Nailora v8.48: label service prices as starting prices in the master list and client booking interface. -->
 <!-- Nailora v8.41: add all five visual themes to account settings and share persistent theme selection. -->
 <!-- Nailora v8.40: five visual themes and frosted-glass interface. -->
@@ -22,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<title>Nailora v8.56 · мобильный Тетрис без прокрутки</title>
+<title>Nailora v8.61 · плавный календарь</title>
 <style>
 :root{font-family:Manrope,"Segoe UI",Arial,sans-serif;color:#292433;background:#f7f5fa}*{box-sizing:border-box}body{margin:0}header{background:#fff;padding:18px 22px;border-bottom:1px solid #e8e2ef}h1{font-size:22px;margin:0 0 6px}header p{margin:0;color:#766d80;font-size:14px}.wrap{max-width:1100px;margin:0 auto;padding:18px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tabs button,.btn{border:0;border-radius:10px;padding:10px 14px;background:#e9e2f1;color:#342742;cursor:pointer;font-weight:600}.tabs button.active,.btn.primary{background:#71529a;color:#fff}.panel{background:white;border:1px solid #e9e3ee;border-radius:14px;padding:16px;margin-bottom:16px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:1}.row .fixed{flex:0 0 auto}input,select,textarea{width:100%;padding:10px;border:1px solid #d9d1e1;border-radius:8px;font:inherit;background:#fff}label{display:block;font-size:13px;color:#655b70;margin:8px 0 5px}
 .password-field{position:relative;width:100%}.password-field input{padding-right:48px}.password-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);padding:5px 9px;min-width:36px;border:0!important;background:transparent!important;color:#655b70!important;box-shadow:none!important;filter:none!important;font-size:18px;line-height:1;cursor:pointer}.password-toggle svg{display:block;width:20px;height:20px}.password-toggle:hover{box-shadow:none!important;filter:none!important}.password-toggle:focus-visible{outline:2px solid #71529a;outline-offset:1px;border-radius:6px}.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.day{min-height:75px;border:1px solid #e5dfeb;border-radius:8px;padding:7px;background:#fff;text-align:left;cursor:pointer;touch-action:pan-y;user-select:none;-webkit-user-select:none}.day.today{outline:2px solid #2563eb;outline-offset:1px}.day.today:not(.off){background:#dbeafe;border-color:#2563eb;color:#1e3a8a}.day.has:not(.today):not(.off){background:#dcfce7;border-color:#22c55e;color:#14532d}.day.off{background:#fee2e2!important;border-color:#ef4444!important;color:#991b1b}.day.today.off{outline:3px solid #2563eb}.day.selected{box-shadow:inset 0 0 0 2px #8b5cf6}.day:disabled{opacity:1;cursor:not-allowed}.day .num{font-weight:bold}.day small{display:block;margin-top:5px;color:inherit;font-size:11px}.day .day-legend{display:block;font-size:10px;margin-top:3px;color:inherit}.muted{color:#786e80;font-size:14px}.card{border:1px solid #e9e2ee;border-radius:10px;padding:12px;margin:8px 0}.card h3{margin:0 0 6px;font-size:16px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:#f5f0fa;border-radius:10px;padding:13px}.stat strong{display:block;font-size:21px;margin-top:5px}.verify-panel{max-width:650px;margin:0 auto;text-align:center;padding:clamp(20px,4vw,30px)!important}.verify-mark{width:58px;height:58px;display:grid;place-items:center;margin:0 auto 12px;border-radius:20px;background:#f0e9f8;color:#7955a6;font-size:28px;box-shadow:inset 0 0 0 1px #e5d8f2}.verify-title{margin:0 0 8px;color:#4e3c62;font-size:clamp(22px,4vw,28px);line-height:1.25}.verify-subtitle{color:#74677f;line-height:1.6;margin:0 auto 16px;max-width:480px}.verify-intro{font-size:1rem;font-weight:600;color:#4e3c62;background:#f7f3fb;border:1px solid #e9dff3;padding:12px 15px;border-radius:12px;line-height:1.6;margin:0 0 14px}.verify-steps{list-style:none;counter-reset:verify-step;text-align:left;margin:14px 0;padding:0;display:grid;gap:10px;line-height:1.5;font-size:1rem;font-weight:500;color:#40354d}.verify-steps li{counter-increment:verify-step;position:relative;padding:13px 14px 13px 54px;background:#fbf9fd;border:1px solid #eee6f5;border-radius:12px;min-height:52px}.verify-steps li::before{content:counter(verify-step);position:absolute;left:13px;top:13px;width:28px;height:28px;display:grid;place-items:center;border-radius:50%;background:#e9def5;color:#684a8d;font-size:14px;font-weight:800}.verify-steps li strong{display:block;font-weight:750;color:#4e3c62}.verify-steps li span{display:block;margin-top:3px;color:#796e84;font-size:.92rem;font-weight:400}.verify-note{margin:14px 0 10px;padding:13px 15px;border-radius:12px;background:#f0f7f3;border:1px solid #dcece2;color:#476554;font-size:.95rem;line-height:1.55}.verify-help{margin-top:12px;color:#82798a;line-height:1.55}.link-button{border:0;background:transparent;color:#79658d;text-decoration:underline;text-underline-offset:3px;padding:5px 8px;font:inherit;font-size:13px;cursor:pointer;border-radius:7px}.link-button:hover{background:#f4eef8}.link-button:focus-visible{outline:2px solid #9a80b7;outline-offset:2px}@media(max-width:600px){.verify-panel{padding:20px 15px!important}.verify-steps li{padding:12px 12px 12px 50px}.verify-steps li::before{left:11px;top:12px}}.hidden{display:none!important}.danger{background:#f9e8e8;color:#8d2525}.small{font-size:12px}@media(max-width:600px){.wrap{padding:10px}.grid{gap:3px}.day{min-height:62px;padding:4px}.day small{font-size:9px}.stats{grid-template-columns:1fr}.dayname{font-size:11px;text-align:center}}
@@ -1049,8 +1052,8 @@ input,select,textarea{background:rgba(255,255,255,.72)}
  <article class="dashboard-card"><span class="dashboard-icon">◷</span><span class="dashboard-label">Сегодня</span><strong id="dashTodayCount">0</strong><small>записей</small></article>
  <article class="dashboard-card"><span class="dashboard-icon">↗</span><span class="dashboard-label">Ближайшая запись</span><strong id="dashNextTime">—</strong><small id="dashNextName">Предстоящих записей нет</small></article>
 </div>
-<div class="panel"><div class="row"><button class="btn fixed" id="prev">←</button><h2 id="monthTitle" style="text-align:center;margin:0;flex:2"></h2><button class="btn fixed" id="next">→</button><button class="btn fixed" id="todayBtn">Сегодня</button></div><div class="row" style="margin-top:12px"><label style="flex:0 0 130px">Вид календаря<select id="view"><option value="month">Месяц</option><option value="week">Неделя</option></select></label><div class="muted" style="align-self:end">Нажми на день, чтобы открыть записи. Дважды коснись даты (или дважды щёлкни), чтобы настроить рабочие интервалы, в том числе с перерывами. Удерживай день около секунды, чтобы отметить или снять выходной.</div></div></div>
 <details class="panel" id="monthHoursPanel"><summary class="month-hours-summary"><h2>Рабочее время на месяц</h2><span class="muted small">Нажми, чтобы настроить</span></summary><div class="month-hours-body"><p class="muted small">Эти часы применяются ко всем дням выбранного месяца, кроме дней, отмеченных как выходные.</p><div class="row"><div><label for="monthStartTime">Начало рабочего дня</label><input id="monthStartTime" type="time" value="09:00" required></div><div><label for="monthEndTime">Окончание рабочего дня</label><input id="monthEndTime" type="time" value="20:00" required></div></div><div class="row" style="margin-top:10px"><button class="btn primary fixed" id="saveMonthHours" type="button">Применить ко всему месяцу</button><span class="muted small" id="monthHoursStatus">График действует на весь выбранный месяц.</span></div></div></details>
+<div class="panel"><div class="row"><label style="flex:0 0 130px">Вид календаря<select id="view"><option value="month">Месяц</option><option value="week">Неделя</option></select></label><div class="muted" style="align-self:end">Нажми на день, чтобы открыть записи. Дважды коснись даты (или дважды щёлкни), чтобы настроить рабочие интервалы, в том числе с перерывами. Удерживай день около секунды, чтобы отметить или снять выходной.</div></div><div class="row" style="margin-top:12px"><button class="btn fixed" id="prev">←</button><h2 id="monthTitle" style="text-align:center;margin:0;flex:2"></h2><button class="btn fixed" id="next">→</button><button class="btn fixed" id="todayBtn">Сегодня</button></div></div>
 <div class="panel"><div class="grid" id="calendarGrid"></div><div id="calendarInsights" class="calendar-insights" aria-live="polite"></div><p class="muted small" style="margin:12px 0 0">Лавандовый — сегодня · сиреневый — есть записи · коралловый — выходной.</p></div>
 <div class="panel"><h2 id="selectedTitle">Распорядок рабочего дня</h2><p class="muted small">Нажми на свободный интервал, чтобы добавить клиента. Удерживай свободную ячейку около секунды, чтобы заблокировать время. Заблокированную ячейку можно разблокировать таким же удержанием.</p><div id="daySchedule" class="schedule-list"></div><details class="master-services" id="masterServicesPanel"><summary class="master-services-summary"><h3 id="masterServicesTitle">Услуги мастера</h3><span class="muted small">Нажми, чтобы свернуть или раскрыть</span></summary><div class="master-services-content"><p class="muted small">Настрой длительность каждой услуги. При выборе услуги клиентом время записи рассчитывается автоматически.</p><div id="masterServicesList"></div><details id="masterServiceEditor" style="margin-top:12px"><summary id="masterServiceEditorSummary" style="cursor:pointer;font-weight:600">+ Добавить услугу</summary><form id="masterServiceForm" style="margin-top:10px"><input type="hidden" id="masterServiceId"><label for="masterServiceName">Название услуги *</label><input id="masterServiceName" required maxlength="120" placeholder="Например, маникюр с покрытием"><div class="row"><div><label for="masterServiceDuration">Длительность, минут *</label><input id="masterServiceDuration" type="number" min="15" max="480" step="15" value="90" required></div><div><label for="masterServicePrice">Цена от <span class="price-currency-symbol" id="masterServicePriceCurrency">(₽)</span></label><input id="masterServicePrice" type="number" min="0" step="0.01" value="0"></div></div><div class="row" style="margin-top:10px"><button class="btn primary fixed" id="saveMasterService" type="submit">Сохранить услугу</button><button class="btn fixed hidden" id="cancelMasterServiceEdit" type="button">Отмена</button></div></form></details></div></details></div>
 <div class="panel" id="masterReviewsPanel"><h2>Рейтинг мастера и отзывы</h2><div id="masterRatingSummary"></div><div id="masterReviewsList"></div><p class="muted small">Отзывы оставляются клиентами по прошедшим записям. В демоверсии они сохраняются только в этом браузере.</p></div><div class="panel appointment-form-panel hidden" id="appointmentFormPanel"><h2 id="appointmentFormTitle">Новая запись</h2><form id="appointmentForm"><input type="hidden" id="appointmentId"><div class="row"><div><label>Дата записи *</label><input id="appointmentDate" type="date" required></div><div><label>Время *</label><input id="appointmentTime" type="time" required value="10:00"></div><div><label for="appointmentDuration">Продолжительность, минут</label><input id="appointmentDuration" type="number" min="15" max="480" step="15" required value="60"></div></div><div class="row"><div><label>Имя клиента *</label><input id="appointmentName" required maxlength="100" placeholder="Имя и фамилия"></div><div><label>Телефон клиента</label><input id="appointmentPhone" type="tel" maxlength="30" placeholder="Телефон"></div></div><div class="row"><div><label>Услуга</label><input id="appointmentService" maxlength="120" placeholder="Например, маникюр с покрытием"></div><div><label for="appointmentPrice">Цена <span class="price-currency-symbol" id="appointmentPriceCurrency">(₽)</span></label><input id="appointmentPrice" type="number" min="0" step="0.01" value="0"></div></div><label>Комментарий</label><textarea id="appointmentNotes" rows="2" maxlength="500" placeholder="Пожелания клиента"></textarea><label for="appointmentPhotos">Прикрепить фото из галереи</label><input id="appointmentPhotos" type="file" accept="image/*" multiple><p class="photo-picker-help">До 3 фотографий к комментарию. Фото автоматически сжимаются.</p><div id="appointmentPhotoPreview" class="photo-preview-grid"></div><label><input id="appointmentPaid" type="checkbox" style="width:auto;margin-right:8px">Услуга уже оплачена</label><div class="row" style="margin-top:12px"><button class="btn primary fixed" type="submit">Сохранить запись</button><button class="btn fixed" type="button" id="cancelAppointment">Отмена</button></div></form></div>
@@ -1943,14 +1946,87 @@ const backgroundChoice=$('backgroundChoice');if(backgroundChoice)backgroundChoic
 $('masterCurrencyChoice').onchange=async()=>{if(activeRole!=='master')return;const currency=String($('masterCurrencyChoice').value||'RUB').toUpperCase();if(!CURRENCY_CODES.includes(currency))return;const nextProfiles={...profiles,master:{...(profiles.master||{}),currency}};if(persistProfilesSafely(nextProfiles)){refreshCurrencyLabels();renderAll();if(cloudReady()){if(!profiles.master?.cloudId){showAppToast('Валюта сохранена на этом устройстве, но не удалось найти облачный профиль мастера.');return}const synced=await syncMasterScheduleToCloud();if(!synced){showAppToast('Валюта сохранена на этом устройстве, но не удалось передать её клиентам.');return}}showAppToast(t('Валюта цен сохранена.'))}};
 $('accountEditForm').onsubmit=e=>{e.preventDefault();if(!activeRole)return;const old=profiles[activeRole]||{};profiles[activeRole]={...old,name:$('settingsName').value.trim(),phone:$('settingsPhone').value.trim(),country:$('settingsCountry').value.trim(),city:$('settingsCity').value.trim(),area:activeRole==='master'? $('settingsArea').value.trim():(old.area||''),address:activeRole==='master'? $('settingsAddress').value.trim():(old.address||''),specialty:activeRole==='master'? $('settingsSpecialty').value.trim():(old.specialty||'')};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));refreshRoleGreetings();renderProfileAvatar(activeRole);if(activeRole==='master')renderMasterReviews();if(activeRole==='client'){$('searchCountry').value=profiles.client.country;$('searchCity').value=profiles.client.city;renderMasterSearch()}syncCurrentProfile();alert(t('Данные аккаунта сохранены.'))};
 applyUiSettings();setLanguage(currentLanguage,false);
-function moveClientMonth(delta){if($('clientCalendarView')?.value==='week'){const d=new Date((clientSelectedDate||iso(new Date()))+'T12:00:00');d.setDate(d.getDate()+delta*7);clientSelectedDate=iso(d);clientCursor=new Date(d.getFullYear(),d.getMonth(),1)}else{clientCursor.setMonth(clientCursor.getMonth()+delta);clientSelectedDate=iso(new Date(clientCursor.getFullYear(),clientCursor.getMonth(),1))}renderClientCalendar()}
+// Calendar navigation uses a shared slide transition. On phones, the visible calendar follows the finger;
+// when the swipe completes, the old view leaves and the full next view enters from the opposite side.
+const calendarMotionState={master:{busy:false,cleanupTimer:0},client:{busy:false,cleanupTimer:0}};
+function calendarMotionElements(role){
+ if(role==='client'){
+  const titleRow=$('clientMonthTitle')?.parentElement,grid=$('clientCalendarGrid');
+  return [...new Set([titleRow,grid].filter(Boolean))];
+ }
+ const titleRow=$('monthTitle')?.parentElement,calendarPanel=$('calendarGrid')?.parentElement;
+ return [...new Set([titleRow,calendarPanel].filter(Boolean))];
+}
+function clearCalendarMotionStyles(elements){elements.forEach(el=>{el.style.transition='';el.style.transform='';el.style.opacity='';el.style.willChange='';})}
+function resetCalendarDrag(role){
+ const state=calendarMotionState[role];if(!state||state.busy)return;
+ clearTimeout(state.cleanupTimer);
+ const elements=calendarMotionElements(role);
+ elements.forEach(el=>{el.style.willChange='transform';el.style.transition='transform 180ms ease-out';el.style.transform='translateX(0px)';el.style.opacity='';});
+ state.cleanupTimer=setTimeout(()=>{if(!state.busy)clearCalendarMotionStyles(elements)},220);
+}
+function transitionCalendar(role,delta,update,startOffset=0){
+ const state=calendarMotionState[role];
+ if(!state||state.busy)return;
+ if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches){clearCalendarMotionStyles(calendarMotionElements(role));update();return;}
+ clearTimeout(state.cleanupTimer);
+ const elements=calendarMotionElements(role);if(!elements.length){update();return;}
+ state.busy=true;
+ const width=Math.ceil(Math.max(320,...elements.map(el=>el.getBoundingClientRect().width||0)));
+ const outX=delta>0?-width:width,inX=-outX,duration=240;
+ elements.forEach(el=>{el.style.willChange='transform';el.style.opacity='';if(!startOffset){el.style.transition='none';el.style.transform='translateX(0px)';}});
+ // Force the starting position to be painted before the outgoing transition.
+ elements.forEach(el=>void el.offsetWidth);
+ elements.forEach(el=>{el.style.transition=`transform ${duration}ms cubic-bezier(.22,.61,.36,1)`;el.style.transform=`translateX(${outX}px)`;});
+ setTimeout(()=>{
+  update();
+  elements.forEach(el=>{el.style.transition='none';el.style.transform=`translateX(${inX}px)`;el.style.opacity='';});
+  elements.forEach(el=>void el.offsetWidth);
+  requestAnimationFrame(()=>{
+   elements.forEach(el=>{el.style.transition=`transform ${duration}ms cubic-bezier(.22,.61,.36,1)`;el.style.transform='translateX(0px)';});
+   state.cleanupTimer=setTimeout(()=>{state.busy=false;clearCalendarMotionStyles(elements)},duration+35);
+  });
+ },duration+20);
+}
+function stepClientMonth(delta){if($('clientCalendarView')?.value==='week'){const d=new Date((clientSelectedDate||iso(new Date()))+'T12:00:00');d.setDate(d.getDate()+delta*7);clientSelectedDate=iso(d);clientCursor=new Date(d.getFullYear(),d.getMonth(),1)}else{clientCursor.setMonth(clientCursor.getMonth()+delta);clientSelectedDate=iso(new Date(clientCursor.getFullYear(),clientCursor.getMonth(),1))}renderClientCalendar()}
+function moveClientMonth(delta,startOffset=0){transitionCalendar('client',delta,()=>stepClientMonth(delta),startOffset)}
 $('clientCalendarView').onchange=()=>{if($('clientCalendarView').value==='week'){const d=new Date((clientSelectedDate||iso(new Date()))+'T12:00:00');clientCursor=new Date(d.getFullYear(),d.getMonth(),1)}renderClientCalendar()};
 $('clientPrev').onclick=()=>moveClientMonth(-1);
 $('clientNext').onclick=()=>moveClientMonth(1);
-// Touch-swipe month navigation for both account calendars.
-function enableCalendarSwipe(gridId,onSwipe){const grid=$(gridId);if(!grid||grid.dataset.swipeReady)return;grid.dataset.swipeReady='1';let sx=0,sy=0,tracking=false;grid.addEventListener('touchstart',e=>{if(!e.touches||e.touches.length!==1)return;sx=e.touches[0].clientX;sy=e.touches[0].clientY;tracking=true},{passive:true});grid.addEventListener('touchend',e=>{if(!tracking||!e.changedTouches||!e.changedTouches.length)return;tracking=false;const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.25)onSwipe(dx>0?1:-1)},{passive:true});}
-enableCalendarSwipe('calendarGrid',delta=>moveMasterMonth(-delta));
-enableCalendarSwipe('clientCalendarGrid',delta=>moveClientMonth(-delta));
+// The calendar grid listens for horizontal gestures and drags the complete calendar panel, not individual cells.
+function enableCalendarSwipe(gridId,role){
+ const grid=$(gridId);if(!grid||grid.dataset.swipeReady)return;grid.dataset.swipeReady='1';
+ let sx=0,sy=0,tracking=false,horizontal=false,lastDx=0;
+ grid.addEventListener('click',e=>{if(Date.now()<Number(grid.dataset.swipeSuppressUntil||0)){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation()}},true);
+ grid.addEventListener('touchstart',e=>{
+  if(calendarMotionState[role]?.busy||!e.touches||e.touches.length!==1)return;
+  const state=calendarMotionState[role];clearTimeout(state.cleanupTimer);
+  calendarMotionElements(role).forEach(el=>{el.style.transition='none';el.style.transform='translateX(0px)';el.style.opacity='';el.style.willChange='transform';});
+  sx=e.touches[0].clientX;sy=e.touches[0].clientY;lastDx=0;horizontal=false;tracking=true;
+ },{passive:true});
+ grid.addEventListener('touchmove',e=>{
+  if(!tracking||!e.touches||!e.touches.length)return;
+  const dx=e.touches[0].clientX-sx,dy=e.touches[0].clientY-sy;
+  if(!horizontal){
+   if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)*1.15)horizontal=true;
+   else if(Math.abs(dy)>10&&Math.abs(dy)>Math.abs(dx)*1.15){tracking=false;resetCalendarDrag(role);return;}
+  }
+  if(horizontal){lastDx=dx;e.preventDefault();const width=Math.max(320,grid.getBoundingClientRect().width||320);const opacity=1-Math.min(.12,Math.abs(dx)/width*.12);calendarMotionElements(role).forEach(el=>{el.style.transition='none';el.style.transform=`translateX(${dx}px)`;el.style.opacity=String(opacity)});}
+ },{passive:false});
+ grid.addEventListener('touchend',e=>{
+  if(!tracking)return;tracking=false;
+  const dx=lastDx||(e.changedTouches&&e.changedTouches.length?e.changedTouches[0].clientX-sx:0);
+  const dy=e.changedTouches&&e.changedTouches.length?e.changedTouches[0].clientY-sy:0;
+  if(horizontal&&Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.25){
+   grid.dataset.swipeSuppressUntil=String(Date.now()+700);
+   const delta=dx<0?1:-1;
+   if(role==='master')moveMasterMonth(delta,dx);else moveClientMonth(delta,dx);
+  }else resetCalendarDrag(role);
+ },{passive:true});
+ grid.addEventListener('touchcancel',()=>{tracking=false;resetCalendarDrag(role)},{passive:true});
+}
+enableCalendarSwipe('calendarGrid','master');
+enableCalendarSwipe('clientCalendarGrid','client');
 function nextAvailableDate(from){let d=new Date(from+'T12:00:00');for(let i=0;i<370;i++){const ds=iso(d);if(!isDayOff(ds))return ds;d.setDate(d.getDate()+1)}return ''}
 // Client calendar stays empty until a specific artist is explicitly selected.
 let selectedClientMasterKey='';
@@ -2005,10 +2081,11 @@ let migratedClientCards=false;
 data.appointments.forEach(a=>{const existed=data.clients.find(c=>(a.clientId&&c.id===a.clientId)||String(c.name||'').trim().toLocaleLowerCase()===String(a.name||'').trim().toLocaleLowerCase());const c=ensureClientCard({id:a.clientId||'',name:a.name||'',service:a.service||'',price:a.price??''});if(c&&!a.clientId){a.clientId=c.id;migratedClientCards=true}if(!existed&&c)migratedClientCards=true});
 if(migratedClientCards){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}}
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('hidden',x.id!==b.dataset.tab));renderAll()});
-function moveMasterMonth(delta){cursor.setMonth(cursor.getMonth()+delta);selectedDate=iso(new Date(cursor.getFullYear(),cursor.getMonth(),1));renderCalendar();renderAppointments()}
+function stepMasterMonth(delta){cursor.setMonth(cursor.getMonth()+delta);selectedDate=iso(new Date(cursor.getFullYear(),cursor.getMonth(),1));renderCalendar();renderAppointments()}
+function moveMasterMonth(delta,startOffset=0){transitionCalendar('master',delta,()=>stepMasterMonth(delta),startOffset)}
 $('prev').onclick=()=>moveMasterMonth(-1);
 $('next').onclick=()=>moveMasterMonth(1);
-$('todayBtn').onclick=()=>{cursor=new Date();cursor.setDate(1);selectedDate=iso(new Date());renderCalendar();renderAppointments()};
+$('todayBtn').onclick=()=>{const now=new Date(),sameMonth=cursor.getFullYear()===now.getFullYear()&&cursor.getMonth()===now.getMonth();if(sameMonth){cursor=new Date(now.getFullYear(),now.getMonth(),1);selectedDate=iso(now);renderCalendar();renderAppointments();return}const delta=new Date(now.getFullYear(),now.getMonth(),1)<new Date(cursor.getFullYear(),cursor.getMonth(),1)?-1:1;transitionCalendar('master',delta,()=>{cursor=new Date(now.getFullYear(),now.getMonth(),1);selectedDate=iso(now);renderCalendar();renderAppointments()})};
 $('view').onchange=renderCalendar;
 function attachMasterDayEvents(button,ds){
  let pressTimer=null,clickTimer=null,longPressed=false;
@@ -2396,13 +2473,13 @@ setInterval(checkMasterReminders,30000);
 </script>
 
 <script>
-/* Nailora v8.55: working Tetris game logic */
+/* Nailora v8.60: Tetris with automatic saving and resume after closing. */
 (()=>{
  const $=id=>document.getElementById(id);
  const dialog=$('nailoraTetrisDialog'), canvas=$('nailoraTetrisCanvas');
  if(!dialog||!canvas)return;
  const ctx=canvas.getContext('2d'); if(!ctx)return;
- const COLS=10, ROWS=20, SIZE=30;
+ const COLS=10, ROWS=20, SIZE=30, SAVE_KEY='nailoraTetrisProgress_v1';
  const SHAPES=[
   {m:[[1,1,1,1]],c:'#65d6ce'},
   {m:[[1,1],[1,1]],c:'#f4d35e'},
@@ -2412,33 +2489,56 @@ setInterval(checkMasterReminders,30000);
   {m:[[0,1,1],[1,1,0]],c:'#8bd17c'},
   {m:[[1,1,0],[0,1,1]],c:'#ff7f9f'}
  ];
- let board,piece,score=0,lines=0,best=0,running=false,paused=false,over=false,last=0,acc=0,raf=0;
+ let board=Array.from({length:ROWS},()=>Array(COLS).fill(0)),piece=null;
+ let score=0,lines=0,best=0,running=false,paused=false,over=false,last=0,acc=0,raf=0;
  try{best=Number(localStorage.getItem('nailoraTetrisBest')||0)||0}catch(_){}
  const overlay=$('nailoraTetrisOverlay'), overlayTitle=$('nailoraTetrisOverlayTitle'),overlayText=$('nailoraTetrisOverlayText');
  function overlayShow(title,text){overlayTitle.textContent=title;overlayText.textContent=text;overlay.classList.remove('hidden')}
  function overlayHide(){overlay.classList.add('hidden')}
  function stats(){ $('nailoraTetrisScore').textContent=score; $('nailoraTetrisLines').textContent=lines; $('nailoraTetrisBest').textContent=best; }
+ function saveGame(){
+  if(!Array.isArray(board)||board.length!==ROWS||!piece)return;
+  try{localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,board,piece,score,lines,over}))}catch(_){/* The current session can still continue if browser storage is unavailable. */}
+ }
+ function loadGame(){
+  let saved;try{saved=JSON.parse(localStorage.getItem(SAVE_KEY)||'null')}catch(_){return false}
+  if(!saved||saved.v!==1||!Array.isArray(saved.board)||saved.board.length!==ROWS||!saved.board.every(row=>Array.isArray(row)&&row.length===COLS)||!saved.piece||!Array.isArray(saved.piece.m)||!saved.piece.m.length)return false;
+  if(!saved.piece.m.every(row=>Array.isArray(row)&&row.every(v=>v===0||v===1))||!Number.isFinite(Number(saved.piece.x))||!Number.isFinite(Number(saved.piece.y)))return false;
+  board=saved.board.map(row=>row.map(cell=>typeof cell==='string'&&/^#[0-9a-f]{3,8}$/i.test(cell)?cell:0));
+  piece={m:saved.piece.m.map(row=>row.slice()),c:String(saved.piece.c||'#b388eb'),x:Number(saved.piece.x),y:Number(saved.piece.y)};
+  score=Math.max(0,Number(saved.score)||0);lines=Math.max(0,Number(saved.lines)||0);over=!!saved.over;running=false;paused=!over;acc=0;last=0;
+  if(over)overlayShow('Игра окончена','Нажми на поле, чтобы начать заново');
+  else overlayShow('Игра сохранена','Нажми на поле, чтобы продолжить');
+  return true;
+ }
+ function pauseAndSave(){
+  if(piece&&!over){running=false;paused=true;cancelAnimationFrame(raf);saveGame();if(dialog.open)overlayShow('Пауза сохранена','Нажми на поле, чтобы продолжить')}
+  else if(piece)saveGame();
+ }
  function randomPiece(){const s=SHAPES[Math.floor(Math.random()*SHAPES.length)],m=s.m.map(r=>r.slice());return {m,c:s.c,x:Math.floor((COLS-m[0].length)/2),y:0}}
  function collides(p,dx=0,dy=0,m=p.m){for(let y=0;y<m.length;y++)for(let x=0;x<m[y].length;x++)if(m[y][x]){const bx=p.x+x+dx,by=p.y+y+dy;if(bx<0||bx>=COLS||by>=ROWS||(by>=0&&board[by][bx]))return true}return false}
- function spawn(){piece=randomPiece();if(collides(piece)){running=false;paused=false;over=true;cancelAnimationFrame(raf);overlayShow('Игра окончена','Нажми на поле, чтобы начать заново');}}
+ function spawn(){piece=randomPiece();if(collides(piece)){running=false;paused=false;over=true;cancelAnimationFrame(raf);overlayShow('Игра окончена','Нажми на поле, чтобы начать заново')}saveGame()}
  function rotate(){const m=piece.m[0].map((_,i)=>piece.m.map(row=>row[i]).reverse());if(!collides(piece,0,0,m))piece.m=m}
- function lock(){piece.m.forEach((row,y)=>row.forEach((v,x)=>{if(v&&piece.y+y>=0)board[piece.y+y][piece.x+x]=piece.c}));let cleared=0;for(let y=ROWS-1;y>=0;y--)if(board[y].every(Boolean)){board.splice(y,1);board.unshift(Array(COLS).fill(0));cleared++;y++}if(cleared){lines+=cleared;score+=([0,100,300,500,800][cleared]||800);if(score>best){best=score;try{localStorage.setItem('nailoraTetrisBest',String(best))}catch(_){}}stats()}spawn()}
- function step(){if(!collides(piece,0,1))piece.y++;else lock()}
- function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#211a2d';ctx.fillRect(0,0,canvas.width,canvas.height);for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){if(board[y][x])cell(x,y,board[y][x]);else{ctx.strokeStyle='rgba(255,255,255,.07)';ctx.strokeRect(x*SIZE+.5,y*SIZE+.5,SIZE,SIZE)}}if(piece)piece.m.forEach((row,y)=>row.forEach((v,x)=>{if(v)cell(piece.x+x,piece.y+y,piece.c)}))}
+ function lock(){piece.m.forEach((row,y)=>row.forEach((v,x)=>{if(v&&piece.y+y>=0)board[piece.y+y][piece.x+x]=piece.c}));let cleared=0;for(let y=ROWS-1;y>=0;y--)if(board[y].every(Boolean)){board.splice(y,1);board.unshift(Array(COLS).fill(0));cleared++;y++}if(cleared){lines+=cleared;score+=([0,100,300,500,800][cleared]||800);if(score>best){best=score;try{localStorage.setItem('nailoraTetrisBest',String(best))}catch(_){}}stats()}spawn();saveGame()}
+ function step(){if(!collides(piece,0,1)){piece.y++;saveGame()}else lock()}
  function cell(x,y,color){ctx.fillStyle=color;ctx.fillRect(x*SIZE+1,y*SIZE+1,SIZE-2,SIZE-2);ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(x*SIZE+3,y*SIZE+3,SIZE-6,3)}
+ function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#211a2d';ctx.fillRect(0,0,canvas.width,canvas.height);for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){if(board[y][x])cell(x,y,board[y][x]);else{ctx.strokeStyle='rgba(255,255,255,.07)';ctx.strokeRect(x*SIZE+.5,y*SIZE+.5,SIZE,SIZE)}}if(piece)piece.m.forEach((row,y)=>row.forEach((v,x)=>{if(v)cell(piece.x+x,piece.y+y,piece.c)}))}
  function loop(ts){if(!running||paused)return;const dt=Math.min(100,ts-last||0);last=ts;acc+=dt;const speed=Math.max(90,650-Math.floor(lines/5)*45);while(acc>=speed){step();acc-=speed;if(!running)break}draw();if(running&&!paused)raf=requestAnimationFrame(loop)}
- function start(){cancelAnimationFrame(raf);board=Array.from({length:ROWS},()=>Array(COLS).fill(0));score=0;lines=0;running=true;paused=false;over=false;last=0;acc=0;spawn();stats();if(!over){overlayHide();draw();raf=requestAnimationFrame(loop)}}
- function togglePause(){if(!running&&!paused)return;if(!paused){paused=true;cancelAnimationFrame(raf);overlayShow('Пауза','Нажми на поле, чтобы продолжить')}else{paused=false;last=0;acc=0;overlayHide();raf=requestAnimationFrame(loop)}}
- function fieldTap(){if(!running){start();return}if(paused){togglePause();return}togglePause();}
- function act(a){if(!running||paused||!piece)return;if(a==='left'&&!collides(piece,-1,0))piece.x--;else if(a==='right'&&!collides(piece,1,0))piece.x++;else if(a==='down'){step();}else if(a==='rotate')rotate();else if(a==='drop'){while(!collides(piece,0,1)){piece.y++;score+=2}lock();stats()}draw()}
- $('openNailoraTetris')?.addEventListener('click',()=>{if(typeof dialog.showModal==='function'){if(!dialog.open)dialog.showModal()}else dialog.setAttribute('open','');draw();stats()});
- $('closeNailoraTetris')?.addEventListener('click',()=>{dialog.close?dialog.close():dialog.removeAttribute('open');running=false;paused=false;cancelAnimationFrame(raf)});
- const boardWrap=$('nailoraTetrisDialog').querySelector('.tetris-board-wrap');
+ function start(){cancelAnimationFrame(raf);board=Array.from({length:ROWS},()=>Array(COLS).fill(0));piece=null;score=0;lines=0;running=true;paused=false;over=false;last=0;acc=0;spawn();stats();saveGame();if(!over){overlayHide();draw();raf=requestAnimationFrame(loop)}}
+ function togglePause(){if(!running&&!paused)return;if(!paused){paused=true;cancelAnimationFrame(raf);saveGame();overlayShow('Пауза','Нажми на поле, чтобы продолжить')}else{running=true;paused=false;last=0;acc=0;saveGame();overlayHide();raf=requestAnimationFrame(loop)}}
+ function fieldTap(){if(!running){if(paused&&piece){togglePause();return}start();return}if(paused){togglePause();return}togglePause()}
+ function act(a){if(!running||paused||!piece)return;if(a==='left'&&!collides(piece,-1,0))piece.x--;else if(a==='right'&&!collides(piece,1,0))piece.x++;else if(a==='down')step();else if(a==='rotate')rotate();else if(a==='drop'){while(!collides(piece,0,1)){piece.y++;score+=2}lock();stats()}draw();saveGame()}
+ $('openNailoraTetris')?.addEventListener('click',()=>{if(typeof dialog.showModal==='function'){if(!dialog.open)dialog.showModal()}else dialog.setAttribute('open','');draw();stats();if(paused)overlayShow('Пауза сохранена','Нажми на поле, чтобы продолжить')});
+ $('closeNailoraTetris')?.addEventListener('click',()=>{pauseAndSave();dialog.close?dialog.close():dialog.removeAttribute('open')});
+ const boardWrap=dialog.querySelector('.tetris-board-wrap');
  boardWrap?.addEventListener('click',fieldTap);
- dialog.addEventListener('click',e=>{if(e.target===dialog){dialog.close();running=false;cancelAnimationFrame(raf)}});
+ dialog.addEventListener('click',e=>{if(e.target===dialog){pauseAndSave();dialog.close()}});
+ dialog.addEventListener('close',pauseAndSave);
+ window.addEventListener('pagehide',pauseAndSave);
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')pauseAndSave()});
  dialog.querySelectorAll('[data-tetris-action]').forEach(b=>{b.addEventListener('click',()=>act(b.dataset.tetrisAction));b.addEventListener('touchstart',e=>{e.preventDefault();act(b.dataset.tetrisAction)},{passive:false})});
  document.addEventListener('keydown',e=>{if(!dialog.open)return;const map={ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down',ArrowUp:'rotate',' ':'drop',p:'pause',P:'pause'};const a=map[e.key];if(a){e.preventDefault();if(a==='pause')togglePause();else act(a)}});
- stats();draw();
+ loadGame();stats();draw();
 })();
 </script>
 
