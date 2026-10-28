@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="ru">
 <head>
-<!-- Nailora v8.56: mobile Tetris fullscreen layout with no page/dialog scrolling. -->
+<!-- Nailora v8.57: tap-field start/pause/resume/restart and larger mobile controls. -->
 <!-- Nailora v8.55: fix Tetris launch, controls, scoring, pause, and restart. -->
 <!-- Nailora v8.54: add standalone Tetris mini-game to account settings; based on v8.53 mobile-hours fix. -->
-<!-- Nailora v8.53: fix monthly work-hours field overlap and overflow on mobile. -->
+<!-- Nailora v8.58: swipe calendars, preserve selected-day marker, and auto-scroll to daily schedule. -->
 <!-- Nailora v8.52: contain finance/date/time inputs on iPhone and align their values vertically. -->
 <!-- Nailora v8.48: label service prices as starting prices in the master list and client booking interface. -->
 <!-- Nailora v8.41: add all five visual themes to account settings and share persistent theme selection. -->
@@ -179,7 +179,7 @@ label{font-weight:650;letter-spacing:-.01em}
 .day.today:not(.off){outline:2px solid #8060a8;outline-offset:1px;background:#eee5f8;border-color:#cbb7e2;color:#50386d}
 .day.has:not(.today):not(.off){background:#f0e8f8;border-color:#d9c7e9;color:#5d4278}
 .day.off{background:#fff0ed!important;border-color:#f1c7be!important;color:#963f36}
-.day.selected{box-shadow:inset 0 0 0 2px #8060a8,0 4px 12px rgba(128,96,168,.13)}
+.day.selected{position:relative;box-shadow:inset 0 0 0 3px #8b5cf6,0 4px 12px rgba(128,96,168,.18);background-image:linear-gradient(135deg,rgba(139,92,246,.10),rgba(139,92,246,.03))}.day.selected::after{content:"✦";position:absolute;right:5px;top:3px;color:#8b5cf6;font-size:14px;font-weight:900;line-height:1;pointer-events:none}.day.selected .num{padding-right:12px}
 .day .num{font-size:14px;font-weight:800}
 .day small{font-weight:600}
 .schedule-row{border-radius:12px;padding:11px 13px;min-height:56px}
@@ -346,7 +346,9 @@ body.auth-pending #welcome,body.auth-pending #register,body.auth-pending #login,
 body.auth-pending::before{content:"Загружаю Nailora…";position:fixed;inset:0;z-index:20000;display:flex;align-items:center;justify-content:center;background:#f7f5fa;color:#71529a;font-size:18px;font-weight:700}
 
 .availability-intervals{display:flex;flex-direction:column;gap:8px;margin-top:12px}
-#calendarGrid .day{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+#calendarGrid .day,#clientCalendarGrid .day{touch-action:pan-y;-webkit-tap-highlight-color:transparent}
+#calendarGrid,#clientCalendarGrid{touch-action:pan-y;overscroll-behavior-x:contain}
+@media(max-width:600px){.day.selected::after{right:3px;top:2px;font-size:12px}.day.selected .num{padding-right:10px}}
 .availability-interval-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:end;padding:10px;border:1px solid var(--line,#e8e1f0);border-radius:12px;background:var(--panel,#fff)}
 .availability-interval-row label{font-size:12px;display:block;margin-bottom:4px}
 .availability-interval-row input{width:100%;min-width:0;box-sizing:border-box}
@@ -980,7 +982,7 @@ input,select,textarea{background:rgba(255,255,255,.72)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <style>
-#nailoraTetrisDialog{box-sizing:border-box;width:min(420px,calc(100% - 20px));max-width:calc(100vw - 20px);max-height:92vh;max-height:92dvh;overflow:auto;border:1px solid #e9e2ee;border-radius:18px;padding:0;background:var(--panel-bg,#fff);color:var(--text-color,#292433);box-shadow:0 20px 70px #20142e40;margin:auto}#nailoraTetrisDialog::backdrop{background:rgba(25,18,33,.62)}#nailoraTetrisDialog *{box-sizing:border-box;min-width:0}.tetris-body{display:flex;flex-direction:column;align-items:center;gap:12px}.tetris-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}.tetris-stat{background:var(--page-bg,#f7f5fa);border:1px solid var(--border-color,#e9e2ee);border-radius:12px;padding:8px;text-align:center;display:flex;flex-direction:column;gap:3px}.tetris-stat span{font-size:12px;color:var(--muted-color,#746b7c)}.tetris-stat strong{font-size:19px}.tetris-board-wrap{position:relative;width:min(100%,300px);margin:auto;border:2px solid #d7c4e8;border-radius:8px;overflow:hidden;background:#211a2d;line-height:0;touch-action:pan-y}.tetris-board-wrap canvas{display:block;width:100%;height:auto;aspect-ratio:1/2}.tetris-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:18px;background:rgba(28,20,39,.76);color:#fff;line-height:1.35}.tetris-overlay.hidden{display:none}.tetris-overlay strong{font-size:22px}.tetris-overlay span{font-size:14px}.tetris-actions{display:flex;gap:8px;width:100%}.tetris-actions button{flex:1}.tetris-controls{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;width:100%;max-width:340px}.tetris-controls button{min-height:46px;border:1px solid #d9c8e8;border-radius:12px;background:linear-gradient(145deg,#f9eafa,#eee5ff);color:#4b315d;font-size:25px;font-weight:700;touch-action:manipulation;user-select:none;-webkit-user-select:none}.tetris-controls button:active{transform:scale(.96);background:#e4d1f5}.tetris-help{margin:0;text-align:center;line-height:1.45}@media(max-height:760px){#nailoraTetrisDialog{max-height:96vh;max-height:96dvh}.tetris-board-wrap{width:min(100%,250px)}.tetris-controls button{min-height:40px}}
+#nailoraTetrisDialog{box-sizing:border-box;width:min(420px,calc(100% - 20px));max-width:calc(100vw - 20px);max-height:92vh;max-height:92dvh;overflow:auto;border:1px solid #e9e2ee;border-radius:18px;padding:0;background:var(--panel-bg,#fff);color:var(--text-color,#292433);box-shadow:0 20px 70px #20142e40;margin:auto}#nailoraTetrisDialog::backdrop{background:rgba(25,18,33,.62)}#nailoraTetrisDialog *{box-sizing:border-box;min-width:0}.tetris-body{display:flex;flex-direction:column;align-items:center;gap:12px}.tetris-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}.tetris-stat{background:var(--page-bg,#f7f5fa);border:1px solid var(--border-color,#e9e2ee);border-radius:12px;padding:8px;text-align:center;display:flex;flex-direction:column;gap:3px}.tetris-stat span{font-size:12px;color:var(--muted-color,#746b7c)}.tetris-stat strong{font-size:19px}.tetris-board-wrap{position:relative;width:min(100%,300px);margin:auto;border:2px solid #d7c4e8;border-radius:8px;overflow:hidden;background:#211a2d;line-height:0;touch-action:pan-y}.tetris-board-wrap canvas{display:block;width:100%;height:auto;aspect-ratio:1/2}.tetris-overlay{position:absolute;inset:0;display:flex;cursor:pointer;touch-action:manipulation;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:18px;background:rgba(28,20,39,.76);color:#fff;line-height:1.35}.tetris-overlay.hidden{display:none}.tetris-overlay strong{font-size:22px}.tetris-overlay span{font-size:14px}.tetris-actions{display:flex;gap:8px;width:100%}.tetris-actions button{flex:1}.tetris-controls{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;width:100%;max-width:340px}.tetris-controls button{min-height:46px;border:1px solid #d9c8e8;border-radius:12px;background:linear-gradient(145deg,#f9eafa,#eee5ff);color:#4b315d;font-size:25px;font-weight:700;touch-action:manipulation;user-select:none;-webkit-user-select:none}.tetris-controls button:active{transform:scale(.96);background:#e4d1f5}.tetris-help{margin:0;text-align:center;line-height:1.45}@media(max-height:760px){#nailoraTetrisDialog{max-height:96vh;max-height:96dvh}.tetris-board-wrap{width:min(100%,250px)}.tetris-controls button{min-height:40px}}
 /* Nailora v8.56: fit the complete Tetris interface inside the phone viewport. */
 @media(max-width:600px){
  #nailoraTetrisDialog{position:fixed;inset:0;margin:0;width:100vw;max-width:100vw;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh;border:0;border-radius:0;padding:0;overflow:hidden;display:none;flex-direction:column;box-shadow:none;overscroll-behavior:none}
@@ -997,18 +999,14 @@ input,select,textarea{background:rgba(255,255,255,.72)}
  #nailoraTetrisDialog .tetris-stat strong{font-size:15px;line-height:1.15}
  #nailoraTetrisDialog .tetris-board-wrap{flex:0 1 auto;width:min(100%,calc((100dvh - 205px)/2),300px);max-height:calc(100dvh - 205px);aspect-ratio:1/2;margin:0 auto}
  #nailoraTetrisDialog .tetris-board-wrap canvas{width:100%;height:100%;object-fit:fill;aspect-ratio:auto}
- #nailoraTetrisDialog .tetris-actions{flex:0 0 auto;gap:6px}
- #nailoraTetrisDialog .tetris-actions button{min-height:34px;padding:6px 10px;font-size:13px}
- #nailoraTetrisPause{display:none}
  #nailoraTetrisDialog .tetris-controls{flex:0 0 auto;gap:5px;width:100%;max-width:360px}
- #nailoraTetrisDialog .tetris-controls button{min-height:38px;padding:2px 0;font-size:22px;border-radius:9px}
+ #nailoraTetrisDialog .tetris-controls button{min-height:50px;padding:2px 0;font-size:29px;border-radius:11px}
  #nailoraTetrisDialog .tetris-help{display:none}
 }
 @media(max-width:600px) and (max-height:700px){
  #nailoraTetrisDialog .tetris-body{gap:3px;padding-top:3px}
- #nailoraTetrisDialog .tetris-board-wrap{width:min(100%,calc((100dvh - 174px)/2),260px);max-height:calc(100dvh - 174px)}
- #nailoraTetrisDialog .tetris-controls button{min-height:32px;font-size:20px}
- #nailoraTetrisDialog .tetris-actions button{min-height:30px;padding:4px 8px}
+ #nailoraTetrisDialog .tetris-board-wrap{width:min(100%,calc((100dvh - 205px)/2),260px);max-height:calc(100dvh - 205px)}
+ #nailoraTetrisDialog .tetris-controls button{min-height:44px;font-size:26px}
 }
 </style>
 </head>
@@ -1097,8 +1095,7 @@ input,select,textarea{background:rgba(255,255,255,.72)}
  <div class="dialog-head"><div><h2 id="nailoraTetrisTitle" style="margin:0">🎮 Тетрис Nailora</h2><p class="muted small" style="margin:5px 0 0">Собирай линии и побей свой рекорд</p></div><button type="button" class="btn fixed" id="closeNailoraTetris" aria-label="Закрыть игру">✕</button></div>
  <div class="dialog-body tetris-body">
   <div class="tetris-stats"><div class="tetris-stat"><span>Очки</span><strong id="nailoraTetrisScore">0</strong></div><div class="tetris-stat"><span>Линии</span><strong id="nailoraTetrisLines">0</strong></div><div class="tetris-stat"><span>Рекорд</span><strong id="nailoraTetrisBest">0</strong></div></div>
-  <div class="tetris-board-wrap"><canvas id="nailoraTetrisCanvas" width="300" height="600" aria-label="Игровое поле тетриса"></canvas><div id="nailoraTetrisOverlay" class="tetris-overlay"><strong id="nailoraTetrisOverlayTitle">Готов играть?</strong><span id="nailoraTetrisOverlayText">Нажми «Начать игру»</span></div></div>
-  <div class="tetris-actions"><button type="button" class="btn primary" id="nailoraTetrisStart">Начать игру</button><button type="button" class="btn" id="nailoraTetrisPause">Пауза</button></div>
+  <div class="tetris-board-wrap"><canvas id="nailoraTetrisCanvas" width="300" height="600" aria-label="Игровое поле тетриса"></canvas><div id="nailoraTetrisOverlay" class="tetris-overlay"><strong id="nailoraTetrisOverlayTitle">Готов играть?</strong><span id="nailoraTetrisOverlayText">Нажми на поле, чтобы начать</span></div></div>
   <div class="tetris-controls" aria-label="Управление тетрисом"><button type="button" data-tetris-action="left" aria-label="Влево">←</button><button type="button" data-tetris-action="rotate" aria-label="Повернуть фигуру">↻</button><button type="button" data-tetris-action="right" aria-label="Вправо">→</button><button type="button" data-tetris-action="down" aria-label="Ускорить падение">↓</button><button type="button" data-tetris-action="drop" aria-label="Сбросить фигуру вниз">⇊</button></div>
   <p class="muted small tetris-help">На компьютере: стрелки для движения, ↑ для поворота, пробел для сброса, P для паузы. На телефоне используй кнопки ниже.</p>
  </div>
@@ -1950,6 +1947,10 @@ function moveClientMonth(delta){if($('clientCalendarView')?.value==='week'){cons
 $('clientCalendarView').onchange=()=>{if($('clientCalendarView').value==='week'){const d=new Date((clientSelectedDate||iso(new Date()))+'T12:00:00');clientCursor=new Date(d.getFullYear(),d.getMonth(),1)}renderClientCalendar()};
 $('clientPrev').onclick=()=>moveClientMonth(-1);
 $('clientNext').onclick=()=>moveClientMonth(1);
+// Touch-swipe month navigation for both account calendars.
+function enableCalendarSwipe(gridId,onSwipe){const grid=$(gridId);if(!grid||grid.dataset.swipeReady)return;grid.dataset.swipeReady='1';let sx=0,sy=0,tracking=false;grid.addEventListener('touchstart',e=>{if(!e.touches||e.touches.length!==1)return;sx=e.touches[0].clientX;sy=e.touches[0].clientY;tracking=true},{passive:true});grid.addEventListener('touchend',e=>{if(!tracking||!e.changedTouches||!e.changedTouches.length)return;tracking=false;const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.25)onSwipe(dx>0?1:-1)},{passive:true});}
+enableCalendarSwipe('calendarGrid',delta=>moveMasterMonth(-delta));
+enableCalendarSwipe('clientCalendarGrid',delta=>moveClientMonth(-delta));
 function nextAvailableDate(from){let d=new Date(from+'T12:00:00');for(let i=0;i<370;i++){const ds=iso(d);if(!isDayOff(ds))return ds;d.setDate(d.getDate()+1)}return ''}
 // Client calendar stays empty until a specific artist is explicitly selected.
 let selectedClientMasterKey='';
@@ -2015,7 +2016,7 @@ function attachMasterDayEvents(button,ds){
  const cancelTimer=()=>{if(pressTimer){clearTimeout(pressTimer);pressTimer=null}};
  ['pointerup','pointerleave','pointercancel'].forEach(type=>button.addEventListener(type,cancelTimer));
  button.addEventListener('contextmenu',event=>event.preventDefault());
- button.onclick=event=>{if(longPressed){longPressed=false;return}if(clickTimer){clearTimeout(clickTimer);clickTimer=null;selectedDate=ds;cursor=new Date(ds+'T12:00:00');cursor.setDate(1);renderCalendar();renderAppointments();openAvailabilityEditor(ds);return}if(event.detail>=2){openAvailabilityEditor(ds);return}clickTimer=setTimeout(()=>{clickTimer=null;selectedDate=ds;cursor=new Date(ds+'T12:00:00');cursor.setDate(1);renderCalendar();renderAppointments()},550)};
+ button.onclick=event=>{if(longPressed){longPressed=false;return}if(clickTimer){clearTimeout(clickTimer);clickTimer=null;selectedDate=ds;cursor=new Date(ds+'T12:00:00');cursor.setDate(1);renderCalendar();renderAppointments();openAvailabilityEditor(ds);return}if(event.detail>=2){openAvailabilityEditor(ds);return}clickTimer=setTimeout(()=>{clickTimer=null;selectedDate=ds;cursor=new Date(ds+'T12:00:00');cursor.setDate(1);renderCalendar();renderAppointments();const target=$('daySchedule');if(target)target.scrollIntoView({behavior:'smooth',block:'start'})},260)};
 }
 function renderAvailabilityIntervalRows(intervals){const host=$('availabilityIntervals');if(!host)return;const items=normalizeAvailabilityIntervals(intervals);host.innerHTML='';(items.length?items:[]).forEach((x,i)=>{const row=document.createElement('div');row.className='availability-interval-row';row.innerHTML=`<div><label>Начало</label><input type="time" class="availability-start" value="${escapeHtml(x.start)}" required></div><div><label>Окончание</label><input type="time" class="availability-end" value="${escapeHtml(x.end)}" required></div><button type="button" class="btn danger remove-interval">Убрать</button>`;row.querySelector('.remove-interval').onclick=()=>{row.remove()};host.append(row)});if(!host.children.length){const row=document.createElement('div');row.className='availability-interval-row';row.innerHTML='<div><label>Начало</label><input type="time" class="availability-start" value="09:00" required></div><div><label>Окончание</label><input type="time" class="availability-end" value="12:00" required></div><button type="button" class="btn danger remove-interval">Убрать</button>';row.querySelector('.remove-interval').onclick=()=>row.remove();host.append(row)}}
 function openAvailabilityEditor(date){if(activeRole!=='master')return;editingAvailabilityDate=date;$('availabilityDialogDate').textContent=formatDate(new Date(date+'T12:00:00'));let windows;if(Object.prototype.hasOwnProperty.call(data.availabilityByDate||{},date))windows=normalizeAvailabilityIntervals(data.availabilityByDate[date]);else windows=masterAvailabilityIntervals(date,true);renderAvailabilityIntervalRows(windows);const dialog=$('availabilityDialog');if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');}
@@ -2110,7 +2111,7 @@ $('searchCountry').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventD
 $('searchCity').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();renderMasterSearch()}});
 $('resetMasterSearch').onclick=()=>{$('searchCountry').value=profiles.client?.country||'';$('searchCity').value=profiles.client?.city||profiles.client?.area||'';renderMasterSearch()};
 
-function selectClientScheduleDay(ds){if(!ds)return;clientSelectedDate=ds;clientCursor=new Date(ds+'T12:00:00');clientCursor.setDate(1);renderClientCalendar()}
+function selectClientScheduleDay(ds){if(!ds)return;clientSelectedDate=ds;clientCursor=new Date(ds+'T12:00:00');clientCursor.setDate(1);renderClientCalendar();const target=$('clientDaySchedule');if(target)target.scrollIntoView({behavior:'smooth',block:'start'})}
 function clientDayLabel(ds){const d=new Date(ds+'T12:00:00');return new Intl.DateTimeFormat(LOCALES[currentLanguage]||currentLanguage,{weekday:'short',day:'numeric',month:'short'}).format(d)}
 function renderClientCalendar(){
  const grid=$('clientCalendarGrid');if(!grid)return;grid.innerHTML='';
@@ -2419,7 +2420,7 @@ setInterval(checkMasterReminders,30000);
  function stats(){ $('nailoraTetrisScore').textContent=score; $('nailoraTetrisLines').textContent=lines; $('nailoraTetrisBest').textContent=best; }
  function randomPiece(){const s=SHAPES[Math.floor(Math.random()*SHAPES.length)],m=s.m.map(r=>r.slice());return {m,c:s.c,x:Math.floor((COLS-m[0].length)/2),y:0}}
  function collides(p,dx=0,dy=0,m=p.m){for(let y=0;y<m.length;y++)for(let x=0;x<m[y].length;x++)if(m[y][x]){const bx=p.x+x+dx,by=p.y+y+dy;if(bx<0||bx>=COLS||by>=ROWS||(by>=0&&board[by][bx]))return true}return false}
- function spawn(){piece=randomPiece();if(collides(piece)){running=false;over=true;overlayShow('Игра окончена','Нажми «Начать игру», чтобы сыграть ещё раз');}}
+ function spawn(){piece=randomPiece();if(collides(piece)){running=false;paused=false;over=true;cancelAnimationFrame(raf);overlayShow('Игра окончена','Нажми на поле, чтобы начать заново');}}
  function rotate(){const m=piece.m[0].map((_,i)=>piece.m.map(row=>row[i]).reverse());if(!collides(piece,0,0,m))piece.m=m}
  function lock(){piece.m.forEach((row,y)=>row.forEach((v,x)=>{if(v&&piece.y+y>=0)board[piece.y+y][piece.x+x]=piece.c}));let cleared=0;for(let y=ROWS-1;y>=0;y--)if(board[y].every(Boolean)){board.splice(y,1);board.unshift(Array(COLS).fill(0));cleared++;y++}if(cleared){lines+=cleared;score+=([0,100,300,500,800][cleared]||800);if(score>best){best=score;try{localStorage.setItem('nailoraTetrisBest',String(best))}catch(_){}}stats()}spawn()}
  function step(){if(!collides(piece,0,1))piece.y++;else lock()}
@@ -2427,12 +2428,13 @@ setInterval(checkMasterReminders,30000);
  function cell(x,y,color){ctx.fillStyle=color;ctx.fillRect(x*SIZE+1,y*SIZE+1,SIZE-2,SIZE-2);ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(x*SIZE+3,y*SIZE+3,SIZE-6,3)}
  function loop(ts){if(!running||paused)return;const dt=Math.min(100,ts-last||0);last=ts;acc+=dt;const speed=Math.max(90,650-Math.floor(lines/5)*45);while(acc>=speed){step();acc-=speed;if(!running)break}draw();if(running&&!paused)raf=requestAnimationFrame(loop)}
  function start(){cancelAnimationFrame(raf);board=Array.from({length:ROWS},()=>Array(COLS).fill(0));score=0;lines=0;running=true;paused=false;over=false;last=0;acc=0;spawn();stats();if(!over){overlayHide();draw();raf=requestAnimationFrame(loop)}}
- function togglePause(){if(!running&& !paused)return;if(!paused){paused=true;cancelAnimationFrame(raf);overlayShow('Пауза','Нажми «Пауза» ещё раз, чтобы продолжить')}else{paused=false;last=0;acc=0;overlayHide();raf=requestAnimationFrame(loop)}}
+ function togglePause(){if(!running&&!paused)return;if(!paused){paused=true;cancelAnimationFrame(raf);overlayShow('Пауза','Нажми на поле, чтобы продолжить')}else{paused=false;last=0;acc=0;overlayHide();raf=requestAnimationFrame(loop)}}
+ function fieldTap(){if(!running){start();return}if(paused){togglePause();return}togglePause();}
  function act(a){if(!running||paused||!piece)return;if(a==='left'&&!collides(piece,-1,0))piece.x--;else if(a==='right'&&!collides(piece,1,0))piece.x++;else if(a==='down'){step();}else if(a==='rotate')rotate();else if(a==='drop'){while(!collides(piece,0,1)){piece.y++;score+=2}lock();stats()}draw()}
  $('openNailoraTetris')?.addEventListener('click',()=>{if(typeof dialog.showModal==='function'){if(!dialog.open)dialog.showModal()}else dialog.setAttribute('open','');draw();stats()});
  $('closeNailoraTetris')?.addEventListener('click',()=>{dialog.close?dialog.close():dialog.removeAttribute('open');running=false;paused=false;cancelAnimationFrame(raf)});
- $('nailoraTetrisStart')?.addEventListener('click',start);
- $('nailoraTetrisPause')?.addEventListener('click',togglePause);
+ const boardWrap=$('nailoraTetrisDialog').querySelector('.tetris-board-wrap');
+ boardWrap?.addEventListener('click',fieldTap);
  dialog.addEventListener('click',e=>{if(e.target===dialog){dialog.close();running=false;cancelAnimationFrame(raf)}});
  dialog.querySelectorAll('[data-tetris-action]').forEach(b=>{b.addEventListener('click',()=>act(b.dataset.tetrisAction));b.addEventListener('touchstart',e=>{e.preventDefault();act(b.dataset.tetrisAction)},{passive:false})});
  document.addEventListener('keydown',e=>{if(!dialog.open)return;const map={ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down',ArrowUp:'rotate',' ':'drop',p:'pause',P:'pause'};const a=map[e.key];if(a){e.preventDefault();if(a==='pause')togglePause();else act(a)}});
