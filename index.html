@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ru">
 <head>
+<!-- Working copy based on Nailora v8.64. -->
 <!-- Nailora v8.64: revert calendar gesture/animation experiments; change months using arrows only. -->
 <!-- Nailora v8.60: save Tetris progress and resume after closing the game or reopening Nailora. -->
 <!-- Nailora v8.57: tap-field start/pause/resume/restart and larger mobile controls. -->
@@ -982,6 +983,18 @@ input,select,textarea{background:rgba(255,255,255,.72)}
 <!-- Nailora v8.16: normalize iPhone date/time controls in the master appointment form. -->
 <!-- Nailora v8.15: show service price alongside duration in the client booking dialog. -->
 <!-- Nailora v8.10: dashboard client-card count widget removed; client-management tab retained. -->
+<!-- Nailora v8.65: show a retry screen if a blocking CDN script stalls page parsing. -->
+<style>
+html.nailora-load-timeout::before{content:"Nailora загружается дольше обычного.\A\AНажми здесь, чтобы попробовать снова.";white-space:pre-line;position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;text-align:center;padding:28px;background:#f7f5fa;color:#71529a;font:700 18px/1.6 system-ui,-apple-system,sans-serif;cursor:pointer}
+</style>
+<script>
+(function(){
+  var timer=window.setTimeout(function(){document.documentElement.classList.add('nailora-load-timeout')},12000);
+  window.__nailoraClearLoadGuard=function(){window.clearTimeout(timer);document.documentElement.classList.remove('nailora-load-timeout')};
+  document.addEventListener('click',function(){if(document.documentElement.classList.contains('nailora-load-timeout'))window.location.reload()});
+  window.addEventListener('pageshow',function(){document.documentElement.classList.remove('nailora-load-timeout')});
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <style>
@@ -1014,6 +1027,7 @@ input,select,textarea{background:rgba(255,255,255,.72)}
 </style>
 </head>
 <body class="auth-pending">
+<script>window.__nailoraClearLoadGuard&&window.__nailoraClearLoadGuard();</script>
 <section id="welcome" class="wrap" style="max-width:760px;padding-top:8vh">
  <div class="panel" style="padding:28px">
   <h1 style="font-size:28px">Nailora 💅</h1><p class="muted">Выбери свой тип аккаунта</p>
