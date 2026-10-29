@@ -1637,21 +1637,24 @@ function isPasswordRecoveryCallback(){try{const query=new URLSearchParams(window
 function cloudReady(){return !!(cloud&&cloudUser&&profiles[activeRole]?.cloudId)}
 function setCloudStatus(message){const el=$('cloudStatus');if(el)el.textContent=message}
 function profileFromCloudRow(role,row){return {name:row.name||'',phone:row.phone||'',country:row.country||'',city:row.city||'',area:row.area||'',address:row.address||'',specialty:row.specialty||'',avatar:row.avatar_url||profiles[role]?.avatar||'',avatarUrl:row.avatar_url||profiles[role]?.avatarUrl||'',email:row.email||cloudUser?.email||'',cloudId:row.id,profileId:row.id,authUserId:row.auth_user_id,language:currentLanguage,...(role==='master'?{currency:profiles.master?.currency||'RUB'}:{})}}
-async function ensureCloudProfile(role, profile, user=cloudUser){if(!cloud||!user)throw new Error('Сначала войди в аккаунт Supabase.');const table=role==='master'?'masters':'clients';const row={auth_user_id:user.id,email:user.email||profile.email||null,name:profile.name||'',phone:profile.phone||'',country:profile.country||'',city:profile.city||'',area:role==='master'?(profile.area||''):null,address:role==='master'?(profile.address||''):null,specialty:role==='master'?(profile.specialty||''):null,...(role==='master'?{timezone_name:(Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC')}:{}),avatar_url:(typeof profile.avatar==='string'&&/^https:\/\//i.test(profile.avatar)?profile.avatar.split('?')[0]:(profile.avatarUrl||null)),updated_at:new Date().toISOString()};const {data:rows,error}=await cloud.from(table).upsert(row,{onConflict:'auth_user_id'}).select('*');if(error)throw error;const saved=Array.isArray(rows)?rows[0]:rows;if(!saved?.id)throw new Error('Supabase не вернул ID профиля.');profiles[role]={...profile,...profileFromCloudRow(role,saved),email:user.email||profile.email};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));return profiles[role]}
+async function ensureCloudProfile(role, profile, user=cloudUser){if(!cloud||!user)throw new Error('Сначала войди в аккаунт Supabase.');const table=role==='master'?'masters':'clients';const row={auth_user_id:user.id,email:user.email||profile.email||null,name:profile.name||'',phone:profile.phone||'',country:profile.country||'',city:profile.city||'',area:role==='master'?(profile.area||''):null,address:role==='master'?(profile.address||''):null,specialty:role==='master'?(profile.specialty||''):null,timezone_name:(Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'),avatar_url:(typeof profile.avatar==='string'&&/^https:\/\//i.test(profile.avatar)?profile.avatar.split('?')[0]:(profile.avatarUrl||null)),updated_at:new Date().toISOString()};const {data:rows,error}=await cloud.from(table).upsert(row,{onConflict:'auth_user_id'}).select('*');if(error)throw error;const saved=Array.isArray(rows)?rows[0]:rows;if(!saved?.id)throw new Error('Supabase не вернул ID профиля.');profiles[role]={...profile,...profileFromCloudRow(role,saved),email:user.email||profile.email};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));return profiles[role]}
 async function syncCurrentProfile(){if(!cloud||!cloudUser||!activeRole||!profiles[activeRole])return;try{await ensureCloudProfile(activeRole,profiles[activeRole]);setCloudStatus('Подключено · '+(cloudUser.email||'аккаунт'));}catch(err){console.error(err);showAppToast('Профиль сохранён в браузере, но не синхронизирован: '+(err.message||'ошибка Supabase'));}}
-// Store the current master's IANA time zone on the server whenever the master app is opened.
-// The SQL notification trigger formats push text from public.masters.timezone_name.
-async function syncMasterTimezoneToCloud(){
- if(!cloud||!cloudUser||!profiles.master?.cloudId)return false;
+// Store each account's IANA time zone on the server when that role is opened.
+// Appointment notifications use the master's zone for master alerts and the client's zone for client alerts.
+async function syncRoleTimezoneToCloud(role=activeRole){
+ if(!cloud||!cloudUser||!['master','client'].includes(role)||!profiles[role]?.cloudId)return false;
+ const table=role==='master'?'masters':'clients';
  const timezoneName=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
- const {data:updated,error}=await cloud.from('masters').update({timezone_name:timezoneName,updated_at:new Date().toISOString()})
+ const {data:updated,error}=await cloud.from(table).update({timezone_name:timezoneName,updated_at:new Date().toISOString()})
   .eq('auth_user_id',cloudUser.id).select('id,timezone_name').maybeSingle();
  if(error)throw error;
- if(!updated)throw new Error('Не удалось подтвердить сохранение часового пояса мастера в Supabase.');
- profiles.master={...profiles.master,timezoneName};
+ if(!updated)throw new Error('Не удалось подтвердить сохранение часового пояса пользователя в Supabase.');
+ profiles[role]={...profiles[role],timezoneName};
  try{localStorage.setItem(ROLE_KEY,JSON.stringify(profiles))}catch(_){}
  return timezoneName;
 }
+async function syncMasterTimezoneToCloud(){return syncRoleTimezoneToCloud('master')}
+async function syncClientTimezoneToCloud(){return syncRoleTimezoneToCloud('client')}
 async function loginWithSupabase(email,password,role){
  if(!cloud)throw new Error('Библиотека Supabase не загрузилась. Проверь интернет и перезагрузи страницу.');
  try{
@@ -1865,7 +1868,7 @@ async function bootCloudAuth(){
       row={id:savedProfile.cloudId,auth_user_id:uid,name:savedProfile.name,phone:savedProfile.phone,country:savedProfile.country,city:savedProfile.city,area:savedProfile.area,address:savedProfile.address,specialty:savedProfile.specialty,email:cloudUser.email,avatar_url:savedProfile.avatarUrl||savedProfile.avatar||null};
     }
     profiles[role]={...profiles[role],...profileFromCloudRow(role,row),email:cloudUser.email};
-    if(role==='master'){const timezoneName=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';const {error:timezoneError}=await cloud.from('masters').update({timezone_name:timezoneName}).eq('auth_user_id',uid);if(timezoneError)console.warn('Master timezone sync failed:',timezoneError.message);}
+    {const timezoneName=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';const timezoneTable=role==='master'?'masters':'clients';const {error:timezoneError}=await cloud.from(timezoneTable).update({timezone_name:timezoneName}).eq('auth_user_id',uid);if(timezoneError)console.warn('Account timezone sync failed:',timezoneError.message);}
     localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));
     activeRole=role;
     clearPendingVerification();
@@ -1885,7 +1888,7 @@ async function bootCloudAuth(){
 }
 
 cloud?.auth.onAuthStateChange((event,session)=>{cloudUser=session?.user||null;if(event==='PASSWORD_RECOVERY'){sessionStorage.setItem('nailoraPasswordRecoveryActive','1');chosenRole=selectedEntryRole||'client';$('resetEmail').value=cloudUser?.email||$('loginEmail').value||'';$('requestPasswordReset').classList.add('hidden');$('setNewPassword').classList.remove('hidden');$('newPasswordStatus').textContent='Ссылка действительна. Задай новый пароль.';showOnly('resetPassword');return}if(!cloudUser){setCloudStatus('Не выполнен вход в Supabase');if(cloudPollTimer)clearInterval(cloudPollTimer)}else setCloudStatus('Сессия Supabase активна · '+(cloudUser.email||''))});bootCloudAuth();
-async function openRole(role){activeRole=role;chosenRole=role;try{localStorage.setItem(ACTIVE_ROLE_KEY,role)}catch(_){}if(role==='master'&&cloudReady()){try{await syncMasterTimezoneToCloud()}catch(timezoneSyncError){console.warn('Master time-zone sync failed:',timezoneSyncError);showAppToast('Не удалось обновить часовой пояс на сервере. Проверь соединение и войди в аккаунт мастера ещё раз.')}}if(role==='client'){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange=''}setLanguage(profiles[role]?.language||currentLanguage);renderProfileAvatar(role);refreshRoleGreetings();if(role==='client')getClientProfileId(true);if(role==='master'){showOnly('masterApp');renderMasterReviews();$('masterApp').scrollIntoView({block:'start'});checkMasterReminders();if(cloudReady())await refreshCloudDataForRole('master');return}showOnly('clientApp');$('searchCountry').value=profiles.client?.country||'';$('searchCity').value=profiles.client?.city||profiles.client?.area||'';renderMasterSearch();renderClientCalendar()}
+async function openRole(role){activeRole=role;chosenRole=role;try{localStorage.setItem(ACTIVE_ROLE_KEY,role)}catch(_){}if((role==='master'||role==='client')&&cloudReady()){try{await syncRoleTimezoneToCloud(role)}catch(timezoneSyncError){console.warn('Account time-zone sync failed:',timezoneSyncError);showAppToast('Не удалось обновить часовой пояс на сервере. Проверь соединение и войди в аккаунт ещё раз.')}}if(role==='client'){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange=''}setLanguage(profiles[role]?.language||currentLanguage);renderProfileAvatar(role);refreshRoleGreetings();if(role==='client')getClientProfileId(true);if(role==='master'){showOnly('masterApp');renderMasterReviews();$('masterApp').scrollIntoView({block:'start'});checkMasterReminders();if(cloudReady())await refreshCloudDataForRole('master');return}showOnly('clientApp');$('searchCountry').value=profiles.client?.country||'';$('searchCity').value=profiles.client?.city||profiles.client?.area||'';renderMasterSearch();renderClientCalendar()}
 async function logout(){
  if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=null;
  if($('settingsDialog').open)$('settingsDialog').close();
