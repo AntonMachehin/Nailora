@@ -32,7 +32,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<title>Nailora v8.66 · календарь по стрелкам · Web Push</title>
+<title>Nailora v8.69 · поддержка · Web Push</title>
 <style>
 :root{font-family:Manrope,"Segoe UI",Arial,sans-serif;color:#292433;background:#f7f5fa}*{box-sizing:border-box}body{margin:0}header{background:#fff;padding:18px 22px;border-bottom:1px solid #e8e2ef}h1{font-size:22px;margin:0 0 6px}header p{margin:0;color:#766d80;font-size:14px}.wrap{max-width:1100px;margin:0 auto;padding:18px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tabs button,.btn{border:0;border-radius:10px;padding:10px 14px;background:#e9e2f1;color:#342742;cursor:pointer;font-weight:600}.tabs button.active,.btn.primary{background:#71529a;color:#fff}.panel{background:white;border:1px solid #e9e3ee;border-radius:14px;padding:16px;margin-bottom:16px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:1}.row .fixed{flex:0 0 auto}input,select,textarea{width:100%;padding:10px;border:1px solid #d9d1e1;border-radius:8px;font:inherit;background:#fff}label{display:block;font-size:13px;color:#655b70;margin:8px 0 5px}
 .password-field{position:relative;width:100%}.password-field input{padding-right:48px}.password-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);padding:5px 9px;min-width:36px;border:0!important;background:transparent!important;color:#655b70!important;box-shadow:none!important;filter:none!important;font-size:18px;line-height:1;cursor:pointer}.password-toggle svg{display:block;width:20px;height:20px}.password-toggle:hover{box-shadow:none!important;filter:none!important}.password-toggle:focus-visible{outline:2px solid #71529a;outline-offset:1px;border-radius:6px}.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.day{min-height:75px;border:1px solid #e5dfeb;border-radius:8px;padding:7px;background:#fff;text-align:left;cursor:pointer;touch-action:pan-y;user-select:none;-webkit-user-select:none}.day.today{outline:2px solid #2563eb;outline-offset:1px}.day.today:not(.off){background:#dbeafe;border-color:#2563eb;color:#1e3a8a}.day.has:not(.today):not(.off){background:#dcfce7;border-color:#22c55e;color:#14532d}.day.off{background:#fee2e2!important;border-color:#ef4444!important;color:#991b1b}.day.today.off{outline:3px solid #2563eb}.day.selected{box-shadow:inset 0 0 0 2px #8b5cf6}.day:disabled{opacity:1;cursor:not-allowed}.day .num{font-weight:bold}.day small{display:block;margin-top:5px;color:inherit;font-size:11px}.day .day-legend{display:block;font-size:10px;margin-top:3px;color:inherit}.muted{color:#786e80;font-size:14px}.card{border:1px solid #e9e2ee;border-radius:10px;padding:12px;margin:8px 0}.card h3{margin:0 0 6px;font-size:16px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:#f5f0fa;border-radius:10px;padding:13px}.stat strong{display:block;font-size:21px;margin-top:5px}.verify-panel{max-width:650px;margin:0 auto;text-align:center;padding:clamp(20px,4vw,30px)!important}.verify-mark{width:58px;height:58px;display:grid;place-items:center;margin:0 auto 12px;border-radius:20px;background:#f0e9f8;color:#7955a6;font-size:28px;box-shadow:inset 0 0 0 1px #e5d8f2}.verify-title{margin:0 0 8px;color:#4e3c62;font-size:clamp(22px,4vw,28px);line-height:1.25}.verify-subtitle{color:#74677f;line-height:1.6;margin:0 auto 16px;max-width:480px}.verify-intro{font-size:1rem;font-weight:600;color:#4e3c62;background:#f7f3fb;border:1px solid #e9dff3;padding:12px 15px;border-radius:12px;line-height:1.6;margin:0 0 14px}.verify-steps{list-style:none;counter-reset:verify-step;text-align:left;margin:14px 0;padding:0;display:grid;gap:10px;line-height:1.5;font-size:1rem;font-weight:500;color:#40354d}.verify-steps li{counter-increment:verify-step;position:relative;padding:13px 14px 13px 54px;background:#fbf9fd;border:1px solid #eee6f5;border-radius:12px;min-height:52px}.verify-steps li::before{content:counter(verify-step);position:absolute;left:13px;top:13px;width:28px;height:28px;display:grid;place-items:center;border-radius:50%;background:#e9def5;color:#684a8d;font-size:14px;font-weight:800}.verify-steps li strong{display:block;font-weight:750;color:#4e3c62}.verify-steps li span{display:block;margin-top:3px;color:#796e84;font-size:.92rem;font-weight:400}.verify-note{margin:14px 0 10px;padding:13px 15px;border-radius:12px;background:#f0f7f3;border:1px solid #dcece2;color:#476554;font-size:.95rem;line-height:1.55}.verify-help{margin-top:12px;color:#82798a;line-height:1.55}.link-button{border:0;background:transparent;color:#79658d;text-decoration:underline;text-underline-offset:3px;padding:5px 8px;font:inherit;font-size:13px;cursor:pointer;border-radius:7px}.link-button:hover{background:#f4eef8}.link-button:focus-visible{outline:2px solid #9a80b7;outline-offset:2px}@media(max-width:600px){.verify-panel{padding:20px 15px!important}.verify-steps li{padding:12px 12px 12px 50px}.verify-steps li::before{left:11px;top:12px}}.hidden{display:none!important}.danger{background:#f9e8e8;color:#8d2525}.small{font-size:12px}@media(max-width:600px){.wrap{padding:10px}.grid{gap:3px}.day{min-height:62px;padding:4px}.day small{font-size:9px}.stats{grid-template-columns:1fr}.dayname{font-size:11px;text-align:center}}
@@ -975,6 +975,33 @@ input,select,textarea{background:rgba(255,255,255,.72)}
   }
 }
 
+
+
+/* Nailora v8.69: private support ticket history */
+#nailoraSupportDialog .support-ticket-list{display:grid;gap:10px;margin-top:16px}
+#nailoraSupportDialog .support-ticket-card{border:1px solid var(--border-color,#e9e2ee);border-radius:12px;padding:12px;background:var(--panel-bg,#fff);min-width:0}
+#nailoraSupportDialog .support-ticket-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap}
+#nailoraSupportDialog .support-ticket-status{border-radius:999px;padding:3px 8px;font-size:11px;background:var(--soft-bg,#f2edf7);white-space:nowrap}
+#nailoraSupportDialog .support-ticket-message{margin:8px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+#nailoraSupportDialog .support-ticket-reply{margin-top:10px;padding:10px;border-radius:9px;background:var(--soft-bg,#f7f3fb);white-space:pre-wrap;overflow-wrap:anywhere}
+#nailoraSupportDialog .support-ticket-meta{font-size:11px;color:var(--muted-color,#786e80)}
+body[data-theme="dark"] #nailoraSupportDialog .support-ticket-card{background:var(--panel-bg);border-color:var(--border-color)}
+
+/* Nailora v8.69: Support ticket dialog and history */
+#nailoraSupportDialog{width:min(560px,calc(100% - 24px));max-height:88vh;max-height:88dvh;overflow:auto;border:1px solid #e9e2ee;border-radius:20px;padding:0;background:var(--panel-bg,#fff);color:var(--text-color,#292433);box-shadow:0 24px 80px rgba(33,22,45,.24)}
+#nailoraSupportDialog::backdrop{background:rgba(25,18,33,.58)}
+#nailoraSupportDialog .support-hero{display:flex;align-items:center;gap:13px;padding:18px 20px;background:linear-gradient(135deg,#f4eafe,#fff2f5);border-bottom:1px solid #eadff2}
+#nailoraSupportDialog .support-hero-icon{width:48px;height:48px;flex:0 0 48px;display:grid;place-items:center;border-radius:16px;background:#fff;color:#71529a;font-size:24px;box-shadow:0 4px 15px rgba(90,56,120,.12)}
+#nailoraSupportDialog .support-body{padding:18px 20px 20px}
+#nailoraSupportDialog .support-note{display:flex;gap:10px;margin:14px 0;padding:12px 13px;border-radius:12px;background:var(--soft-bg,#f7f3fb);color:var(--muted-color,#6f657a);font-size:12px;line-height:1.5}
+#nailoraSupportDialog .support-note span:first-child{font-size:17px;line-height:1.2}
+#nailoraSupportDialog textarea{min-height:140px;resize:vertical}
+#nailoraSupportDialog .support-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+#nailoraSupportDialog .support-actions .btn{flex:1 1 155px}
+#nailoraSupportDialog .support-status{min-height:18px;margin:10px 0 0;line-height:1.45}
+#openNailoraSupport{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:46px}
+#openNailoraSupport .support-button-icon{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;background:rgba(255,255,255,.18);font-size:17px}
+@media(max-width:480px){#nailoraSupportDialog .support-hero{padding:15px}#nailoraSupportDialog .support-body{padding:15px}#nailoraSupportDialog .support-actions{display:grid;grid-template-columns:1fr}}
 </style>
 <!-- Nailora v8.27: show only “Свободно” on client available time rows; keep duration internally for booking validation. -->
 <!-- Nailora v8.25: restore master-specific schedule from Supabase before display; show busy bookings even when work intervals are missing. -->
@@ -1106,12 +1133,33 @@ html.nailora-load-timeout::before{content:"Nailora загружается дол
    </div>
    <p id="pushNotificationsStatus" class="muted small" role="status" aria-live="polite" style="margin:8px 0 0">Push-уведомления пока не включены на этом устройстве.</p>
   </section>
+  <section class="settings-section" id="nailoraSupportSettings"><h3>💬 Поддержка</h3><p class="muted small">Есть вопрос, заметил ошибку или хочешь предложить улучшение? Подготовь обращение в поддержку Nailora.</p><button type="button" class="btn primary" id="openNailoraSupport"><span class="support-button-icon" aria-hidden="true">✉</span><span>Открыть поддержку</span></button></section>
   <section class="settings-section"><h3>Поделиться Nailora</h3><p class="muted small">Покажи QR-код клиенту или отправь ссылку на Nailora через мессенджер.</p><button type="button" class="btn primary" id="openShareNailora">Поделиться Nailora</button></section>
   <section class="settings-section"><h3>🎮 Мини-игры</h3><p class="muted small">Немного развлечения, пока ждёшь свою запись.</p><button type="button" class="btn primary" id="openNailoraTetris">Играть в тетрис</button></section>
   <section class="settings-section"><h3>Язык интерфейса</h3><label for="settingsLanguageChoice">Язык этого аккаунта</label><select id="settingsLanguageChoice" aria-label="Язык этого аккаунта"></select></section>
   <section class="settings-section"><h3>Оформление Nailora</h3><div class="theme-picker" id="settingsThemePicker" style="margin-top:10px"><p class="muted small">Выбери одну из пяти тем. Она сразу применится и сохранится в этом браузере.</p><div class="theme-options" role="group" aria-label="Тема приложения"><button class="theme-choice" type="button" data-theme-choice="flower" aria-pressed="false"><span class="theme-swatch flower"></span>Цветочный шёлк</button><button class="theme-choice" type="button" data-theme-choice="lavender" aria-pressed="false"><span class="theme-swatch lavender"></span>Лавандовый туман</button><button class="theme-choice" type="button" data-theme-choice="mist" aria-pressed="false"><span class="theme-swatch mist"></span>Цветная дымка</button><button class="theme-choice" type="button" data-theme-choice="mint" aria-pressed="false"><span class="theme-swatch mint"></span>Мятный сад</button><button class="theme-choice" type="button" data-theme-choice="nude" aria-pressed="false"><span class="theme-swatch nude"></span>Нюдовый люкс</button></div></div><label for="backgroundChoice" style="margin-top:14px">Дополнительный фон</label><select id="backgroundChoice"><option value="solid">Однотонный</option><option value="gradient">Мягкий градиент</option><option value="paper">Точечный узор</option></select><p class="muted small">Выбранная тема сохраняется при повторном входе и используется в аккаунтах мастера и клиента на этом устройстве.</p></section>
   <div class="account-actions"><button type="button" class="btn danger" id="settingsDeleteAccount">Удалить аккаунт</button><button type="button" class="btn danger" id="settingsLogout">Выйти из аккаунта</button><button type="button" class="btn" id="settingsDone">Готово</button></div>
   <p class="muted small">Удаление аккаунта безвозвратно удалит ваш профиль и связанные с ним данные Nailora на сервере. После удаления войти в этот аккаунт будет невозможно.</p>
+ </div>
+</dialog>
+<dialog id="nailoraSupportDialog" aria-labelledby="nailoraSupportTitle">
+ <div class="support-hero"><div class="support-hero-icon" aria-hidden="true">💬</div><div style="flex:1;min-width:0"><h2 id="nailoraSupportTitle" style="margin:0">Поддержка Nailora</h2><p class="muted small" style="margin:5px 0 0">Расскажи, чем помочь</p></div><button type="button" class="btn fixed" id="closeNailoraSupport" aria-label="Закрыть поддержку">✕</button></div>
+ <div class="support-body">
+  <label for="nailoraSupportTopic">Тема обращения</label>
+  <select id="nailoraSupportTopic">
+   <option value="Проблема с записью">Проблема с записью</option>
+   <option value="Аккаунт и профиль">Аккаунт и профиль</option>
+   <option value="Push-уведомления">Push-уведомления</option>
+   <option value="Ошибка в приложении">Ошибка в приложении</option>
+   <option value="Предложение по улучшению">Предложение по улучшению</option>
+   <option value="Другое">Другое</option>
+  </select>
+  <label for="nailoraSupportMessage">Опиши вопрос или проблему</label>
+  <textarea id="nailoraSupportMessage" maxlength="2000" placeholder="Что произошло? Что ты ожидал увидеть?" rows="6"></textarea>
+  <div class="support-note"><span aria-hidden="true">🔒</span><span>Обращение отправится в Nailora и сохранится в истории. Ответ поддержки появится здесь. Не указывай пароли, коды подтверждения и платёжные данные.</span></div>
+  <div class="support-actions"><button type="button" class="btn primary" id="submitNailoraSupport">Отправить обращение</button><button type="button" class="btn" id="refreshNailoraSupportTickets">Мои обращения</button><button type="button" class="btn" id="shareNailoraSupport">Поделиться текстом</button><button type="button" class="btn" id="copyNailoraSupport">Скопировать текст</button></div>
+  <p class="muted small support-status" id="nailoraSupportStatus" role="status" aria-live="polite"></p>
+  <div class="support-ticket-list" id="nailoraSupportTicketList" aria-live="polite"></div>
  </div>
 </dialog>
 <dialog id="shareNailoraDialog" aria-labelledby="shareNailoraTitle">
@@ -1512,6 +1560,50 @@ Object.assign(RU_TEXT,{
 'QR-код сохранён.':{en:'QR code saved.',de:'QR-Code gespeichert.',es:'Código QR guardado.',fr:'QR code enregistré.',it:'Codice QR salvato.',pt:'Código QR salvo.',tr:'QR kodu kaydedildi.',uk:'QR-код збережено.'},
 'Не удалось загрузить генератор QR-кода. Обнови страницу и попробуй ещё раз.':{en:'Could not load the QR generator. Refresh the page and try again.',de:'Der QR-Code-Generator konnte nicht geladen werden. Aktualisiere die Seite und versuche es erneut.',es:'No se pudo cargar el generador QR. Actualiza la página e inténtalo de nuevo.',fr:'Impossible de charger le générateur QR. Actualisez la page et réessayez.',it:'Impossibile caricare il generatore QR. Aggiorna la pagina e riprova.',pt:'Não foi possível carregar o gerador QR. Atualize a página e tente novamente.',tr:'QR oluşturucu yüklenemedi. Sayfayı yenileyip tekrar dene.',uk:'Не вдалося завантажити генератор QR-коду. Онови сторінку та спробуй ще раз.'},
 });
+Object.assign(RU_TEXT,{
+'💬 Поддержка':{en:'💬 Support',de:'💬 Support',es:'💬 Soporte',fr:'💬 Assistance',it:'💬 Supporto',pt:'💬 Suporte',tr:'💬 Destek',uk:'💬 Підтримка'},
+'Есть вопрос, заметил ошибку или хочешь предложить улучшение? Подготовь обращение в поддержку Nailora.':{en:'Have a question, found a bug, or want to suggest an improvement? Prepare a message for Nailora support.',de:'Du hast eine Frage, einen Fehler gefunden oder möchtest eine Verbesserung vorschlagen? Bereite eine Nachricht an den Nailora-Support vor.',es:'¿Tienes una pregunta, encontraste un error o quieres sugerir una mejora? Prepara un mensaje para el soporte de Nailora.',fr:'Une question, un problème ou une suggestion ? Prépare un message pour le support Nailora.',it:'Hai una domanda, hai trovato un errore o vuoi suggerire un miglioramento? Prepara un messaggio per il supporto Nailora.',pt:'Tem uma dúvida, encontrou um erro ou quer sugerir uma melhoria? Prepare uma mensagem para o suporte Nailora.',tr:'Sorun mu var, hata mı buldun veya önerin mi var? Nailora desteği için bir mesaj hazırla.',uk:'Маєш запитання, знайшов помилку або хочеш запропонувати покращення? Підготуй звернення до підтримки Nailora.'},
+'Открыть поддержку':{en:'Open support',de:'Support öffnen',es:'Abrir soporte',fr:'Ouvrir l’assistance',it:'Apri il supporto',pt:'Abrir suporte',tr:'Desteği aç',uk:'Відкрити підтримку'},
+'Поддержка Nailora':{en:'Nailora Support',de:'Nailora Support',es:'Soporte de Nailora',fr:'Assistance Nailora',it:'Supporto Nailora',pt:'Suporte Nailora',tr:'Nailora desteği',uk:'Підтримка Nailora'},
+'Расскажи, чем помочь':{en:'Tell us how we can help',de:'Beschreibe, wobei wir helfen können',es:'Cuéntanos cómo podemos ayudarte',fr:'Explique-nous comment aider',it:'Dicci come possiamo aiutarti',pt:'Conte como podemos ajudar',tr:'Nasıl yardımcı olabileceğimizi anlat',uk:'Розкажи, чим допомогти'},
+'Тема обращения':{en:'Request topic',de:'Thema der Anfrage',es:'Tema de la solicitud',fr:'Sujet de la demande',it:'Argomento della richiesta',pt:'Assunto do pedido',tr:'Başvuru konusu',uk:'Тема звернення'},
+'Проблема с записью':{en:'Booking issue',de:'Terminproblem',es:'Problema con la reserva',fr:'Problème de réservation',it:'Problema con la prenotazione',pt:'Problema com agendamento',tr:'Randevu sorunu',uk:'Проблема із записом'},
+'Аккаунт и профиль':{en:'Account and profile',de:'Konto und Profil',es:'Cuenta y perfil',fr:'Compte et profil',it:'Account e profilo',pt:'Conta e perfil',tr:'Hesap ve profil',uk:'Обліковий запис і профіль'},
+'Ошибка в приложении':{en:'App error',de:'App-Fehler',es:'Error en la aplicación',fr:'Erreur dans l’application',it:'Errore nell’app',pt:'Erro no aplicativo',tr:'Uygulama hatası',uk:'Помилка в застосунку'},
+'Предложение по улучшению':{en:'Improvement suggestion',de:'Verbesserungsvorschlag',es:'Sugerencia de mejora',fr:'Suggestion d’amélioration',it:'Suggerimento di miglioramento',pt:'Sugestão de melhoria',tr:'İyileştirme önerisi',uk:'Пропозиція щодо покращення'},
+'Другое':{en:'Other',de:'Sonstiges',es:'Otro',fr:'Autre',it:'Altro',pt:'Outro',tr:'Diğer',uk:'Інше'},
+'Опиши вопрос или проблему':{en:'Describe your question or issue',de:'Beschreibe deine Frage oder dein Problem',es:'Describe tu pregunta o problema',fr:'Décris ta question ou ton problème',it:'Descrivi la domanda o il problema',pt:'Descreva sua dúvida ou problema',tr:'Sorunu veya sorunu açıkla',uk:'Опиши запитання або проблему'},
+'Что произошло? Что ты ожидал увидеть?':{en:'What happened? What did you expect to see?',de:'Was ist passiert? Was hast du erwartet?',es:'¿Qué pasó? ¿Qué esperabas ver?',fr:'Que s’est-il passé ? Qu’espérais-tu voir ?',it:'Che cosa è successo? Che cosa ti aspettavi?',pt:'O que aconteceu? O que esperava ver?',tr:'Ne oldu? Ne görmeyi bekliyordun?',uk:'Що сталося? Що ти очікував побачити?'},
+'Не указывай пароли, коды подтверждения и платёжные данные. Сообщение не отправляется автоматически в Nailora: его можно передать через доступное приложение или скопировать.':{en:'Do not include passwords, verification codes, or payment details. The message is not sent automatically to Nailora; you can share it through an available app or copy it.',de:'Gib keine Passwörter, Bestätigungscodes oder Zahlungsdaten an. Die Nachricht wird nicht automatisch an Nailora gesendet; du kannst sie über eine verfügbare App teilen oder kopieren.',es:'No incluyas contraseñas, códigos de verificación ni datos de pago. El mensaje no se envía automáticamente a Nailora; puedes compartirlo mediante una aplicación disponible o copiarlo.',fr:'N’inclus aucun mot de passe, code de vérification ni donnée de paiement. Le message n’est pas envoyé automatiquement à Nailora ; tu peux le partager via une application disponible ou le copier.',it:'Non inserire password, codici di verifica o dati di pagamento. Il messaggio non viene inviato automaticamente a Nailora; puoi condividerlo tramite un’app disponibile o copiarlo.',pt:'Não inclua senhas, códigos de verificação ou dados de pagamento. A mensagem não é enviada automaticamente ao Nailora; você pode compartilhá-la por um app disponível ou copiá-la.',tr:'Şifre, doğrulama kodu veya ödeme bilgisi ekleme. Mesaj Nailora’ya otomatik gönderilmez; kullanılabilir bir uygulamayla paylaşabilir veya kopyalayabilirsin.',uk:'Не вказуй паролі, коди підтвердження та платіжні дані. Повідомлення не надсилається автоматично до Nailora: його можна поширити через доступний застосунок або скопіювати.'},
+'Поделиться обращением':{en:'Share request',de:'Anfrage teilen',es:'Compartir solicitud',fr:'Partager la demande',it:'Condividi richiesta',pt:'Compartilhar solicitação',tr:'Talebi paylaş',uk:'Поділитися зверненням'},
+'Скопировать текст':{en:'Copy text',de:'Text kopieren',es:'Copiar texto',fr:'Copier le texte',it:'Copia testo',pt:'Copiar texto',tr:'Metni kopyala',uk:'Копіювати текст'},
+'Закрыть поддержку':{en:'Close support',de:'Support schließen',es:'Cerrar soporte',fr:'Fermer l’assistance',it:'Chiudi supporto',pt:'Fechar suporte',tr:'Desteği kapat',uk:'Закрити підтримку'},
+'Обращение в поддержку Nailora':{en:'Nailora support request',de:'Supportanfrage an Nailora',es:'Solicitud de soporte de Nailora',fr:'Demande d’assistance Nailora',it:'Richiesta di supporto Nailora',pt:'Solicitação de suporte Nailora',tr:'Nailora destek talebi',uk:'Звернення до підтримки Nailora'},
+'Опиши вопрос или проблему перед отправкой.':{en:'Describe your question or issue before sharing.',de:'Beschreibe deine Frage oder dein Problem, bevor du es teilst.',es:'Describe tu pregunta o problema antes de compartirlo.',fr:'Décris ta question ou ton problème avant de le partager.',it:'Descrivi la domanda o il problema prima di condividerlo.',pt:'Descreva sua dúvida ou problema antes de compartilhar.',tr:'Paylaşmadan önce sorununu açıkla.',uk:'Опиши запитання або проблему перед надсиланням.'},
+'Текст обращения скопирован. Вставь его в почту или мессенджер поддержки Nailora.':{en:'Request text copied. Paste it into your email or Nailora support messenger.',de:'Anfragetext kopiert. Füge ihn in deine E-Mail oder den Nailora-Support-Messenger ein.',es:'Texto de solicitud copiado. Pégalo en tu correo o mensajería de soporte de Nailora.',fr:'Texte copié. Colle-le dans ton e-mail ou messagerie du support Nailora.',it:'Testo copiato. Incollalo nell’e-mail o nella chat del supporto Nailora.',pt:'Texto copiado. Cole no seu e-mail ou mensageiro do suporte Nailora.',tr:'Talep metni kopyalandı. E-postana veya Nailora destek mesajına yapıştır.',uk:'Текст звернення скопійовано. Встав його в пошту або месенджер підтримки Nailora.'},
+'Системное меню отправки закрыто. Проверь выбранное приложение, чтобы убедиться, что сообщение отправлено.':{en:'The system sharing panel closed. Check the selected app to confirm the message was sent.',de:'Das Teilen-Menü wurde geschlossen. Prüfe in der ausgewählten App, ob die Nachricht gesendet wurde.',es:'Se cerró el menú para compartir. Comprueba en la aplicación seleccionada si se envió el mensaje.',fr:'Le menu de partage est fermé. Vérifie dans l’application choisie que le message a bien été envoyé.',it:'Il menu di condivisione è chiuso. Controlla nell’app selezionata che il messaggio sia stato inviato.',pt:'O menu de compartilhamento foi fechado. Verifique no app selecionado se a mensagem foi enviada.',tr:'Paylaşım menüsü kapandı. Mesajın gönderildiğini seçtiğin uygulamada kontrol et.',uk:'Меню поширення закрито. Перевір у вибраному застосунку, чи надіслано повідомлення.'},
+'Не удалось скопировать текст. Выдели его вручную.':{en:'Could not copy the text. Select it manually.',de:'Der Text konnte nicht kopiert werden. Markiere ihn manuell.',es:'No se pudo copiar el texto. Selecciónalo manualmente.',fr:'Impossible de copier le texte. Sélectionne-le manuellement.',it:'Impossibile copiare il testo. Selezionalo manualmente.',pt:'Não foi possível copiar o texto. Selecione-o manualmente.',tr:'Metin kopyalanamadı. Elle seç.',uk:'Не вдалося скопіювати текст. Виділи його вручну.'}
+});
+Object.assign(RU_TEXT,{
+'Отправить обращение':{en:'Send request',de:'Anfrage senden',es:'Enviar solicitud',fr:'Envoyer la demande',it:'Invia richiesta',pt:'Enviar pedido',tr:'Talebi gönder',uk:'Надіслати звернення'},
+'Мои обращения':{en:'My requests',de:'Meine Anfragen',es:'Mis solicitudes',fr:'Mes demandes',it:'Le mie richieste',pt:'Meus pedidos',tr:'Taleplerim',uk:'Мої звернення'},
+'Поделиться текстом':{en:'Share text',de:'Text teilen',es:'Compartir texto',fr:'Partager le texte',it:'Condividi testo',pt:'Partilhar texto',tr:'Metni paylaş',uk:'Поділитися текстом'},
+'Обращение отправится в Nailora и сохранится в истории. Ответ поддержки появится здесь. Не указывай пароли, коды подтверждения и платёжные данные.':{en:'Your request will be sent to Nailora and saved in your history. The support reply will appear here. Do not include passwords, verification codes, or payment details.',de:'Deine Anfrage wird an Nailora gesendet und im Verlauf gespeichert. Die Antwort erscheint hier. Gib keine Passwörter, Bestätigungscodes oder Zahlungsdaten an.',es:'Tu solicitud se enviará a Nailora y se guardará en el historial. La respuesta aparecerá aquí. No incluyas contraseñas, códigos de verificación ni datos de pago.',fr:'Ta demande sera envoyée à Nailora et conservée dans l’historique. La réponse apparaîtra ici. N’inclus aucun mot de passe, code de vérification ni donnée de paiement.',it:'La richiesta sarà inviata a Nailora e salvata nella cronologia. La risposta apparirà qui. Non inserire password, codici di verifica o dati di pagamento.',pt:'O pedido será enviado ao Nailora e guardado no histórico. A resposta aparecerá aqui. Não inclua senhas, códigos de verificação ou dados de pagamento.',tr:'Talebin Nailora’ya gönderilecek ve geçmişte saklanacak. Yanıt burada görünecek. Şifre, doğrulama kodu veya ödeme bilgisi ekleme.',uk:'Звернення буде надіслано до Nailora й збережено в історії. Відповідь з’явиться тут. Не вказуй паролі, коди підтвердження та платіжні дані.'},
+'Загрузка обращений…':{en:'Loading requests…',de:'Anfragen werden geladen…',es:'Cargando solicitudes…',fr:'Chargement des demandes…',it:'Caricamento richieste…',pt:'A carregar pedidos…',tr:'Talepler yükleniyor…',uk:'Завантаження звернень…'},
+'Пока нет обращений.':{en:'No requests yet.',de:'Noch keine Anfragen.',es:'Aún no hay solicitudes.',fr:'Aucune demande pour le moment.',it:'Nessuna richiesta per ora.',pt:'Ainda não há pedidos.',tr:'Henüz talep yok.',uk:'Поки немає звернень.'},
+'Новое':{en:'New',de:'Neu',es:'Nuevo',fr:'Nouveau',it:'Nuovo',pt:'Novo',tr:'Yeni',uk:'Нове'},
+'В работе':{en:'In progress',de:'In Bearbeitung',es:'En curso',fr:'En cours',it:'In lavorazione',pt:'Em andamento',tr:'İşlemde',uk:'У роботі'},
+'Отвечено':{en:'Answered',de:'Beantwortet',es:'Respondido',fr:'Répondu',it:'Risposto',pt:'Respondido',tr:'Yanıtlandı',uk:'Є відповідь'},
+'Закрыто':{en:'Closed',de:'Geschlossen',es:'Cerrado',fr:'Fermé',it:'Chiuso',pt:'Fechado',tr:'Kapalı',uk:'Закрито'},
+'Отправка…':{en:'Sending…',de:'Wird gesendet…',es:'Enviando…',fr:'Envoi…',it:'Invio…',pt:'A enviar…',tr:'Gönderiliyor…',uk:'Надсилання…'},
+'Обращение отправлено. Ответ появится в истории.':{en:'Request sent. The reply will appear in your history.',de:'Anfrage gesendet. Die Antwort erscheint im Verlauf.',es:'Solicitud enviada. La respuesta aparecerá en el historial.',fr:'Demande envoyée. La réponse apparaîtra dans l’historique.',it:'Richiesta inviata. La risposta apparirà nella cronologia.',pt:'Pedido enviado. A resposta aparecerá no histórico.',tr:'Talep gönderildi. Yanıt geçmişinde görünecek.',uk:'Звернення надіслано. Відповідь з’явиться в історії.'},
+'Сначала войди в аккаунт Nailora, чтобы отправить обращение.':{en:'Sign in to Nailora before sending a request.',de:'Melde dich bei Nailora an, bevor du eine Anfrage sendest.',es:'Inicia sesión en Nailora antes de enviar una solicitud.',fr:'Connecte-toi à Nailora avant d’envoyer une demande.',it:'Accedi a Nailora prima di inviare una richiesta.',pt:'Inicie sessão no Nailora antes de enviar um pedido.',tr:'Talep göndermeden önce Nailora’da oturum aç.',uk:'Увійди в Nailora, щоб надіслати звернення.'},
+'Ответ поддержки:':{en:'Support reply:',de:'Antwort des Supports:',es:'Respuesta de soporte:',fr:'Réponse du support :',it:'Risposta del supporto:',pt:'Resposta do suporte:',tr:'Destek yanıtı:',uk:'Відповідь підтримки:'},
+'Создано:':{en:'Created:',de:'Erstellt:',es:'Creado:',fr:'Créé :',it:'Creato:',pt:'Criado:',tr:'Oluşturuldu:',uk:'Створено:'},
+'Ответ появится здесь, когда поддержка ответит.':{en:'The reply will appear here when support responds.',de:'Die Antwort erscheint hier, sobald der Support antwortet.',es:'La respuesta aparecerá aquí cuando soporte responda.',fr:'La réponse apparaîtra ici lorsque le support répondra.',it:'La risposta apparirà qui quando il supporto risponderà.',pt:'A resposta aparecerá aqui quando o suporte responder.',tr:'Destek yanıt verdiğinde cevap burada görünecek.',uk:'Відповідь з’явиться тут, коли підтримка відповість.'},
+'Не удалось загрузить обращения. Проверь, что SQL-настройка поддержки выполнена.':{en:'Could not load requests. Check that the support SQL setup has been run.',de:'Anfragen konnten nicht geladen werden. Prüfe, ob das Support-SQL ausgeführt wurde.',es:'No se pudieron cargar las solicitudes. Comprueba que se haya ejecutado el SQL de soporte.',fr:'Impossible de charger les demandes. Vérifie que le SQL de support a été exécuté.',it:'Impossibile caricare le richieste. Verifica che sia stato eseguito l’SQL di supporto.',pt:'Não foi possível carregar os pedidos. Verifique se o SQL de suporte foi executado.',tr:'Talepler yüklenemedi. Destek SQL kurulumunun çalıştırıldığını kontrol et.',uk:'Не вдалося завантажити звернення. Перевір, чи виконано SQL для підтримки.'},
+'Не удалось отправить обращение. Проверь SQL-настройку поддержки и повтори попытку.':{en:'Could not send the request. Check the support SQL setup and try again.',de:'Anfrage konnte nicht gesendet werden. Prüfe die Support-SQL-Einrichtung und versuche es erneut.',es:'No se pudo enviar la solicitud. Comprueba la configuración SQL de soporte e inténtalo de nuevo.',fr:'Impossible d’envoyer la demande. Vérifie le SQL de support et réessaie.',it:'Impossibile inviare la richiesta. Controlla la configurazione SQL di supporto e riprova.',pt:'Não foi possível enviar o pedido. Verifique o SQL de suporte e tente novamente.',tr:'Talep gönderilemedi. Destek SQL ayarını kontrol edip tekrar dene.',uk:'Не вдалося надіслати звернення. Перевір SQL для підтримки та повтори спробу.'}
+});
 function t(source){const row=RU_TEXT[source]||EXTRA_TEXT[source];return currentLanguage==='ru'||!row?source:(row[currentLanguage]||row.en||source)}
 function setupLanguageSelect(select){if(!select)return;const current=select.value;select.innerHTML='';LANGUAGE_OPTIONS.forEach(([value,label])=>{const o=document.createElement('option');o.value=value;o.textContent=label;select.append(o)});select.value=LANGUAGESAFE(current)?current:currentLanguage}
 function LANGUAGESAFE(code){return LANGUAGE_OPTIONS.some(x=>x[0]===code)}
@@ -1908,6 +2000,100 @@ async function logout(){
 function openSettings(){if(!activeRole)return;const p=profiles[activeRole]||{};renderProfileAvatar(activeRole);$('settingsLanguageChoice').value=p.language||currentLanguage;$('settingsRoleLabel').textContent=t(activeRole==='master'?'Тип аккаунта: Мастер':'Тип аккаунта: Клиент');$('settingsName').value=p.name||'';$('settingsPhone').value=p.phone||'';$('settingsCountry').value=p.country||'';$('settingsCity').value=p.city||p.area||'';$('settingsMasterFields').classList.toggle('hidden',activeRole!=='master');$('masterReminderSettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencySettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencyChoice').value=CURRENCY_CODES.includes(String((profiles.master||{}).currency||'RUB').toUpperCase())?String((profiles.master||{}).currency||'RUB').toUpperCase():'RUB';$('settingsAddress').required=activeRole==='master';$('settingsArea').value=p.area||'';$('settingsAddress').value=p.address||'';$('settingsSpecialty').value=p.specialty||'';const reminderPrefs=getMasterReminderPrefs();$('masterRemindersEnabled').checked=!!reminderPrefs.enabled;$('masterReminderLeadTime').value=String(reminderPrefs.minutes||60);$('masterReminderLeadTime').disabled=!reminderPrefs.enabled;refreshNotificationPermissionStatus();applyUiSettings();if(typeof $('settingsDialog').showModal==='function')$('settingsDialog').showModal();else $('settingsDialog').setAttribute('open','');refreshPushSettingsStatus()}
 $('masterAccount').onclick=openSettings;$('clientAccount').onclick=openSettings;
 $('closeSettings').onclick=()=>$('settingsDialog').close();$('settingsDone').onclick=()=>$('settingsDialog').close();$('settingsLogout').onclick=logout;
+
+// Nailora v8.69: authenticated support tickets stored in Supabase; replies are visible to the ticket owner.
+function makeNailoraSupportMessage(){
+ const topic=String($('nailoraSupportTopic').value||'Другое').trim();
+ const message=String($('nailoraSupportMessage').value||'').trim();
+ const role=activeRole==='master'?'Мастер':'Клиент';
+ const lang=currentLanguage||'ru';
+ return `Nailora v8.69\nРоль: ${role}\nЯзык приложения: ${lang}\nТема: ${topic}\n\n${message}`;
+}
+function openNailoraSupport(){
+ const settings=$('settingsDialog');
+ if(settings&&settings.open)settings.close();
+ $('nailoraSupportStatus').textContent='';
+ if(typeof $('nailoraSupportDialog').showModal==='function')$('nailoraSupportDialog').showModal();
+ else $('nailoraSupportDialog').setAttribute('open','');
+ loadNailoraSupportTickets();
+}
+function supportTicketStatusLabel(status){return ({new:t('Новое'),in_progress:t('В работе'),answered:t('Отвечено'),closed:t('Закрыто')})[status]||t('Новое')}
+function formatSupportTicketDate(value){const d=new Date(value);if(!Number.isFinite(d.getTime()))return String(value||'');return new Intl.DateTimeFormat(LOCALES[currentLanguage]||currentLanguage,{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(d)}
+async function loadNailoraSupportTickets(){
+ const list=$('nailoraSupportTicketList');if(!list)return;
+ list.innerHTML=`<p class="muted small">${escapeHtml(t('Загрузка обращений…'))}</p>`;
+ if(!cloud||!cloudUser||!activeRole){list.innerHTML=`<p class="muted small">${escapeHtml(t('Сначала войди в аккаунт Nailora, чтобы отправить обращение.'))}</p>`;return}
+ try{
+  const {data:rows,error}=await cloud.from('nailora_support_tickets').select('id,topic,message,status,admin_reply,created_at,replied_at').eq('user_id',cloudUser.id).order('created_at',{ascending:false}).limit(25);
+  if(error)throw error;
+  if(!rows||!rows.length){list.innerHTML=`<p class="muted small">${escapeHtml(t('Пока нет обращений.'))}</p>`;return}
+  list.innerHTML=rows.map(row=>{
+   const replied=String(row.admin_reply||'').trim();
+   return `<article class="support-ticket-card"><div class="support-ticket-head"><strong>${escapeHtml(row.topic||'Другое')}</strong><span class="support-ticket-status">${escapeHtml(supportTicketStatusLabel(row.status))}</span></div><p class="support-ticket-message">${escapeHtml(row.message||'')}</p><div class="support-ticket-meta">${escapeHtml(t('Создано:'))} ${escapeHtml(formatSupportTicketDate(row.created_at))} · #${escapeHtml(String(row.id||'').slice(0,8))}</div>${replied?`<div class="support-ticket-reply"><strong>${escapeHtml(t('Ответ поддержки:'))}</strong><div style="margin-top:5px">${escapeHtml(replied)}</div></div>`:`<p class="muted small" style="margin:8px 0 0">${escapeHtml(t('Ответ появится здесь, когда поддержка ответит.'))}</p>`}</article>`;
+  }).join('');
+ }catch(err){
+  console.warn('Support ticket load failed:',err?.message||err);
+  list.innerHTML=`<p class="muted small">${escapeHtml(t('Не удалось загрузить обращения. Проверь, что SQL-настройка поддержки выполнена.'))}</p>`;
+ }
+}
+async function submitNailoraSupportRequest(){
+ const button=$('submitNailoraSupport'),status=$('nailoraSupportStatus');
+ const topic=String($('nailoraSupportTopic').value||'Другое').trim();
+ const message=String($('nailoraSupportMessage').value||'').trim();
+ if(message.length<5){status.textContent=t('Опиши вопрос или проблему перед отправкой.');$('nailoraSupportMessage').focus();return}
+ if(message.length>2000){status.textContent=t('Не удалось отправить обращение. Проверь SQL-настройку поддержки и повтори попытку.');return}
+ if(!cloud||!cloudUser||!activeRole||!profiles[activeRole]){status.textContent=t('Сначала войди в аккаунт Nailora, чтобы отправить обращение.');return}
+ button.disabled=true;status.textContent=t('Отправка…');
+ try{
+  const payload={
+   user_id:cloudUser.id,
+   profile_id:profiles[activeRole]?.cloudId||null,
+   account_role:activeRole,
+   user_email:cloudUser.email||profiles[activeRole]?.email||null,
+   user_name:String(profiles[activeRole]?.name||'').slice(0,80),
+   language_code:currentLanguage||'ru',
+   topic:topic.slice(0,80),
+   message,
+   status:'new'
+  };
+  const {data:created,error}=await cloud.from('nailora_support_tickets').insert(payload).select('id').single();
+  if(error)throw error;
+  $('nailoraSupportMessage').value='';
+  status.textContent=t('Обращение отправлено. Ответ появится в истории.')+(created?.id?' #'+String(created.id).slice(0,8):'');
+  await loadNailoraSupportTickets();
+ }catch(err){
+  console.error('Support ticket submit failed:',err);
+  status.textContent=t('Не удалось отправить обращение. Проверь SQL-настройку поддержки и повтори попытку.');
+ }
+ finally{button.disabled=false}
+}
+async function copyNailoraSupportMessage(){
+ const body=String($('nailoraSupportMessage').value||'').trim();
+ if(body.length<5){$('nailoraSupportStatus').textContent=t('Опиши вопрос или проблему перед отправкой.');$('nailoraSupportMessage').focus();return false;}
+ const text=makeNailoraSupportMessage();let copied=false;
+ try{if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(text);copied=true;}}
+ catch(e){}
+ if(!copied){
+  const helper=document.createElement('textarea');helper.value=text;helper.setAttribute('readonly','');helper.style.position='fixed';helper.style.opacity='0';document.body.appendChild(helper);helper.select();
+  try{copied=document.execCommand('copy')}catch(e){}helper.remove();
+ }
+ $('nailoraSupportStatus').textContent=copied?t('Текст обращения скопирован. Вставь его в почту или мессенджер поддержки Nailora.'):t('Не удалось скопировать текст. Выдели его вручную.');
+ return copied;
+}
+$('openNailoraSupport').onclick=openNailoraSupport;
+$('closeNailoraSupport').onclick=()=>$('nailoraSupportDialog').close();
+$('copyNailoraSupport').onclick=copyNailoraSupportMessage;
+$('submitNailoraSupport').onclick=submitNailoraSupportRequest;
+$('refreshNailoraSupportTickets').onclick=loadNailoraSupportTickets;
+$('shareNailoraSupport').onclick=async()=>{
+ const body=String($('nailoraSupportMessage').value||'').trim();
+ if(body.length<5){$('nailoraSupportStatus').textContent=t('Опиши вопрос или проблему перед отправкой.');$('nailoraSupportMessage').focus();return;}
+ const text=makeNailoraSupportMessage();
+ if(typeof navigator.share==='function'){
+  try{await navigator.share({title:t('Обращение в поддержку Nailora'),text});$('nailoraSupportStatus').textContent=t('Системное меню отправки закрыто. Проверь выбранное приложение, чтобы убедиться, что сообщение отправлено.');}
+  catch(e){if(e&&e.name!=='AbortError'){$('nailoraSupportStatus').textContent=t('Не удалось скопировать текст. Выдели его вручную.');}}
+ }else{await copyNailoraSupportMessage();}
+};
 // Share one stable public URL. Never derive it from a local file:// or localhost origin.
 const NAILORA_PUBLIC_URL='https://antonmachehin.github.io/Nailora/';
 const NAILORA_VAPID_PUBLIC_KEY='BHj8FdR4RHezyFagbPZTP-t3xIWV1_DzuZP1_mWlcoxVgrJlLShfTQ6kH3M3d7vVnNnTYK1KOcfEMQvQLWVsg0Y';
