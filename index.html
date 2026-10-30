@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ru">
 <head>
-<!-- Nailora v8.80: production Supabase build; visual updates merged; demo tests removed. -->
+<!-- Nailora v8.81: align master calendar navigation and week-range display with the updated client calendar; preserve all role-specific scheduling logic. Based on v8.74. -->
 <!-- Nailora v8.74: restore the last signed-in profile immediately from local cache; refresh Supabase data in background and preserve cached access during transient network failures. Based on v8.73. -->
 <!-- Nailora v8.72: non-blocking Supabase startup, lazy QR library, mobile-data loading recovery, and single master refresh. Based on v8.71. -->
 <!-- Nailora v8.66: automatic client cards, appointment duration layout, and master timezone sync for iOS Home Screen. -->
@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<title>Nailora v8.80 · премиальный интерфейс</title>
+<title>Nailora v8.81 · единый календарь мастера и клиента</title>
 <style>
 :root{font-family:Manrope,"Segoe UI",Arial,sans-serif;color:#292433;background:#f7f5fa}*{box-sizing:border-box}body{margin:0}header{background:#fff;padding:18px 22px;border-bottom:1px solid #e8e2ef}h1{font-size:22px;margin:0 0 6px}header p{margin:0;color:#766d80;font-size:14px}.wrap{max-width:1100px;margin:0 auto;padding:18px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tabs button,.btn{border:0;border-radius:10px;padding:10px 14px;background:#e9e2f1;color:#342742;cursor:pointer;font-weight:600}.tabs button.active,.btn.primary{background:#71529a;color:#fff}.panel{background:white;border:1px solid #e9e3ee;border-radius:14px;padding:16px;margin-bottom:16px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:1}.row .fixed{flex:0 0 auto}input,select,textarea{width:100%;padding:10px;border:1px solid #d9d1e1;border-radius:8px;font:inherit;background:#fff}label{display:block;font-size:13px;color:#655b70;margin:8px 0 5px}
 .password-field{position:relative;width:100%}.password-field input{padding-right:48px}.password-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);padding:5px 9px;min-width:36px;border:0!important;background:transparent!important;color:#655b70!important;box-shadow:none!important;filter:none!important;font-size:18px;line-height:1;cursor:pointer}.password-toggle svg{display:block;width:20px;height:20px}.password-toggle:hover{box-shadow:none!important;filter:none!important}.password-toggle:focus-visible{outline:2px solid #71529a;outline-offset:1px;border-radius:6px}.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.day{min-height:75px;border:1px solid #e5dfeb;border-radius:8px;padding:7px;background:#fff;text-align:left;cursor:pointer;touch-action:pan-y;user-select:none;-webkit-user-select:none}.day.today{outline:2px solid #2563eb;outline-offset:1px}.day.today:not(.off){background:#dbeafe;border-color:#2563eb;color:#1e3a8a}.day.has:not(.today):not(.off){background:#dcfce7;border-color:#22c55e;color:#14532d}.day.off{background:#fee2e2!important;border-color:#ef4444!important;color:#991b1b}.day.today.off{outline:3px solid #2563eb}.day.selected{box-shadow:inset 0 0 0 2px #8b5cf6}.day:disabled{opacity:1;cursor:not-allowed}.day .num{font-weight:bold}.day small{display:block;margin-top:5px;color:inherit;font-size:11px}.day .day-legend{display:block;font-size:10px;margin-top:3px;color:inherit}.muted{color:#786e80;font-size:14px}.card{border:1px solid #e9e2ee;border-radius:10px;padding:12px;margin:8px 0}.card h3{margin:0 0 6px;font-size:16px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:#f5f0fa;border-radius:10px;padding:13px}.stat strong{display:block;font-size:21px;margin-top:5px}.verify-panel{max-width:650px;margin:0 auto;text-align:center;padding:clamp(20px,4vw,30px)!important}.verify-mark{width:58px;height:58px;display:grid;place-items:center;margin:0 auto 12px;border-radius:20px;background:#f0e9f8;color:#7955a6;font-size:28px;box-shadow:inset 0 0 0 1px #e5d8f2}.verify-title{margin:0 0 8px;color:#4e3c62;font-size:clamp(22px,4vw,28px);line-height:1.25}.verify-subtitle{color:#74677f;line-height:1.6;margin:0 auto 16px;max-width:480px}.verify-intro{font-size:1rem;font-weight:600;color:#4e3c62;background:#f7f3fb;border:1px solid #e9dff3;padding:12px 15px;border-radius:12px;line-height:1.6;margin:0 0 14px}.verify-steps{list-style:none;counter-reset:verify-step;text-align:left;margin:14px 0;padding:0;display:grid;gap:10px;line-height:1.5;font-size:1rem;font-weight:500;color:#40354d}.verify-steps li{counter-increment:verify-step;position:relative;padding:13px 14px 13px 54px;background:#fbf9fd;border:1px solid #eee6f5;border-radius:12px;min-height:52px}.verify-steps li::before{content:counter(verify-step);position:absolute;left:13px;top:13px;width:28px;height:28px;display:grid;place-items:center;border-radius:50%;background:#e9def5;color:#684a8d;font-size:14px;font-weight:800}.verify-steps li strong{display:block;font-weight:750;color:#4e3c62}.verify-steps li span{display:block;margin-top:3px;color:#796e84;font-size:.92rem;font-weight:400}.verify-note{margin:14px 0 10px;padding:13px 15px;border-radius:12px;background:#f0f7f3;border:1px solid #dcece2;color:#476554;font-size:.95rem;line-height:1.55}.verify-help{margin-top:12px;color:#82798a;line-height:1.55}.link-button{border:0;background:transparent;color:#79658d;text-decoration:underline;text-underline-offset:3px;padding:5px 8px;font:inherit;font-size:13px;cursor:pointer;border-radius:7px}.link-button:hover{background:#f4eef8}.link-button:focus-visible{outline:2px solid #9a80b7;outline-offset:2px}@media(max-width:600px){.verify-panel{padding:20px 15px!important}.verify-steps li{padding:12px 12px 12px 50px}.verify-steps li::before{left:11px;top:12px}}.hidden{display:none!important}.danger{background:#f9e8e8;color:#8d2525}.small{font-size:12px}@media(max-width:600px){.wrap{padding:10px}.grid{gap:3px}.day{min-height:62px;padding:4px}.day small{font-size:9px}.stats{grid-template-columns:1fr}.dayname{font-size:11px;text-align:center}}
@@ -1004,104 +1004,6 @@ body[data-theme="dark"] #nailoraSupportDialog .support-ticket-card{background:va
 #openNailoraSupport{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:46px}
 #openNailoraSupport .support-button-icon{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;background:rgba(255,255,255,.18);font-size:17px}
 @media(max-width:480px){#nailoraSupportDialog .support-hero{padding:15px}#nailoraSupportDialog .support-body{padding:15px}#nailoraSupportDialog .support-actions{display:grid;grid-template-columns:1fr}}
-
-/* Merged from v8.77: calendar-only presentation updates. */
-
-/* Nailora v8.77: clearer calendar navigation and free/busy visual hierarchy. Presentation only. */
-
-/* v8.77: matching visual hierarchy for the client calendar; availability logic is unchanged. */
-#clientApp #clientCalendarView{appearance:none;-webkit-appearance:none;min-width:150px;width:auto;max-width:100%;padding:10px 38px 10px 13px;border:1px solid #d8c8e8;border-radius:12px;background-color:var(--panel-bg,#fff);color:var(--text-color,#342742);font-weight:750;box-shadow:0 2px 8px #3520440a;cursor:pointer}
-#clientApp #clientCalendarGrid{gap:7px}
-#clientApp #clientCalendarGrid .dayname{padding:5px 2px;font-size:11px;font-weight:800;letter-spacing:.045em;text-transform:uppercase;color:var(--muted-color,#786e80)}
-#clientApp #clientCalendarGrid .day{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:88px;padding:9px;border:1px solid var(--border-color,#e9e3ee);border-radius:13px;background:var(--panel-bg,#fff);color:var(--text-color,#292433);box-shadow:0 2px 7px #30203c08;transition:border-color .15s,box-shadow .15s,transform .15s}
-#clientApp #clientCalendarGrid .day:hover{border-color:#a88ac7;box-shadow:0 5px 14px #30203c12;transform:translateY(-1px)}
-#clientApp #clientCalendarGrid .day .num{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;font-size:14px;font-weight:800}
-#clientApp #clientCalendarGrid .day small{margin-top:3px;font-size:10px;line-height:1.35;opacity:.88}
-#clientApp #clientCalendarGrid .day.available:not(.today):not(.has):not(.off){background:linear-gradient(145deg,#eff9f1,#fbfefb);border-color:#c6e6cd;color:#285e36}
-#clientApp #clientCalendarGrid .day.available:not(.today):not(.has):not(.off) .num{background:#d9f0df;color:#285e36}
-#clientApp #clientCalendarGrid .day.has:not(.today):not(.off){background:linear-gradient(145deg,#f4eefb,#fcfaff);border-color:#d8c4eb;color:#563c70}
-#clientApp #clientCalendarGrid .day.has:not(.today):not(.off) .num{background:#e8daf5;color:#563c70}
-#clientApp #clientCalendarGrid .day.today:not(.off){background:linear-gradient(145deg,#edf4ff,#f8fbff);border:1px solid #9bbcf3;color:#244b83;outline:2px solid #5b8ee0;outline-offset:1px}
-#clientApp #clientCalendarGrid .day.today:not(.off) .num{background:#d6e6ff;color:#214d89}
-#clientApp #clientCalendarGrid .day.off{background:linear-gradient(145deg,#fff0f0,#fff8f8)!important;border-color:#efbcbc!important;color:#8b3434!important}
-#clientApp #clientCalendarGrid .day.off .num{background:#f8dede;color:#8b3434}
-#clientApp #clientCalendarGrid .day.selected{box-shadow:inset 0 0 0 2px #8056a8,0 4px 12px #5c3b7b16;border-color:#8056a8}
-#clientApp .calendar-status-legend{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;margin:12px 0 0;padding:10px 12px;border:1px solid var(--border-color,#e9e3ee);border-radius:12px;background:var(--soft-bg,#faf8fc)}
-#clientApp .calendar-status-legend span{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--text-color,#51465d)}
-#clientApp .calendar-status-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
-#clientApp .calendar-status-legend .legend-today{background:#8db5f4}
-#clientApp .calendar-status-legend .legend-booked{background:#b99bd8}
-#clientApp .calendar-status-legend .legend-free{background:#9bd3a8}
-#clientApp .calendar-status-legend .legend-off{background:#e8a2a2}
-#clientApp #clientDaySchedule .schedule-row{position:relative;grid-template-columns:100px minmax(0,1fr) auto;gap:12px;min-height:60px;padding:12px 13px 12px 16px;border-radius:12px;overflow:hidden;box-shadow:0 2px 7px #30203c08}
-#clientApp #clientDaySchedule .schedule-row:before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:currentColor;opacity:.55}
-#clientApp #clientDaySchedule .schedule-row.free{background:#eff9f1;border-color:#c6e6cd;color:#285e36}
-#clientApp #clientDaySchedule .schedule-row.busy{background:#f4eefb;border-color:#d9c8ec;color:#51376b}
-#clientApp #clientDaySchedule .schedule-row.off{background:#fff1f1;border-color:#edc4c4;color:#873b3b}
-#clientApp #clientDaySchedule .schedule-row.warning{background:#fff8e9;border-color:#ecd9a9;color:#75551c}
-#clientApp #clientDaySchedule .schedule-time{font-size:14px;font-weight:850;letter-spacing:.01em}
-#clientApp #clientDaySchedule .schedule-info strong{font-size:14px;font-weight:800}
-#clientApp #clientDaySchedule .schedule-info small{color:inherit;opacity:.78}
-body[data-theme="dark"] #clientApp #clientCalendarGrid .day.available:not(.today):not(.has):not(.off){background:#20392a;border-color:#3e694b;color:#c8f0d1}
-body[data-theme="dark"] #clientApp #clientCalendarGrid .day.available:not(.today):not(.has):not(.off) .num{background:#31563c;color:#d8f5df}
-body[data-theme="dark"] #clientApp #clientCalendarGrid .day.has:not(.today):not(.off){background:#342b40;border-color:#59456f;color:#eadcf8}
-body[data-theme="dark"] #clientApp #clientCalendarGrid .day.has:not(.today):not(.off) .num{background:#514064;color:#f2e8fb}
-body[data-theme="dark"] #clientApp #clientCalendarGrid .day.today:not(.off){background:#26364e;border-color:#567db7;color:#e1edff}
-body[data-theme="dark"] #clientApp #clientCalendarGrid .day.off{background:#452b30!important;border-color:#74434b!important;color:#ffdede!important}
-body[data-theme="dark"] #clientApp .calendar-status-legend{background:#302a38}
-body[data-theme="dark"] #clientApp .calendar-status-legend span{color:#eee6f5}
-body[data-theme="dark"] #clientApp #clientDaySchedule .schedule-row.free{background:#20392a;border-color:#3e694b;color:#c8f0d1}
-body[data-theme="dark"] #clientApp #clientDaySchedule .schedule-row.busy{background:#382d47;border-color:#59456f;color:#eadcf8}
-body[data-theme="dark"] #clientApp #clientDaySchedule .schedule-row.off{background:#422b31;border-color:#74434b;color:#ffdede}
-body[data-theme="dark"] #clientApp #clientDaySchedule .schedule-row.warning{background:#443923;border-color:#76613a;color:#ffebba}
-@media(max-width:600px){#clientApp #clientCalendarGrid{gap:4px}#clientApp #clientCalendarGrid .day{min-height:72px;padding:5px;border-radius:9px}#clientApp #clientCalendarGrid .day .num{width:24px;height:24px;font-size:12px}#clientApp #clientCalendarGrid .day small{font-size:9px}#clientApp #clientApp .calendar-status-legend{gap:7px 10px;padding:9px}#clientApp .calendar-status-legend span{font-size:10px}#clientApp #clientDaySchedule .schedule-row{grid-template-columns:82px minmax(0,1fr);gap:8px;padding:10px 9px 10px 13px}#clientApp #clientDaySchedule .schedule-row>.schedule-actions{grid-column:1/-1}#clientApp #clientDaySchedule .schedule-time{font-size:12px}}
-
-#masterApp #view{appearance:none;-webkit-appearance:none;min-width:150px;width:auto;max-width:100%;padding:10px 38px 10px 13px;border:1px solid #d8c8e8;border-radius:12px;background-color:var(--panel-bg,#fff);color:var(--text-color,#342742);font-weight:750;box-shadow:0 2px 8px #3520440a;cursor:pointer}
-#masterApp .panel:has(>#calendarGrid),#masterApp .panel:has(>#calendarInsights){border-color:var(--border-color,#e9e3ee)}
-#masterApp #calendarGrid{gap:7px}
-#masterApp #calendarGrid .dayname{padding:5px 2px;font-size:11px;font-weight:800;letter-spacing:.045em;text-transform:uppercase;color:var(--muted-color,#786e80)}
-#masterApp #calendarGrid .day{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:94px;padding:9px;border:1px solid var(--border-color,#e9e3ee);border-radius:13px;background:var(--panel-bg,#fff);color:var(--text-color,#292433);box-shadow:0 2px 7px #30203c08;transition:border-color .15s,box-shadow .15s,transform .15s}
-#masterApp #calendarGrid .day:hover{border-color:#a88ac7;box-shadow:0 5px 14px #30203c12;transform:translateY(-1px)}
-#masterApp #calendarGrid .day .num{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;font-size:14px;font-weight:800}
-#masterApp #calendarGrid .day small{margin-top:3px;font-size:10px;line-height:1.35;opacity:.86}
-#masterApp #calendarGrid .day.has:not(.today):not(.off){background:linear-gradient(145deg,#f5effb,#fbf9fe);border-color:#d8c4eb;color:#563c70}
-#masterApp #calendarGrid .day.has:not(.today):not(.off) .num{background:#e8daf5;color:#563c70}
-#masterApp #calendarGrid .day.today:not(.off){background:linear-gradient(145deg,#edf4ff,#f8fbff);border:1px solid #9bbcf3;color:#244b83;outline:2px solid #5b8ee0;outline-offset:1px}
-#masterApp #calendarGrid .day.today:not(.off) .num{background:#d6e6ff;color:#214d89}
-#masterApp #calendarGrid .day.off{background:linear-gradient(145deg,#fff0f0,#fff8f8)!important;border-color:#efbcbc!important;color:#8b3434!important}
-#masterApp #calendarGrid .day.off .num{background:#f8dede;color:#8b3434}
-#masterApp #calendarGrid .day.selected{box-shadow:inset 0 0 0 2px #8056a8,0 4px 12px #5c3b7b16;border-color:#8056a8}
-#masterApp #calendarGrid .day .day-legend{display:flex;align-items:center;gap:4px;margin-top:auto;padding:4px 7px;border-radius:7px;background:#e9def4;color:#563c70;font-size:10px;font-weight:800}
-#masterApp #calendarGrid .day .legend-dot{font-size:8px;color:#8b5bb6}
-#masterApp #calendarGrid .day .hours-compact{display:none}
-#masterApp .calendar-status-legend{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;margin:12px 0 0;padding:10px 12px;border:1px solid var(--border-color,#e9e3ee);border-radius:12px;background:var(--soft-bg,#faf8fc)}
-#masterApp .calendar-status-legend span{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--text-color,#51465d)}
-#masterApp .calendar-status-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
-#masterApp .calendar-status-legend .legend-today{background:#8bb4f1}#masterApp .calendar-status-legend .legend-booked{background:#b99ad8}#masterApp .calendar-status-legend .legend-free{background:#8bc99b}#masterApp .calendar-status-legend .legend-off{background:#e7a0a0}
-#masterApp #daySchedule{margin-top:12px}
-#masterApp #daySchedule>.schedule-header{padding:11px 13px;margin-bottom:10px;border-radius:12px;background:var(--soft-bg,#f5f0fa);border:1px solid var(--border-color,#e9e3ee)}
-#masterApp #daySchedule .schedule-row{position:relative;grid-template-columns:112px minmax(0,1fr) auto;gap:12px;min-height:62px;padding:12px 13px 12px 16px;border-radius:12px;overflow:hidden;box-shadow:0 2px 7px #30203c08}
-#masterApp #daySchedule .schedule-row:before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:currentColor;opacity:.55}
-#masterApp #daySchedule .schedule-row.free{background:#eff9f1;border-color:#c6e6cd;color:#285e36}
-#masterApp #daySchedule .schedule-row.busy{background:#f4eefb;border-color:#d9c8ec;color:#51376b}
-#masterApp #daySchedule .schedule-row.blocked,#masterApp #daySchedule .schedule-row.off{background:#fff1f1;border-color:#edc4c4;color:#873b3b}
-#masterApp #daySchedule .schedule-row.warning{background:#fff8e9;border-color:#ecd9a9;color:#75551c}
-#masterApp #daySchedule .schedule-time{font-size:14px;font-weight:850;letter-spacing:.01em}
-#masterApp #daySchedule .schedule-info strong{font-size:14px;font-weight:800}
-#masterApp #daySchedule .schedule-info small{color:inherit;opacity:.78}
-#masterApp #daySchedule .schedule-badge{font-weight:750}
-body[data-theme="dark"] #masterApp #calendarGrid .day.has:not(.today):not(.off){background:#342b40;border-color:#59456f;color:#eadcf8}
-body[data-theme="dark"] #masterApp #calendarGrid .day.has:not(.today):not(.off) .num{background:#514064;color:#f2e8fb}
-body[data-theme="dark"] #masterApp #calendarGrid .day.today:not(.off){background:#26364e;border-color:#567db7;color:#e1edff}
-body[data-theme="dark"] #masterApp #calendarGrid .day.off{background:#452b30!important;border-color:#74434b!important;color:#ffdede!important}
-body[data-theme="dark"] #masterApp .calendar-status-legend{background:#302a38}
-body[data-theme="dark"] #masterApp .calendar-status-legend span{color:#eee6f5}
-body[data-theme="dark"] #masterApp #daySchedule .schedule-row.free{background:#20392a;border-color:#3e694b;color:#c8f0d1}
-body[data-theme="dark"] #masterApp #daySchedule .schedule-row.busy{background:#382d47;border-color:#59456f;color:#eadcf8}
-body[data-theme="dark"] #masterApp #daySchedule .schedule-row.blocked,body[data-theme="dark"] #masterApp #daySchedule .schedule-row.off{background:#422b31;border-color:#74434b;color:#ffdede}
-body[data-theme="dark"] #masterApp #daySchedule .schedule-row.warning{background:#443923;border-color:#76613a;color:#ffebba}
-@media(max-width:600px){#masterApp #calendarGrid{gap:4px}#masterApp #calendarGrid .day{min-height:76px;padding:5px;border-radius:9px}#masterApp #calendarGrid .day .num{width:24px;height:24px;font-size:12px}#masterApp #calendarGrid .day .hours-long{display:none}#masterApp #calendarGrid .day .hours-compact{display:inline}#masterApp #calendarGrid .day small{font-size:9px}#masterApp #calendarGrid .day .day-legend{padding:3px 5px;font-size:9px}#masterApp #daySchedule .schedule-row{grid-template-columns:86px minmax(0,1fr);gap:8px;padding:10px 9px 10px 13px}#masterApp #daySchedule .schedule-row>.schedule-actions{grid-column:1/-1}#masterApp #daySchedule .schedule-time{font-size:12px}#masterApp .calendar-status-legend{gap:7px 10px;padding:9px}#masterApp .calendar-status-legend span{font-size:10px}}
-
 </style>
 <!-- Nailora v8.27: show only “Свободно” on client available time rows; keep duration internally for booking validation. -->
 <!-- Nailora v8.25: restore master-specific schedule from Supabase before display; show busy bookings even when work intervals are missing. -->
@@ -1174,375 +1076,6 @@ html.nailora-load-timeout::before{content:"Nailora загружается дол
  #nailoraTetrisDialog .tetris-controls button{min-height:44px;font-size:26px}
 }
 </style>
-
-<!-- Nailora v8.80: presentation-only styles merged onto the full Supabase-enabled v8.74 production source. Demo UI and demo handlers are not included. -->
-<style id="nailora-v876-premium-visual">
-
-/* Nailora v8.76: premium visual refresh. Presentation-only overrides; application logic and data flows unchanged. */
-:root{
- --n75-ink:#272332;--n75-muted:#81798b;--n75-line:rgba(104,82,130,.13);
- --n75-purple:#7654a5;--n75-purple-dark:#563879;--n75-lilac:#eee7f7;
- --n75-surface:rgba(255,255,255,.88);--n75-shadow:0 18px 48px rgba(55,36,75,.085);
- font-family:Manrope,Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
- color:var(--n75-ink);background:#f7f4fa;
-}
-html{background:#f7f4fa;scroll-behavior:smooth}
-body{min-height:100vh;background:radial-gradient(ellipse at 12% 0%,rgba(220,204,240,.42),transparent 34%),radial-gradient(ellipse at 92% 12%,rgba(244,220,226,.38),transparent 30%),linear-gradient(180deg,#faf8fc 0%,#f5f2f8 100%);color:var(--n75-ink);-webkit-font-smoothing:antialiased}
-body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.16;background-image:radial-gradient(#b8a6cb .65px,transparent .65px);background-size:18px 18px;mask-image:linear-gradient(to bottom,black,transparent 72%);z-index:-1}
-.wrap{max-width:1160px;padding:clamp(14px,2.4vw,28px)}
-header{background:rgba(255,255,255,.82);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid var(--n75-line);box-shadow:0 8px 28px rgba(48,34,66,.035);padding:17px 22px}
-h1,h2,h3{letter-spacing:-.035em;color:#30283a}
-h1{font-weight:800}h2{font-size:clamp(20px,2.3vw,27px);font-weight:750}h3{font-weight:700}
-.muted{color:var(--n75-muted);line-height:1.55}
-.panel{background:var(--n75-surface);border:1px solid rgba(255,255,255,.9);border-radius:22px;padding:clamp(16px,2.2vw,24px);margin-bottom:18px;box-shadow:var(--n75-shadow);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
-.card{background:linear-gradient(145deg,#fff 0%,#fcfaff 100%);border:1px solid var(--n75-line);border-radius:17px;padding:16px;margin:10px 0;box-shadow:0 7px 22px rgba(58,40,78,.045);transition:transform .18s ease,box-shadow .18s ease}
-.card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(58,40,78,.085)}
-.btn,.tabs button,button.theme-choice{border:1px solid transparent;border-radius:13px;padding:11px 16px;background:#eee8f5;color:#4b3b5d;cursor:pointer;font:inherit;font-weight:700;transition:transform .16s ease,box-shadow .16s ease,background .16s ease;box-shadow:none}
-.btn:hover,.tabs button:hover,button.theme-choice:hover{transform:translateY(-1px);box-shadow:0 7px 18px rgba(81,57,112,.12)}
-.btn:active,.tabs button:active{transform:translateY(0) scale(.985)}
-.btn.primary,.tabs button.active{background:linear-gradient(135deg,#8968b4,#67458f);color:#fff;box-shadow:0 8px 20px rgba(112,79,153,.22)}
-.btn:not(.primary){border-color:var(--n75-line)}
-input,select,textarea{border:1px solid rgba(111,91,135,.2);border-radius:12px;padding:12px 14px;background:rgba(255,255,255,.92);color:var(--n75-ink);font:inherit;min-height:44px;transition:border-color .16s ease,box-shadow .16s ease}
-input:focus,select:focus,textarea:focus{outline:none;border-color:#9b7ac0;box-shadow:0 0 0 4px rgba(137,104,180,.13)}
-label{font-weight:650;color:#5e536b;margin:12px 0 6px}
-.tabs{gap:9px;margin:0 0 18px;padding:5px;border-radius:16px;background:rgba(231,223,240,.62);width:fit-content;max-width:100%}
-.tabs button{border-radius:11px;padding:10px 15px;background:transparent}
-.stats{gap:12px}.stat{background:linear-gradient(145deg,#f5effa,#fff);border:1px solid var(--n75-line);border-radius:17px;padding:16px}.stat strong{font-size:clamp(20px,2.5vw,27px);letter-spacing:-.04em;color:#5f4380}
-.day{min-height:clamp(62px,7vw,86px);border:1px solid rgba(110,89,133,.14);border-radius:13px;padding:8px;background:rgba(255,255,255,.88);transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
-.day:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 7px 16px rgba(58,40,78,.08);border-color:#bda9d2}
-.day.today:not(.off){background:linear-gradient(145deg,#e7efff,#f5f8ff);border-color:#91b4f5;color:#244a87;outline:2px solid rgba(83,133,220,.22)}
-.day.has:not(.today):not(.off){background:linear-gradient(145deg,#e8f5ed,#f7fcf8);border-color:#a8d5b7;color:#286344}
-.day.off{background:linear-gradient(145deg,#fff0f0,#fff9f9)!important;border-color:#edb6b6!important;color:#984c4c!important}
-.day.selected{box-shadow:inset 0 0 0 2px #9875bd,0 5px 14px rgba(112,79,153,.1)}
-.profile-header-row{align-items:center;gap:18px}.profile-identity{gap:4px}.profile-avatar-hero,.profile-avatar-placeholder{border-radius:22px;box-shadow:0 8px 22px rgba(53,38,70,.12)}
-.profile-nickname{font-size:clamp(20px,2.4vw,27px);font-weight:800;letter-spacing:-.04em;color:#30263b}
-.profile-greeting{color:var(--n75-muted);font-size:13px}
-#specialtyPickerPanel{background:linear-gradient(115deg,#f0e8f8,#fff 65%,#f9edf2)!important;border:1px solid rgba(148,119,177,.2)!important;border-radius:18px!important;box-shadow:0 8px 24px rgba(74,52,94,.06)!important}
-#specialtyPickerPanel strong{color:#60427e}
-#specialtyPickerPanel select{max-width:100%}
-#masterApp>.panel,#clientApp>.panel{scroll-margin-top:18px}
-#masterApp header .wrap{padding-top:4px;padding-bottom:4px}
-#masterApp .header-actions,#clientApp .header-actions{gap:8px;flex-wrap:wrap}
-.theme-picker{padding:15px;border-radius:17px;background:linear-gradient(135deg,#faf7fd,#f2edf8);border:1px solid var(--n75-line)}
-.theme-options{gap:9px}
-.theme-choice{border-radius:12px!important;background:#fff!important;border:1px solid var(--n75-line)!important}
-.theme-choice[aria-pressed="true"]{border-color:#9c7bbb!important;box-shadow:0 0 0 3px rgba(137,104,180,.12)!important}
-#calendar,#clientCalendarGrid{gap:7px}
-.schedule-list .card{border-radius:14px}
-.dialog-head{background:linear-gradient(120deg,#f6f0fb,#fff);border-bottom:1px solid var(--n75-line)}
-[role="dialog"],dialog{border-radius:22px;border:1px solid var(--n75-line);box-shadow:0 24px 80px rgba(35,24,48,.2)}
-button:focus-visible{outline:3px solid rgba(137,104,180,.45);outline-offset:2px}
-.hidden{display:none!important}
-@media(min-width:900px){#welcome{padding-top:7vh!important}#welcome>.panel{padding:clamp(30px,5vw,58px)!important;border-radius:30px}#welcome h1{font-size:clamp(34px,4vw,46px)!important}}
-@media(max-width:650px){
- .wrap{padding:12px}.panel{border-radius:18px;padding:15px;margin-bottom:13px}.card{border-radius:15px;padding:13px}
- header{padding:13px 12px}.tabs{width:100%;overflow-x:auto;flex-wrap:nowrap}.tabs button{white-space:nowrap;flex:0 0 auto}
- .stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat{padding:12px}.day{min-height:58px;padding:6px 4px;border-radius:10px}.day small{font-size:10px}
- .profile-header-row{align-items:flex-start}.profile-avatar-hero,.profile-avatar-placeholder{width:54px;height:54px;border-radius:17px}
- #welcome{padding-top:4vh!important}#welcome>.panel{padding:21px!important;border-radius:23px}
- .btn{padding:10px 13px}
-}
-@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
-
-
-</style>
-<style id="nailora-v876-booking-visual">
-
-/* Appointment and booking surfaces */
-#clientBookingDialog,
-#reviewDialog {
-  width: min(560px, calc(100vw - 28px));
-  max-width: 560px;
-  max-height: min(88dvh, 820px);
-  padding: 0;
-  border: 1px solid rgba(132, 105, 165, .18);
-  border-radius: 24px;
-  background: var(--card, #fff);
-  color: var(--text, #292536);
-  box-shadow: 0 24px 80px rgba(35, 23, 52, .24);
-  overflow: hidden;
-}
-#clientBookingDialog::backdrop,
-#reviewDialog::backdrop {
-  background: rgba(25, 19, 34, .48);
-  backdrop-filter: blur(5px);
-}
-#clientBookingDialog[open],
-#reviewDialog[open] { animation: nailoraBookingIn .22s ease-out both; }
-@keyframes nailoraBookingIn {
-  from { opacity: 0; transform: translateY(12px) scale(.985); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-#clientBookingDialog .dialog-head,
-#reviewDialog .dialog-head {
-  padding: 22px 22px 16px;
-  border-bottom: 1px solid rgba(132, 105, 165, .13);
-  background: linear-gradient(135deg, rgba(145, 111, 181, .11), rgba(220, 203, 237, .10));
-}
-#clientBookingDialog .dialog-head h2,
-#reviewDialog .dialog-head h2 {
-  font-size: clamp(19px, 4vw, 23px);
-  letter-spacing: -.035em;
-  font-weight: 750;
-}
-#clientBookingDialog .dialog-body,
-#reviewDialog .dialog-body {
-  padding: 20px 22px 22px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-#clientBookingForm,
-#appointmentForm,
-#masterServiceForm {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-#clientBookingForm label,
-#appointmentForm label,
-#masterServiceForm label {
-  margin: 5px 0 1px;
-  font-size: 13px;
-  line-height: 1.35;
-  font-weight: 650;
-  color: var(--text, #393344);
-}
-#clientBookingForm input:not([type="hidden"]):not([type="file"]),
-#clientBookingForm select,
-#clientBookingForm textarea,
-#appointmentForm input:not([type="hidden"]):not([type="checkbox"]):not([type="file"]),
-#appointmentForm textarea,
-#masterServiceForm input:not([type="hidden"]) {
-  width: 100%;
-  min-height: 48px;
-  padding: 12px 14px;
-  border: 1px solid rgba(132, 105, 165, .23);
-  border-radius: 14px;
-  background: var(--input-bg, rgba(255,255,255,.82));
-  color: var(--text, #292536);
-  font: inherit;
-  font-size: 15px;
-  outline: none;
-  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
-}
-#clientBookingForm textarea,
-#appointmentForm textarea { min-height: 88px; resize: vertical; }
-#clientBookingForm input:focus,
-#clientBookingForm select:focus,
-#clientBookingForm textarea:focus,
-#appointmentForm input:focus,
-#appointmentForm textarea:focus,
-#masterServiceForm input:focus {
-  border-color: var(--accent, #8965ad);
-  box-shadow: 0 0 0 4px rgba(137, 101, 173, .13);
-}
-#clientBookingServicePrice,
-#clientBookingAvailabilityHint {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(137, 101, 173, .075);
-}
-#clientBookingServicePrice {
-  color: var(--accent, #765194);
-  font-weight: 750;
-  font-size: 15px;
-}
-#clientBookingForm .photo-picker-help,
-#appointmentForm .photo-picker-help {
-  margin: -5px 0 2px;
-  font-size: 12px;
-}
-#clientBookingPhotos,
-#appointmentPhotos {
-  padding: 10px;
-  border: 1px dashed rgba(132, 105, 165, .35);
-  border-radius: 13px;
-  background: rgba(137, 101, 173, .045);
-  max-width: 100%;
-}
-#clientBookingForm .account-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  margin-top: 8px;
-}
-#clientBookingSubmit,
-#appointmentForm button[type="submit"],
-#saveMasterService {
-  min-height: 48px;
-  border-radius: 14px;
-  font-weight: 700;
-  box-shadow: 0 7px 18px rgba(104, 74, 137, .16);
-}
-#clientBookingForm button:not(.primary),
-#appointmentForm button:not(.primary),
-#masterServiceForm button:not(.primary) {
-  min-height: 46px;
-  border-radius: 13px;
-}
-#appointmentFormPanel {
-  border: 1px solid rgba(132, 105, 165, .17);
-  border-radius: 22px;
-  padding: clamp(16px, 3vw, 24px);
-  background: linear-gradient(155deg, rgba(255,255,255,.97), rgba(247,243,251,.96));
-  box-shadow: 0 12px 36px rgba(55, 39, 73, .08);
-}
-#appointmentFormPanel > h2 {
-  margin: 0 0 15px;
-  font-size: 22px;
-  letter-spacing: -.035em;
-}
-#appointmentForm .row,
-#masterServiceForm .row {
-  gap: 12px;
-  align-items: end;
-}
-#appointmentForm .row > div,
-#masterServiceForm .row > div { min-width: 0; flex: 1 1 0; }
-#appointmentForm input[type="checkbox"] {
-  accent-color: var(--accent, #8965ad);
-  transform: scale(1.12);
-}
-#masterServiceEditor {
-  padding: 14px 16px;
-  border: 1px solid rgba(132, 105, 165, .18);
-  border-radius: 17px;
-  background: rgba(137, 101, 173, .045);
-}
-#masterServiceEditor > summary {
-  list-style-position: inside;
-  color: var(--accent, #765194);
-  font-weight: 750 !important;
-}
-#masterServiceEditor[open] > summary { margin-bottom: 12px; }
-#masterServicesList > * {
-  border-radius: 16px;
-}
-@media (max-width: 560px) {
-  #clientBookingDialog,
-  #reviewDialog {
-    width: calc(100vw - 16px);
-    max-height: 92dvh;
-    border-radius: 20px;
-  }
-  #clientBookingDialog .dialog-head,
-  #reviewDialog .dialog-head { padding: 18px 17px 13px; }
-  #clientBookingDialog .dialog-body,
-  #reviewDialog .dialog-body { padding: 16px 17px 18px; }
-  #clientBookingForm .account-actions { grid-template-columns: 1fr; }
-  #appointmentForm .row,
-  #masterServiceForm .row { flex-direction: column; align-items: stretch; }
-  #appointmentForm .row > div,
-  #masterServiceForm .row > div { width: 100%; }
-}
-@media (prefers-reduced-motion: reduce) {
-  #clientBookingDialog[open],
-  #reviewDialog[open] { animation: none; }
-  #clientBookingForm *,
-  #appointmentForm *,
-  #masterServiceForm * { transition: none !important; }
-}
-
-</style>
-<style id="nailora-v878-premium-refinement">
-
-/* Nailora v8.78: дополнительная визуальная полировка. Только CSS, без изменения логики. */
-:root{
-  --n78-accent:#7955a6;
-  --n78-accent-soft:#f1eafa;
-  --n78-border:rgba(115,88,145,.15);
-  --n78-shadow:0 10px 30px rgba(53,35,73,.075);
-  --n78-radius:18px;
-}
-body{font-family:Manrope,"Segoe UI",Arial,sans-serif}
-header{
-  background:rgba(255,255,255,.88);
-  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-  box-shadow:0 5px 24px rgba(53,35,73,.045);
-}
-h1,h2,h3{letter-spacing:-.035em}
-.panel,.card,.settings-section,.review-card,.service-row,.month-day-row{
-  border-radius:var(--n78-radius);
-  border-color:var(--n78-border);
-  box-shadow:var(--n78-shadow);
-}
-.panel{padding:clamp(14px,2vw,21px)}
-.card{padding:15px}
-.tabs{gap:7px}
-.tabs button,.btn{border-radius:12px;font-weight:700}
-.btn.primary,.tabs button.active{
-  background:linear-gradient(135deg,#8969b0,#6e4b94);
-  box-shadow:0 5px 14px rgba(110,75,148,.2);
-}
-button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,
-textarea:focus-visible{outline:3px solid rgba(137,105,176,.32);outline-offset:2px}
-input,select,textarea{border-radius:11px}
-.profile-header-row{gap:18px}
-.profile-avatar-hero,.profile-avatar-placeholder{
-  box-shadow:0 7px 20px rgba(53,35,73,.12);
-}
-.master-card-head{align-items:center}
-.master-card-avatar,.master-card-avatar-placeholder{
-  box-shadow:0 4px 14px rgba(53,35,73,.10);
-}
-.dashboard-grid{gap:12px}
-.dashboard-card{
-  border-radius:17px;border-color:var(--n78-border);
-  box-shadow:0 7px 22px rgba(53,35,73,.055);
-}
-.dashboard-feature{
-  background:linear-gradient(140deg,#f0e7fa,#fffafd);
-  border-color:#e4d5f1;
-}
-.dashboard-eyebrow{letter-spacing:.11em}
-.dashboard-card strong{letter-spacing:-.045em}
-.service-row{gap:12px;padding:13px}
-.service-description{gap:5px}
-.service-actions .btn{border-radius:10px}
-.settings-section{
-  padding:16px;background:rgba(255,255,255,.72);
-}
-.settings-section h3{letter-spacing:-.025em}
-dialog{
-  border-radius:20px;
-  box-shadow:0 24px 75px rgba(35,23,48,.22);
-}
-.dialog-head{background:rgba(250,247,253,.92)}
-.schedule-empty,.schedule-badge{border-radius:12px}
-.day{border-radius:11px}
-#calendarGrid .day,#clientCalendarGrid .day{box-shadow:0 2px 8px rgba(53,35,73,.035)}
-#calendarGrid .day.today,#clientCalendarGrid .day.today{box-shadow:0 0 0 2px rgba(121,85,166,.18)}
-body[data-theme="dark"] header,
-body[data-theme="dark"] .panel,
-body[data-theme="dark"] .card,
-body[data-theme="dark"] .settings-section,
-body[data-theme="dark"] .service-row,
-body[data-theme="dark"] .dashboard-card{
-  background:var(--panel-bg,#25212d);
-  color:var(--text-color,#f4eff8);
-  border-color:var(--border-color,#403849);
-}
-body[data-theme="mint"] .settings-section,
-body[data-theme="rose"] .settings-section{
-  background:var(--panel-bg,#fff);
-}
-@media(max-width:760px){
-  .panel{padding:13px}
-  .dashboard-grid{gap:8px}
-  .dashboard-card{padding:12px;border-radius:14px}
-  .service-row{padding:11px}
-}
-@media(max-width:520px){
-  header{padding:14px}
-  .profile-avatar-hero,.profile-avatar-placeholder{width:68px;height:68px;flex-basis:68px}
-  .master-card-avatar,.master-card-avatar-placeholder{width:52px;height:52px;flex-basis:52px}
-  .dialog-head,.dialog-body{padding:13px}
-}
-@media(prefers-reduced-motion:reduce){
-  *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
-}
-
-</style>
 </head>
 <body class="auth-pending">
 <script>window.__nailoraClearLoadGuard&&window.__nailoraClearLoadGuard();</script>
@@ -1585,7 +1118,7 @@ body[data-theme="rose"] .settings-section{
  <article class="dashboard-card"><span class="dashboard-icon">↗</span><span class="dashboard-label">Ближайшая запись</span><strong id="dashNextTime">—</strong><small id="dashNextName">Предстоящих записей нет</small></article>
 </div>
 <details class="panel" id="monthHoursPanel"><summary class="month-hours-summary"><h2>Рабочее время на месяц</h2><span class="muted small">Нажми, чтобы настроить</span></summary><div class="month-hours-body"><p class="muted small">Эти часы применяются ко всем дням выбранного месяца, кроме дней, отмеченных как выходные.</p><div class="row"><div><label for="monthStartTime">Начало рабочего дня</label><input id="monthStartTime" type="time" value="09:00" required></div><div><label for="monthEndTime">Окончание рабочего дня</label><input id="monthEndTime" type="time" value="20:00" required></div></div><div class="row" style="margin-top:10px"><button class="btn primary fixed" id="saveMonthHours" type="button">Применить ко всему месяцу</button><span class="muted small" id="monthHoursStatus">График действует на весь выбранный месяц.</span></div></div></details>
-<div class="panel"><div class="row"><label style="flex:0 0 130px">Вид календаря<select id="view"><option value="month">Месяц</option><option value="week">Неделя</option></select></label><div class="muted" style="align-self:end">Нажми на день, чтобы открыть записи. Дважды коснись даты (или дважды щёлкни), чтобы настроить рабочие интервалы, в том числе с перерывами. Удерживай день около секунды, чтобы отметить или снять выходной.</div></div><div class="row" style="margin-top:12px"><button class="btn fixed" id="prev">←</button><h2 id="monthTitle" style="text-align:center;margin:0;flex:2"></h2><button class="btn fixed" id="next">→</button><button class="btn fixed" id="todayBtn">Сегодня</button></div></div>
+<div class="panel"><div class="row"><button class="btn fixed" id="prev">←</button><h2 id="monthTitle" style="text-align:center;margin:0;flex:2"></h2><button class="btn fixed" id="next">→</button><button class="btn fixed" id="todayBtn">Сегодня</button></div><div class="row" style="margin-top:10px"><label style="flex:0 0 150px">Вид календаря<select id="view"><option value="month">Месяц</option><option value="week">Неделя</option></select></label><div class="muted small" style="align-self:end">Нажми на день, чтобы открыть записи. Дважды коснись даты (или дважды щёлкни), чтобы настроить рабочие интервалы, в том числе с перерывами. Удерживай день около секунды, чтобы отметить или снять выходной.</div></div></div>
 <div class="panel"><div class="grid" id="calendarGrid"></div><div id="calendarInsights" class="calendar-insights" aria-live="polite"></div><p class="muted small" style="margin:12px 0 0">Лавандовый — сегодня · сиреневый — есть записи · коралловый — выходной.</p></div>
 <div class="panel"><h2 id="selectedTitle">Распорядок рабочего дня</h2><p class="muted small">Нажми на свободный интервал, чтобы добавить клиента. Удерживай свободную ячейку около секунды, чтобы заблокировать время. Заблокированную ячейку можно разблокировать таким же удержанием.</p><div id="daySchedule" class="schedule-list"></div><details class="master-services" id="masterServicesPanel"><summary class="master-services-summary"><h3 id="masterServicesTitle">Услуги мастера</h3><span class="muted small">Нажми, чтобы свернуть или раскрыть</span></summary><div class="master-services-content"><p class="muted small">Настрой длительность каждой услуги. При выборе услуги клиентом время записи рассчитывается автоматически.</p><div id="masterServicesList"></div><details id="masterServiceEditor" style="margin-top:12px"><summary id="masterServiceEditorSummary" style="cursor:pointer;font-weight:600">+ Добавить услугу</summary><form id="masterServiceForm" style="margin-top:10px"><input type="hidden" id="masterServiceId"><label for="masterServiceName">Название услуги *</label><input id="masterServiceName" required maxlength="120" placeholder="Например, маникюр с покрытием"><div class="row"><div><label for="masterServiceDuration">Длительность, минут *</label><input id="masterServiceDuration" type="number" min="15" max="480" step="15" value="90" required></div><div><label for="masterServicePrice">Цена от <span class="price-currency-symbol" id="masterServicePriceCurrency">(₽)</span></label><input id="masterServicePrice" type="number" min="0" step="0.01" value="0"></div></div><div class="row" style="margin-top:10px"><button class="btn primary fixed" id="saveMasterService" type="submit">Сохранить услугу</button><button class="btn fixed hidden" id="cancelMasterServiceEdit" type="button">Отмена</button></div></form></details></div></details></div>
 <div class="panel" id="masterReviewsPanel"><h2>Рейтинг мастера и отзывы</h2><div id="masterRatingSummary"></div><div id="masterReviewsList"></div><p class="muted small">Отзывы оставляются клиентами по прошедшим записям. В демоверсии они сохраняются только в этом браузере.</p></div><div class="panel appointment-form-panel hidden" id="appointmentFormPanel"><h2 id="appointmentFormTitle">Новая запись</h2><form id="appointmentForm"><input type="hidden" id="appointmentId"><div class="row"><div><label>Дата записи *</label><input id="appointmentDate" type="date" required></div><div><label>Время *</label><input id="appointmentTime" type="time" required value="10:00"></div></div><div class="row"><div><label>Имя клиента *</label><input id="appointmentName" required maxlength="100" placeholder="Имя и фамилия"></div><div><label>Телефон клиента</label><input id="appointmentPhone" type="tel" maxlength="30" placeholder="Телефон"></div></div><div class="row"><div><label>Услуга</label><input id="appointmentService" maxlength="120" placeholder="Например, маникюр с покрытием"></div><div><label for="appointmentPrice">Цена <span class="price-currency-symbol" id="appointmentPriceCurrency">(₽)</span></label><input id="appointmentPrice" type="number" min="0" step="0.01" value="0"></div></div><div class="row appointment-duration-row"><div style="flex:0 1 320px"><label for="appointmentDuration">Продолжительность, минут</label><input id="appointmentDuration" type="number" min="15" max="480" step="15" required value="60"></div></div><label>Комментарий</label><textarea id="appointmentNotes" rows="2" maxlength="500" placeholder="Пожелания клиента"></textarea><label for="appointmentPhotos">Прикрепить фото из галереи</label><input id="appointmentPhotos" type="file" accept="image/*" multiple><p class="photo-picker-help">До 3 фотографий к комментарию. Фото автоматически сжимаются.</p><div id="appointmentPhotoPreview" class="photo-preview-grid"></div><label><input id="appointmentPaid" type="checkbox" style="width:auto;margin-right:8px">Услуга уже оплачена</label><div class="row" style="margin-top:12px"><button class="btn primary fixed" type="submit">Сохранить запись</button><button class="btn fixed" type="button" id="cancelAppointment">Отмена</button></div></form></div>
@@ -2926,11 +2459,26 @@ let migratedClientCards=false;
 data.appointments.forEach(a=>{const existed=data.clients.find(c=>(a.clientId&&c.id===a.clientId)||String(c.name||'').trim().toLocaleLowerCase()===String(a.name||'').trim().toLocaleLowerCase());const c=ensureClientCard({id:a.clientId||'',name:a.name||'',service:a.service||'',price:a.price??''});if(c&&!a.clientId){a.clientId=c.id;migratedClientCards=true}if(!existed&&c)migratedClientCards=true});
 if(migratedClientCards){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}}
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('hidden',x.id!==b.dataset.tab));renderAll()});
-function moveMasterMonth(delta){cursor.setMonth(cursor.getMonth()+delta);selectedDate=iso(new Date(cursor.getFullYear(),cursor.getMonth(),1));renderCalendar();renderAppointments()}
+function moveMasterMonth(delta){
+ if($('view')?.value==='week'){
+  const d=new Date((selectedDate||iso(new Date()))+'T12:00:00');
+  d.setDate(d.getDate()+delta*7);
+  selectedDate=iso(d);
+  cursor=new Date(d.getFullYear(),d.getMonth(),1);
+ }else{
+  cursor.setMonth(cursor.getMonth()+delta);
+  selectedDate=iso(new Date(cursor.getFullYear(),cursor.getMonth(),1));
+ }
+ renderCalendar();renderAppointments();
+}
 $('prev').onclick=()=>moveMasterMonth(-1);
 $('next').onclick=()=>moveMasterMonth(1);
-$('todayBtn').onclick=()=>{cursor=new Date();cursor.setDate(1);selectedDate=iso(new Date());renderCalendar();renderAppointments()};
-$('view').onchange=renderCalendar;
+$('todayBtn').onclick=()=>{const today=new Date();cursor=new Date(today.getFullYear(),today.getMonth(),1);selectedDate=iso(today);renderCalendar();renderAppointments()};
+$('view').onchange=()=>{
+ const d=new Date((selectedDate||iso(new Date()))+'T12:00:00');
+ cursor=new Date(d.getFullYear(),d.getMonth(),1);
+ renderCalendar();renderAppointments();
+};
 function attachMasterDayEvents(button,ds){
  let pressTimer=null,clickTimer=null,longPressed=false;
  button.addEventListener('pointerdown',event=>{if(event.button!==undefined&&event.button!==0)return;longPressed=false;if(pressTimer)clearTimeout(pressTimer);pressTimer=setTimeout(()=>{longPressed=true;if(clickTimer){clearTimeout(clickTimer);clickTimer=null}toggleDayOff(ds)},650)});
@@ -2967,12 +2515,21 @@ function renderMasterDashboard(){
 
 
 function renderCalendar(){
-$('monthTitle').textContent=formatMonth(new Date(cursor.getFullYear(),cursor.getMonth(),1))+' '+cursor.getFullYear();
 const grid=$('calendarGrid');grid.innerHTML='';
 localizedWeekdays().forEach(x=>{let d=document.createElement('div');d.className='dayname muted';d.textContent=x;grid.append(d)});
 let start=new Date(cursor.getFullYear(),cursor.getMonth(),1), end=new Date(cursor.getFullYear(),cursor.getMonth()+1,0);
 let first=(start.getDay()+6)%7,total=end.getDate();
-if($('view').value==='week'){let base=new Date(selectedDate+'T12:00:00');let shift=(base.getDay()+6)%7;base.setDate(base.getDate()-shift);start=base;total=7;first=0}
+if($('view').value==='week'){
+ start=new Date((selectedDate||iso(new Date()))+'T12:00:00');
+ start.setDate(start.getDate()-((start.getDay()+6)%7));
+ end=new Date(start);end.setDate(start.getDate()+6);
+ first=0;total=7;
+ const left=new Intl.DateTimeFormat(LOCALES[currentLanguage]||currentLanguage,{day:'numeric',month:'short'}).format(start);
+ const right=new Intl.DateTimeFormat(LOCALES[currentLanguage]||currentLanguage,{day:'numeric',month:'short',year:'numeric'}).format(end);
+ $('monthTitle').textContent=left+'–'+right;
+}else{
+ $('monthTitle').textContent=formatMonth(new Date(cursor.getFullYear(),cursor.getMonth(),1))+' '+cursor.getFullYear();
+}
 for(let i=0;i<first;i++){let blank=document.createElement('div');grid.append(blank)}
 for(let i=0;i<total;i++){
  let d;if($('view').value==='week'){d=new Date(start);d.setDate(start.getDate()+i)}else d=new Date(cursor.getFullYear(),cursor.getMonth(),i+1);
