@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ru">
 <head>
+<!-- Nailora v8.72: non-blocking Supabase startup, lazy QR library, mobile-data loading recovery, and single master refresh. Based on v8.71. -->
 <!-- Nailora v8.66: automatic client cards, appointment duration layout, and master timezone sync for iOS Home Screen. -->
 <!-- Nailora v8.65 baseline with additive Web Push integration. Existing app logic retained. -->
 <!-- Nailora v8.64: revert calendar gesture/animation experiments; change months using arrows only. -->
@@ -32,7 +33,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<title>Nailora v8.71 · безопасный каталог мастеров · поддержка</title>
+<title>Nailora v8.72 · быстрый запуск · поддержка</title>
 <style>
 :root{font-family:Manrope,"Segoe UI",Arial,sans-serif;color:#292433;background:#f7f5fa}*{box-sizing:border-box}body{margin:0}header{background:#fff;padding:18px 22px;border-bottom:1px solid #e8e2ef}h1{font-size:22px;margin:0 0 6px}header p{margin:0;color:#766d80;font-size:14px}.wrap{max-width:1100px;margin:0 auto;padding:18px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tabs button,.btn{border:0;border-radius:10px;padding:10px 14px;background:#e9e2f1;color:#342742;cursor:pointer;font-weight:600}.tabs button.active,.btn.primary{background:#71529a;color:#fff}.panel{background:white;border:1px solid #e9e3ee;border-radius:14px;padding:16px;margin-bottom:16px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:1}.row .fixed{flex:0 0 auto}input,select,textarea{width:100%;padding:10px;border:1px solid #d9d1e1;border-radius:8px;font:inherit;background:#fff}label{display:block;font-size:13px;color:#655b70;margin:8px 0 5px}
 .password-field{position:relative;width:100%}.password-field input{padding-right:48px}.password-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);padding:5px 9px;min-width:36px;border:0!important;background:transparent!important;color:#655b70!important;box-shadow:none!important;filter:none!important;font-size:18px;line-height:1;cursor:pointer}.password-toggle svg{display:block;width:20px;height:20px}.password-toggle:hover{box-shadow:none!important;filter:none!important}.password-toggle:focus-visible{outline:2px solid #71529a;outline-offset:1px;border-radius:6px}.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.day{min-height:75px;border:1px solid #e5dfeb;border-radius:8px;padding:7px;background:#fff;text-align:left;cursor:pointer;touch-action:pan-y;user-select:none;-webkit-user-select:none}.day.today{outline:2px solid #2563eb;outline-offset:1px}.day.today:not(.off){background:#dbeafe;border-color:#2563eb;color:#1e3a8a}.day.has:not(.today):not(.off){background:#dcfce7;border-color:#22c55e;color:#14532d}.day.off{background:#fee2e2!important;border-color:#ef4444!important;color:#991b1b}.day.today.off{outline:3px solid #2563eb}.day.selected{box-shadow:inset 0 0 0 2px #8b5cf6}.day:disabled{opacity:1;cursor:not-allowed}.day .num{font-weight:bold}.day small{display:block;margin-top:5px;color:inherit;font-size:11px}.day .day-legend{display:block;font-size:10px;margin-top:3px;color:inherit}.muted{color:#786e80;font-size:14px}.card{border:1px solid #e9e2ee;border-radius:10px;padding:12px;margin:8px 0}.card h3{margin:0 0 6px;font-size:16px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:#f5f0fa;border-radius:10px;padding:13px}.stat strong{display:block;font-size:21px;margin-top:5px}.verify-panel{max-width:650px;margin:0 auto;text-align:center;padding:clamp(20px,4vw,30px)!important}.verify-mark{width:58px;height:58px;display:grid;place-items:center;margin:0 auto 12px;border-radius:20px;background:#f0e9f8;color:#7955a6;font-size:28px;box-shadow:inset 0 0 0 1px #e5d8f2}.verify-title{margin:0 0 8px;color:#4e3c62;font-size:clamp(22px,4vw,28px);line-height:1.25}.verify-subtitle{color:#74677f;line-height:1.6;margin:0 auto 16px;max-width:480px}.verify-intro{font-size:1rem;font-weight:600;color:#4e3c62;background:#f7f3fb;border:1px solid #e9dff3;padding:12px 15px;border-radius:12px;line-height:1.6;margin:0 0 14px}.verify-steps{list-style:none;counter-reset:verify-step;text-align:left;margin:14px 0;padding:0;display:grid;gap:10px;line-height:1.5;font-size:1rem;font-weight:500;color:#40354d}.verify-steps li{counter-increment:verify-step;position:relative;padding:13px 14px 13px 54px;background:#fbf9fd;border:1px solid #eee6f5;border-radius:12px;min-height:52px}.verify-steps li::before{content:counter(verify-step);position:absolute;left:13px;top:13px;width:28px;height:28px;display:grid;place-items:center;border-radius:50%;background:#e9def5;color:#684a8d;font-size:14px;font-weight:800}.verify-steps li strong{display:block;font-weight:750;color:#4e3c62}.verify-steps li span{display:block;margin-top:3px;color:#796e84;font-size:.92rem;font-weight:400}.verify-note{margin:14px 0 10px;padding:13px 15px;border-radius:12px;background:#f0f7f3;border:1px solid #dcece2;color:#476554;font-size:.95rem;line-height:1.55}.verify-help{margin-top:12px;color:#82798a;line-height:1.55}.link-button{border:0;background:transparent;color:#79658d;text-decoration:underline;text-underline-offset:3px;padding:5px 8px;font:inherit;font-size:13px;cursor:pointer;border-radius:7px}.link-button:hover{background:#f4eef8}.link-button:focus-visible{outline:2px solid #9a80b7;outline-offset:2px}@media(max-width:600px){.verify-panel{padding:20px 15px!important}.verify-steps li{padding:12px 12px 12px 50px}.verify-steps li::before{left:11px;top:12px}}.hidden{display:none!important}.danger{background:#f9e8e8;color:#8d2525}.small{font-size:12px}@media(max-width:600px){.wrap{padding:10px}.grid{gap:3px}.day{min-height:62px;padding:4px}.day small{font-size:9px}.stats{grid-template-columns:1fr}.dayname{font-size:11px;text-align:center}}
@@ -1028,8 +1029,23 @@ html.nailora-load-timeout::before{content:"Nailora загружается дол
   window.addEventListener('pageshow',function(){document.documentElement.classList.remove('nailora-load-timeout')});
 })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script>
+// Cloud SDK loads asynchronously: a slow mobile connection must not block
+// parsing and displaying Nailora's local start screen.
+(function(){
+  window.__nailoraSupabaseReady = new Promise(function(resolve){
+    var settled=false;
+    function finish(ok){if(settled)return;settled=true;resolve(!!ok);}
+    var script=document.createElement('script');
+    script.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+    script.async=true;
+    script.onload=function(){finish(!!window.supabase?.createClient);if(window.__nailoraStartCloud)window.__nailoraStartCloud();};
+    script.onerror=function(){finish(false);};
+    window.setTimeout(function(){finish(false);},8000);
+    document.head.appendChild(script);
+  });
+})();
+</script>
 <style>
 #nailoraTetrisDialog{box-sizing:border-box;width:min(420px,calc(100% - 20px));max-width:calc(100vw - 20px);max-height:92vh;max-height:92dvh;overflow:auto;border:1px solid #e9e2ee;border-radius:18px;padding:0;background:var(--panel-bg,#fff);color:var(--text-color,#292433);box-shadow:0 20px 70px #20142e40;margin:auto}#nailoraTetrisDialog::backdrop{background:rgba(25,18,33,.62)}#nailoraTetrisDialog *{box-sizing:border-box;min-width:0}.tetris-body{display:flex;flex-direction:column;align-items:center;gap:12px}.tetris-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}.tetris-stat{background:var(--page-bg,#f7f5fa);border:1px solid var(--border-color,#e9e2ee);border-radius:12px;padding:8px;text-align:center;display:flex;flex-direction:column;gap:3px}.tetris-stat span{font-size:12px;color:var(--muted-color,#746b7c)}.tetris-stat strong{font-size:19px}.tetris-board-wrap{position:relative;width:min(100%,300px);margin:auto;border:2px solid #d7c4e8;border-radius:8px;overflow:hidden;background:#211a2d;line-height:0;touch-action:pan-y}.tetris-board-wrap canvas{display:block;width:100%;height:auto;aspect-ratio:1/2}.tetris-overlay{position:absolute;inset:0;display:flex;cursor:pointer;touch-action:manipulation;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:18px;background:rgba(28,20,39,.76);color:#fff;line-height:1.35}.tetris-overlay.hidden{display:none}.tetris-overlay strong{font-size:22px}.tetris-overlay span{font-size:14px}.tetris-actions{display:flex;gap:8px;width:100%}.tetris-actions button{flex:1}.tetris-controls{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;width:100%;max-width:340px}.tetris-controls button{min-height:46px;border:1px solid #d9c8e8;border-radius:12px;background:linear-gradient(145deg,#f9eafa,#eee5ff);color:#4b315d;font-size:25px;font-weight:700;touch-action:manipulation;user-select:none;-webkit-user-select:none}.tetris-controls button:active{transform:scale(.96);background:#e4d1f5}.tetris-help{margin:0;text-align:center;line-height:1.45}@media(max-height:760px){#nailoraTetrisDialog{max-height:96vh;max-height:96dvh}.tetris-board-wrap{width:min(100%,250px)}.tetris-controls button{min-height:40px}}
 /* Nailora v8.56: fit the complete Tetris interface inside the phone viewport. */
@@ -1722,7 +1738,7 @@ if(!data.availabilityByDate||typeof data.availabilityByDate!=='object'||Array.is
 if(!Array.isArray(data.blockedSlots))data.blockedSlots=[];
 if(!Array.isArray(data.services))data.services=[{id:'nailora-service-default',name:'Маникюр с покрытием',durationMinutes:90,price:0}];
 data.services=data.services.filter(x=>x&&typeof x==='object'&&String(x.name||'').trim()).map(x=>({...x,id:String(x.id||((crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random()))),name:String(x.name).trim(),durationMinutes:Math.max(15,Math.min(480,Math.round((Number(x.durationMinutes)||60)/15)*15)),price:Math.max(0,Number(x.price)||0)}));
-try{if(window.supabase?.createClient){cloud=window.supabase.createClient(NAILORA_SUPABASE_URL,NAILORA_SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});$('cloudStatus').textContent='Supabase SDK загружен';}else $('cloudStatus').textContent='Supabase SDK не загрузился. Проверь интернет.'}catch(err){$('cloudStatus').textContent='Ошибка подключения к Supabase';}
+// Supabase client is initialized by startNailoraCloud() after its async SDK load.
 function getEmailRedirectUrl(){return 'https://antonmachehin.github.io/Nailora/'}
 function getAuthLinkErrorCode(){try{const query=new URLSearchParams(window.location.search||'');const hash=new URLSearchParams(String(window.location.hash||'').replace(/^#/,'') );return query.get('error_code')||hash.get('error_code')||''}catch(_){return ''}}
 function isPasswordRecoveryCallback(){try{const query=new URLSearchParams(window.location.search||'');const hash=new URLSearchParams(String(window.location.hash||'').replace(/^#/,'') );return query.get('type')==='recovery'||hash.get('type')==='recovery'}catch(_){return false}}
@@ -1932,7 +1948,9 @@ let clientSelectedDate=iso(new Date());
 
 async function bootCloudAuth(){
   const finishLoading=()=>document.body.classList.remove('auth-pending');
-  if(!cloud){setCloudStatus('Supabase SDK не загрузился');showOnly('welcome');finishLoading();return;}
+  // Do not leave the whole interface hidden while mobile data waits for auth.
+  const startupFallback=window.setTimeout(()=>{setCloudStatus('Подключение к облаку занимает больше времени. Можно продолжить после загрузки.');showOnly('welcome');finishLoading();},10000);
+  if(!cloud){setCloudStatus('Supabase SDK не загрузился');showOnly('welcome');window.clearTimeout(startupFallback);finishLoading();return;}
   try{
     const {data:sessionData,error:sessionError}=await cloud.auth.getSession();
     if(sessionError)throw sessionError;
@@ -1975,12 +1993,44 @@ async function bootCloudAuth(){
     setCloudStatus('Сессия есть, но профиль не удалось загрузить: '+(e.message||'ошибка'));
     showOnly('welcome');
   }finally{
+    window.clearTimeout(startupFallback);
     finishLoading();
   }
 }
 
-cloud?.auth.onAuthStateChange((event,session)=>{cloudUser=session?.user||null;if(event==='PASSWORD_RECOVERY'){sessionStorage.setItem('nailoraPasswordRecoveryActive','1');chosenRole=selectedEntryRole||'client';$('resetEmail').value=cloudUser?.email||$('loginEmail').value||'';$('requestPasswordReset').classList.add('hidden');$('setNewPassword').classList.remove('hidden');$('newPasswordStatus').textContent='Ссылка действительна. Задай новый пароль.';showOnly('resetPassword');return}if(!cloudUser){setCloudStatus('Не выполнен вход в Supabase');if(cloudPollTimer)clearInterval(cloudPollTimer)}else setCloudStatus('Сессия Supabase активна · '+(cloudUser.email||''))});bootCloudAuth();
-async function openRole(role){activeRole=role;chosenRole=role;try{localStorage.setItem(ACTIVE_ROLE_KEY,role)}catch(_){}if((role==='master'||role==='client')&&cloudReady()){try{await syncRoleTimezoneToCloud(role)}catch(timezoneSyncError){console.warn('Account time-zone sync failed:',timezoneSyncError);showAppToast('Не удалось обновить часовой пояс на сервере. Проверь соединение и войди в аккаунт ещё раз.')}}if(role==='client'){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange=''}setLanguage(profiles[role]?.language||currentLanguage);renderProfileAvatar(role);refreshRoleGreetings();if(role==='client')getClientProfileId(true);if(role==='master'){showOnly('masterApp');renderMasterReviews();$('masterApp').scrollIntoView({block:'start'});checkMasterReminders();if(cloudReady())await refreshCloudDataForRole('master');return}showOnly('clientApp');$('searchCountry').value=profiles.client?.country||'';$('searchCity').value=profiles.client?.city||profiles.client?.area||'';renderMasterSearch();renderClientCalendar()}
+function startNailoraCloud(){
+  if(window.__nailoraCloudStarted)return true;
+  if(!window.supabase?.createClient){
+    setCloudStatus('Облачная синхронизация пока недоступна. Проверь интернет.');
+    showOnly('welcome');
+    document.body.classList.remove('auth-pending');
+    return false;
+  }
+  try{
+    cloud=window.supabase.createClient(NAILORA_SUPABASE_URL,NAILORA_SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+    $('cloudStatus').textContent='Supabase SDK загружен';
+    window.__nailoraCloudStarted=true;
+  }catch(err){
+    console.error('Supabase client initialization failed',err);
+    setCloudStatus('Ошибка подключения к Supabase');
+    showOnly('welcome');
+    document.body.classList.remove('auth-pending');
+    return false;
+  }
+  cloud.auth.onAuthStateChange((event,session)=>{cloudUser=session?.user||null;if(event==='PASSWORD_RECOVERY'){sessionStorage.setItem('nailoraPasswordRecoveryActive','1');chosenRole=selectedEntryRole||'client';$('resetEmail').value=cloudUser?.email||$('loginEmail').value||'';$('requestPasswordReset').classList.add('hidden');$('setNewPassword').classList.remove('hidden');$('newPasswordStatus').textContent='Ссылка действительна. Задай новый пароль.';showOnly('resetPassword');return}if(!cloudUser){setCloudStatus('Не выполнен вход в Supabase');if(cloudPollTimer)clearInterval(cloudPollTimer)}else setCloudStatus('Сессия Supabase активна · '+(cloudUser.email||''))});
+  bootCloudAuth();
+  return true;
+}
+window.__nailoraStartCloud=startNailoraCloud;
+window.__nailoraSupabaseReady.then(ok=>{
+  if(ok)startNailoraCloud();
+  else{setCloudStatus('Supabase загружается медленно или недоступен. Можно продолжить с экрана входа.');showOnly('welcome');document.body.classList.remove('auth-pending');}
+}).catch(err=>{
+  console.warn('Supabase loader failed',err);
+  setCloudStatus('Не удалось загрузить облачную библиотеку. Проверь интернет.');
+  showOnly('welcome');document.body.classList.remove('auth-pending');
+});
+async function openRole(role){activeRole=role;chosenRole=role;try{localStorage.setItem(ACTIVE_ROLE_KEY,role)}catch(_){}if((role==='master'||role==='client')&&cloudReady()){try{await syncRoleTimezoneToCloud(role)}catch(timezoneSyncError){console.warn('Account time-zone sync failed:',timezoneSyncError);showAppToast('Не удалось обновить часовой пояс на сервере. Проверь соединение и войди в аккаунт ещё раз.')}}if(role==='client'){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange=''}setLanguage(profiles[role]?.language||currentLanguage);renderProfileAvatar(role);refreshRoleGreetings();if(role==='client')getClientProfileId(true);if(role==='master'){showOnly('masterApp');renderMasterReviews();$('masterApp').scrollIntoView({block:'start'});checkMasterReminders();return}showOnly('clientApp');$('searchCountry').value=profiles.client?.country||'';$('searchCity').value=profiles.client?.city||profiles.client?.area||'';renderMasterSearch();renderClientCalendar()}
 async function logout(){
  if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=null;
  if($('settingsDialog').open)$('settingsDialog').close();
@@ -2121,27 +2171,32 @@ Object.assign(RU_TEXT,{
 'Включи push-уведомления, чтобы отправить тест.':{en:'Enable push notifications before sending a test.',de:'Aktiviere Push vor dem Test.',es:'Activa push antes de enviar una prueba.',fr:'Activez push avant d’envoyer un test.',it:'Attiva push prima di inviare un test.',pt:'Ative push antes de enviar um teste.',tr:'Testten önce bildirimleri aç.',uk:'Увімкни push перед тестуванням.'}
 });
 let shareReturnToSettings=false;
+function loadNailoraQrLibrary(){
+ if(typeof window.QRCode==='function')return Promise.resolve(true);
+ if(window.__nailoraQrPromise)return window.__nailoraQrPromise;
+ window.__nailoraQrPromise=new Promise(resolve=>{
+  let settled=false;const finish=ok=>{if(settled)return;settled=true;resolve(!!ok&&typeof window.QRCode==='function')};
+  const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';script.async=true;
+  script.onload=()=>finish(true);script.onerror=()=>finish(false);window.setTimeout(()=>finish(false),6000);document.head.appendChild(script);
+ });
+ return window.__nailoraQrPromise;
+}
+function renderNailoraQr(){
+ const qrRoot=$('nailoraQrCode'),fallback=$('nailoraQrFallback');qrRoot.replaceChildren();fallback.classList.add('hidden');
+ if(typeof window.QRCode!=='function'){fallback.classList.remove('hidden');return;}
+ try{
+  new window.QRCode(qrRoot,{text:NAILORA_PUBLIC_URL,width:164,height:164,colorDark:'#111111',colorLight:'#ffffff',correctLevel:window.QRCode.CorrectLevel.M});
+  const qrCanvas=qrRoot.querySelector('canvas'),qrImage=qrRoot.querySelector('img');
+  if(qrCanvas){qrCanvas.style.setProperty('display','block','important');if(qrImage)qrImage.style.setProperty('display','none','important')}
+  else if(qrImage){qrImage.style.setProperty('display','block','important')}
+ }catch(err){console.error('Nailora QR generation failed',err);fallback.classList.remove('hidden')}
+}
 function openNailoraShare(){
- const dialog=$('shareNailoraDialog'),settings=$('settingsDialog'),qrRoot=$('nailoraQrCode'),fallback=$('nailoraQrFallback');
- // Do not open two native dialogs on top of each other. Return to Settings when Share closes.
- shareReturnToSettings=!!(settings&&settings.open);
- if(shareReturnToSettings)settings.close();
- $('nailoraShareUrl').value=NAILORA_PUBLIC_URL;$('nailoraShareStatus').textContent='';
- qrRoot.replaceChildren();fallback.classList.add('hidden');
- if(typeof window.QRCode==='function'){
-  try{
-   new window.QRCode(qrRoot,{text:NAILORA_PUBLIC_URL,width:164,height:164,colorDark:'#111111',colorLight:'#ffffff',correctLevel:window.QRCode.CorrectLevel.M});
-   // qrcodejs may create both a canvas and a fallback image for the same QR.
-   // Show the canvas when available; only show the image on canvas-less browsers.
-   const qrCanvas=qrRoot.querySelector('canvas');
-   const qrImage=qrRoot.querySelector('img');
-   if(qrCanvas){qrCanvas.style.setProperty('display','block','important');if(qrImage)qrImage.style.setProperty('display','none','important')}
-   else if(qrImage){qrImage.style.setProperty('display','block','important')}
-  }
-  catch(err){console.error('Nailora QR generation failed',err);fallback.classList.remove('hidden')}
- }else{fallback.classList.remove('hidden')}
- if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');
- translatePage();
+ const dialog=$('shareNailoraDialog'),settings=$('settingsDialog');
+ shareReturnToSettings=!!(settings&&settings.open);if(shareReturnToSettings)settings.close();
+ $('nailoraShareUrl').value=NAILORA_PUBLIC_URL;$('nailoraShareStatus').textContent='';renderNailoraQr();
+ if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');translatePage();
+ loadNailoraQrLibrary().then(ok=>{if(dialog.open&&ok)renderNailoraQr();}).catch(err=>console.warn('QR library unavailable',err));
 }
 function closeNailoraShare(){const dialog=$('shareNailoraDialog');if(dialog.open&&typeof dialog.close==='function')dialog.close();else{dialog.removeAttribute('open');if(shareReturnToSettings){shareReturnToSettings=false;const settings=$('settingsDialog');if(settings&&typeof settings.showModal==='function')settings.showModal();else settings?.setAttribute('open','')}}}
 $('shareNailoraDialog').addEventListener('close',()=>{if(!shareReturnToSettings)return;shareReturnToSettings=false;const settings=$('settingsDialog');if(settings&&typeof settings.showModal==='function'&&!settings.open)settings.showModal();else if(settings&&!settings.open)settings.setAttribute('open','')});
