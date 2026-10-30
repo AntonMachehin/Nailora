@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ru">
 <head>
+<!-- Nailora v8.74: restore the last signed-in profile immediately from local cache; refresh Supabase data in background and preserve cached access during transient network failures. Based on v8.73. -->
 <!-- Nailora v8.72: non-blocking Supabase startup, lazy QR library, mobile-data loading recovery, and single master refresh. Based on v8.71. -->
 <!-- Nailora v8.66: automatic client cards, appointment duration layout, and master timezone sync for iOS Home Screen. -->
 <!-- Nailora v8.65 baseline with additive Web Push integration. Existing app logic retained. -->
@@ -33,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<title>Nailora v8.73 · быстрый старт</title>
+<title>Nailora v8.74 · мгновенное восстановление профиля</title>
 <style>
 :root{font-family:Manrope,"Segoe UI",Arial,sans-serif;color:#292433;background:#f7f5fa}*{box-sizing:border-box}body{margin:0}header{background:#fff;padding:18px 22px;border-bottom:1px solid #e8e2ef}h1{font-size:22px;margin:0 0 6px}header p{margin:0;color:#766d80;font-size:14px}.wrap{max-width:1100px;margin:0 auto;padding:18px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tabs button,.btn{border:0;border-radius:10px;padding:10px 14px;background:#e9e2f1;color:#342742;cursor:pointer;font-weight:600}.tabs button.active,.btn.primary{background:#71529a;color:#fff}.panel{background:white;border:1px solid #e9e3ee;border-radius:14px;padding:16px;margin-bottom:16px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:1}.row .fixed{flex:0 0 auto}input,select,textarea{width:100%;padding:10px;border:1px solid #d9d1e1;border-radius:8px;font:inherit;background:#fff}label{display:block;font-size:13px;color:#655b70;margin:8px 0 5px}
 .password-field{position:relative;width:100%}.password-field input{padding-right:48px}.password-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);padding:5px 9px;min-width:36px;border:0!important;background:transparent!important;color:#655b70!important;box-shadow:none!important;filter:none!important;font-size:18px;line-height:1;cursor:pointer}.password-toggle svg{display:block;width:20px;height:20px}.password-toggle:hover{box-shadow:none!important;filter:none!important}.password-toggle:focus-visible{outline:2px solid #71529a;outline-offset:1px;border-radius:6px}.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.day{min-height:75px;border:1px solid #e5dfeb;border-radius:8px;padding:7px;background:#fff;text-align:left;cursor:pointer;touch-action:pan-y;user-select:none;-webkit-user-select:none}.day.today{outline:2px solid #2563eb;outline-offset:1px}.day.today:not(.off){background:#dbeafe;border-color:#2563eb;color:#1e3a8a}.day.has:not(.today):not(.off){background:#dcfce7;border-color:#22c55e;color:#14532d}.day.off{background:#fee2e2!important;border-color:#ef4444!important;color:#991b1b}.day.today.off{outline:3px solid #2563eb}.day.selected{box-shadow:inset 0 0 0 2px #8b5cf6}.day:disabled{opacity:1;cursor:not-allowed}.day .num{font-weight:bold}.day small{display:block;margin-top:5px;color:inherit;font-size:11px}.day .day-legend{display:block;font-size:10px;margin-top:3px;color:inherit}.muted{color:#786e80;font-size:14px}.card{border:1px solid #e9e2ee;border-radius:10px;padding:12px;margin:8px 0}.card h3{margin:0 0 6px;font-size:16px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:#f5f0fa;border-radius:10px;padding:13px}.stat strong{display:block;font-size:21px;margin-top:5px}.verify-panel{max-width:650px;margin:0 auto;text-align:center;padding:clamp(20px,4vw,30px)!important}.verify-mark{width:58px;height:58px;display:grid;place-items:center;margin:0 auto 12px;border-radius:20px;background:#f0e9f8;color:#7955a6;font-size:28px;box-shadow:inset 0 0 0 1px #e5d8f2}.verify-title{margin:0 0 8px;color:#4e3c62;font-size:clamp(22px,4vw,28px);line-height:1.25}.verify-subtitle{color:#74677f;line-height:1.6;margin:0 auto 16px;max-width:480px}.verify-intro{font-size:1rem;font-weight:600;color:#4e3c62;background:#f7f3fb;border:1px solid #e9dff3;padding:12px 15px;border-radius:12px;line-height:1.6;margin:0 0 14px}.verify-steps{list-style:none;counter-reset:verify-step;text-align:left;margin:14px 0;padding:0;display:grid;gap:10px;line-height:1.5;font-size:1rem;font-weight:500;color:#40354d}.verify-steps li{counter-increment:verify-step;position:relative;padding:13px 14px 13px 54px;background:#fbf9fd;border:1px solid #eee6f5;border-radius:12px;min-height:52px}.verify-steps li::before{content:counter(verify-step);position:absolute;left:13px;top:13px;width:28px;height:28px;display:grid;place-items:center;border-radius:50%;background:#e9def5;color:#684a8d;font-size:14px;font-weight:800}.verify-steps li strong{display:block;font-weight:750;color:#4e3c62}.verify-steps li span{display:block;margin-top:3px;color:#796e84;font-size:.92rem;font-weight:400}.verify-note{margin:14px 0 10px;padding:13px 15px;border-radius:12px;background:#f0f7f3;border:1px solid #dcece2;color:#476554;font-size:.95rem;line-height:1.55}.verify-help{margin-top:12px;color:#82798a;line-height:1.55}.link-button{border:0;background:transparent;color:#79658d;text-decoration:underline;text-underline-offset:3px;padding:5px 8px;font:inherit;font-size:13px;cursor:pointer;border-radius:7px}.link-button:hover{background:#f4eef8}.link-button:focus-visible{outline:2px solid #9a80b7;outline-offset:2px}@media(max-width:600px){.verify-panel{padding:20px 15px!important}.verify-steps li{padding:12px 12px 12px 50px}.verify-steps li::before{left:11px;top:12px}}.hidden{display:none!important}.danger{background:#f9e8e8;color:#8d2525}.small{font-size:12px}@media(max-width:600px){.wrap{padding:10px}.grid{gap:3px}.day{min-height:62px;padding:4px}.day small{font-size:9px}.stats{grid-template-columns:1fr}.dayname{font-size:11px;text-align:center}}
@@ -1946,10 +1947,11 @@ let selectedDate=iso(new Date());
 let clientCursor=new Date();clientCursor.setDate(1);
 let clientSelectedDate=iso(new Date());
 
+let nailoraRestoredFromCache=false;
 async function bootCloudAuth(){
   const finishLoading=()=>document.body.classList.remove('auth-pending');
   // Do not leave the whole interface hidden while mobile data waits for auth.
-  const startupFallback=window.setTimeout(()=>{setCloudStatus('Подключение к облаку занимает больше времени. Можно продолжить после загрузки.');showOnly('welcome');finishLoading();},10000);
+  const startupFallback=window.setTimeout(()=>{setCloudStatus('Подключение к облаку занимает больше времени. Профиль остаётся доступен из сохранённых данных.');if(!activeRole)showOnly('welcome');finishLoading();},10000);
   if(!cloud){setCloudStatus('Supabase SDK не загрузился');showOnly('welcome');window.clearTimeout(startupFallback);finishLoading();return;}
   try{
     const {data:sessionData,error:sessionError}=await cloud.auth.getSession();
@@ -1960,6 +1962,22 @@ async function bootCloudAuth(){
     cloudUser=sessionData.session.user;
     setCloudStatus('Сессия найдена · '+(cloudUser.email||''));
     const uid=cloudUser.id;
+    // Open the previously used role from the local profile cache immediately.
+    // The server profile and cloud data are refreshed below without hiding this screen.
+    const cachedRole=localStorage.getItem(ACTIVE_ROLE_KEY);
+    const cachedProfile=(cachedRole==='master'||cachedRole==='client')?profiles[cachedRole]:null;
+    const cachedEmail=String(cachedProfile?.email||'').trim().toLowerCase();
+    const sessionEmail=String(cloudUser.email||'').trim().toLowerCase();
+    const cachedBelongsToSession=!!cachedProfile&&(
+      cachedProfile.authUserId===uid || (!!cachedEmail&&!!sessionEmail&&cachedEmail===sessionEmail)
+    );
+    if(cachedBelongsToSession){
+      nailoraRestoredFromCache=true;
+      activeRole=cachedRole;
+      chosenRole=cachedRole;
+      await openRole(cachedRole);
+      setCloudStatus('Профиль открыт · обновляю данные…');
+    }
     const [mres,cres]=await Promise.all([
       cloud.from('masters').select('*').eq('auth_user_id',uid).maybeSingle(),
       cloud.from('clients').select('*').eq('auth_user_id',uid).maybeSingle()
@@ -1991,7 +2009,8 @@ async function bootCloudAuth(){
   }catch(e){
     console.warn('Session restore failed',e);
     setCloudStatus('Сессия есть, но профиль не удалось загрузить: '+(e.message||'ошибка'));
-    showOnly('welcome');
+    if(!nailoraRestoredFromCache)showOnly('welcome');
+    else setCloudStatus('Профиль открыт из сохранённых данных. Облачное обновление временно недоступно.');
   }finally{
     window.clearTimeout(startupFallback);
     finishLoading();
@@ -2021,6 +2040,16 @@ function startNailoraCloud(){
   bootCloudAuth();
   return true;
 }
+// Fast path: render the last locally saved profile before the remote Auth SDK finishes loading.
+// bootCloudAuth validates the persisted Supabase session and switches to welcome only if needed.
+try{
+ const lastRole=localStorage.getItem(ACTIVE_ROLE_KEY);
+ if((lastRole==='master'||lastRole==='client')&&profiles[lastRole]){
+  activeRole=lastRole;chosenRole=lastRole;
+  openRole(lastRole);
+  setCloudStatus('Восстанавливаю сохранённый профиль…');
+ }
+}catch(cacheRestoreError){console.warn('Local profile fast restore failed:',cacheRestoreError)}
 window.__nailoraStartCloud=startNailoraCloud;
 window.__nailoraSupabaseReady.then(ok=>{
   if(ok)startNailoraCloud();
@@ -2030,7 +2059,33 @@ window.__nailoraSupabaseReady.then(ok=>{
   setCloudStatus('Не удалось загрузить облачную библиотеку. Проверь интернет.');
   showOnly('welcome');document.body.classList.remove('auth-pending');
 });
-async function openRole(role){activeRole=role;chosenRole=role;try{localStorage.setItem(ACTIVE_ROLE_KEY,role)}catch(_){}if((role==='master'||role==='client')&&cloudReady()){try{await syncRoleTimezoneToCloud(role)}catch(timezoneSyncError){console.warn('Account time-zone sync failed:',timezoneSyncError);showAppToast('Не удалось обновить часовой пояс на сервере. Проверь соединение и войди в аккаунт ещё раз.')}}if(role==='client'){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange=''}setLanguage(profiles[role]?.language||currentLanguage);renderProfileAvatar(role);refreshRoleGreetings();if(role==='client')getClientProfileId(true);if(role==='master'){showOnly('masterApp');renderMasterReviews();$('masterApp').scrollIntoView({block:'start'});checkMasterReminders();return}showOnly('clientApp');$('searchCountry').value=profiles.client?.country||'';$('searchCity').value=profiles.client?.city||profiles.client?.area||'';renderMasterSearch();renderClientCalendar()}
+async function openRole(role){
+ activeRole=role;chosenRole=role;
+ try{localStorage.setItem(ACTIVE_ROLE_KEY,role)}catch(_){}
+ if(role==='client'){
+  selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;
+  cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';
+ }
+ setLanguage(profiles[role]?.language||currentLanguage);
+ renderProfileAvatar(role);refreshRoleGreetings();
+ if(role==='master'){
+  showOnly('masterApp');
+  renderMasterReviews();
+  checkMasterReminders();
+ }else{
+  showOnly('clientApp');
+  $('searchCountry').value=profiles.client?.country||'';
+  $('searchCity').value=profiles.client?.city||profiles.client?.area||'';
+  renderMasterSearch();renderClientCalendar();
+  getClientProfileId(true);
+ }
+ // Network maintenance must never delay opening the saved profile.
+ if((role==='master'||role==='client')&&cloudReady()){
+  syncRoleTimezoneToCloud(role).catch(timezoneSyncError=>{
+   console.warn('Account time-zone sync failed:',timezoneSyncError);
+  });
+ }
+}
 async function logout(){
  if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=null;
  if($('settingsDialog').open)$('settingsDialog').close();
