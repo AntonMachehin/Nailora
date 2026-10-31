@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="ru">
 <head>
+<!-- Nailora v8.88: translate readiness status and role-specific login prompts at creation time. Based on v8.87. -->
+<!-- Nailora v8.87: show only languages with complete dedicated UI dictionaries; normalize legacy unsupported language settings to Russian. Based on v8.86. -->
+<!-- Nailora v8.85: expand translations for all small UI text and keep dynamically rendered text translated after updates. Based on v8.84. -->
+<!-- Nailora v8.82: add master activity-direction selection to registration and account settings; keep existing scheduling and Supabase schema unchanged. Based on v8.81.
 <!-- Nailora v8.81: align master calendar navigation and week-range display with the updated client calendar; preserve all role-specific scheduling logic. Based on v8.74. -->
 <!-- Nailora v8.74: restore the last signed-in profile immediately from local cache; refresh Supabase data in background and preserve cached access during transient network failures. Based on v8.73. -->
 <!-- Nailora v8.72: non-blocking Supabase startup, lazy QR library, mobile-data loading recovery, and single master refresh. Based on v8.71. -->
@@ -35,7 +39,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<title>Nailora v8.81 · единый календарь мастера и клиента</title>
+<title>Nailora v8.88 · перевод экрана входа</title>
 <style>
 :root{font-family:Manrope,"Segoe UI",Arial,sans-serif;color:#292433;background:#f7f5fa}*{box-sizing:border-box}body{margin:0}header{background:#fff;padding:18px 22px;border-bottom:1px solid #e8e2ef}h1{font-size:22px;margin:0 0 6px}header p{margin:0;color:#766d80;font-size:14px}.wrap{max-width:1100px;margin:0 auto;padding:18px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tabs button,.btn{border:0;border-radius:10px;padding:10px 14px;background:#e9e2f1;color:#342742;cursor:pointer;font-weight:600}.tabs button.active,.btn.primary{background:#71529a;color:#fff}.panel{background:white;border:1px solid #e9e3ee;border-radius:14px;padding:16px;margin-bottom:16px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:1}.row .fixed{flex:0 0 auto}input,select,textarea{width:100%;padding:10px;border:1px solid #d9d1e1;border-radius:8px;font:inherit;background:#fff}label{display:block;font-size:13px;color:#655b70;margin:8px 0 5px}
 .password-field{position:relative;width:100%}.password-field input{padding-right:48px}.password-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);padding:5px 9px;min-width:36px;border:0!important;background:transparent!important;color:#655b70!important;box-shadow:none!important;filter:none!important;font-size:18px;line-height:1;cursor:pointer}.password-toggle svg{display:block;width:20px;height:20px}.password-toggle:hover{box-shadow:none!important;filter:none!important}.password-toggle:focus-visible{outline:2px solid #71529a;outline-offset:1px;border-radius:6px}.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.day{min-height:75px;border:1px solid #e5dfeb;border-radius:8px;padding:7px;background:#fff;text-align:left;cursor:pointer;touch-action:pan-y;user-select:none;-webkit-user-select:none}.day.today{outline:2px solid #2563eb;outline-offset:1px}.day.today:not(.off){background:#dbeafe;border-color:#2563eb;color:#1e3a8a}.day.has:not(.today):not(.off){background:#dcfce7;border-color:#22c55e;color:#14532d}.day.off{background:#fee2e2!important;border-color:#ef4444!important;color:#991b1b}.day.today.off{outline:3px solid #2563eb}.day.selected{box-shadow:inset 0 0 0 2px #8b5cf6}.day:disabled{opacity:1;cursor:not-allowed}.day .num{font-weight:bold}.day small{display:block;margin-top:5px;color:inherit;font-size:11px}.day .day-legend{display:block;font-size:10px;margin-top:3px;color:inherit}.muted{color:#786e80;font-size:14px}.card{border:1px solid #e9e2ee;border-radius:10px;padding:12px;margin:8px 0}.card h3{margin:0 0 6px;font-size:16px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:#f5f0fa;border-radius:10px;padding:13px}.stat strong{display:block;font-size:21px;margin-top:5px}.verify-panel{max-width:650px;margin:0 auto;text-align:center;padding:clamp(20px,4vw,30px)!important}.verify-mark{width:58px;height:58px;display:grid;place-items:center;margin:0 auto 12px;border-radius:20px;background:#f0e9f8;color:#7955a6;font-size:28px;box-shadow:inset 0 0 0 1px #e5d8f2}.verify-title{margin:0 0 8px;color:#4e3c62;font-size:clamp(22px,4vw,28px);line-height:1.25}.verify-subtitle{color:#74677f;line-height:1.6;margin:0 auto 16px;max-width:480px}.verify-intro{font-size:1rem;font-weight:600;color:#4e3c62;background:#f7f3fb;border:1px solid #e9dff3;padding:12px 15px;border-radius:12px;line-height:1.6;margin:0 0 14px}.verify-steps{list-style:none;counter-reset:verify-step;text-align:left;margin:14px 0;padding:0;display:grid;gap:10px;line-height:1.5;font-size:1rem;font-weight:500;color:#40354d}.verify-steps li{counter-increment:verify-step;position:relative;padding:13px 14px 13px 54px;background:#fbf9fd;border:1px solid #eee6f5;border-radius:12px;min-height:52px}.verify-steps li::before{content:counter(verify-step);position:absolute;left:13px;top:13px;width:28px;height:28px;display:grid;place-items:center;border-radius:50%;background:#e9def5;color:#684a8d;font-size:14px;font-weight:800}.verify-steps li strong{display:block;font-weight:750;color:#4e3c62}.verify-steps li span{display:block;margin-top:3px;color:#796e84;font-size:.92rem;font-weight:400}.verify-note{margin:14px 0 10px;padding:13px 15px;border-radius:12px;background:#f0f7f3;border:1px solid #dcece2;color:#476554;font-size:.95rem;line-height:1.55}.verify-help{margin-top:12px;color:#82798a;line-height:1.55}.link-button{border:0;background:transparent;color:#79658d;text-decoration:underline;text-underline-offset:3px;padding:5px 8px;font:inherit;font-size:13px;cursor:pointer;border-radius:7px}.link-button:hover{background:#f4eef8}.link-button:focus-visible{outline:2px solid #9a80b7;outline-offset:2px}@media(max-width:600px){.verify-panel{padding:20px 15px!important}.verify-steps li{padding:12px 12px 12px 50px}.verify-steps li::before{left:11px;top:12px}}.hidden{display:none!important}.danger{background:#f9e8e8;color:#8d2525}.small{font-size:12px}@media(max-width:600px){.wrap{padding:10px}.grid{gap:3px}.day{min-height:62px;padding:4px}.day small{font-size:9px}.stats{grid-template-columns:1fr}.dayname{font-size:11px;text-align:center}}
@@ -1082,7 +1086,7 @@ html.nailora-load-timeout::before{content:"Nailora загружается дол
 <section id="welcome" class="wrap" style="max-width:760px;padding-top:8vh">
  <div class="panel" style="padding:28px">
   <h1 style="font-size:28px">Nailora 💅</h1><p class="muted">Выбери свой тип аккаунта</p>
-  <div style="max-width:340px;margin-top:20px"><label for="languageChoice">🌐 Язык приложения</label><select id="languageChoice" aria-label="Язык приложения"></select><p class="muted small" id="languageHint" style="margin:7px 0 0">Интерфейс можно переводить и расширять на новые языки.</p></div>
+  <div style="max-width:340px;margin-top:20px"><label for="languageChoice">🌐 Язык приложения</label><select id="languageChoice" aria-label="Язык приложения"></select><p class="muted small" id="languageHint" style="margin:7px 0 0">В списке только языки с готовым переводом интерфейса.</p></div>
   <div class="theme-picker" id="welcomeThemePicker"><h3>Выбери оформление</h3><p class="muted small">Тему можно будет изменить позже в настройках. 🌸</p><div class="theme-options" role="group" aria-label="Тема приложения"><button class="theme-choice" type="button" data-theme-choice="flower" aria-pressed="false"><span class="theme-swatch flower"></span>Цветочный шёлк</button><button class="theme-choice" type="button" data-theme-choice="lavender" aria-pressed="true"><span class="theme-swatch lavender"></span>Лавандовый туман</button><button class="theme-choice" type="button" data-theme-choice="mist" aria-pressed="false"><span class="theme-swatch mist"></span>Цветная дымка</button><button class="theme-choice" type="button" data-theme-choice="mint" aria-pressed="false"><span class="theme-swatch mint"></span>Мятный сад</button><button class="theme-choice" type="button" data-theme-choice="nude" aria-pressed="false"><span class="theme-swatch nude"></span>Нюдовый люкс</button></div></div>
   <div class="row" style="margin-top:20px"><button class="btn primary" id="chooseMaster" type="button">Я мастер</button><button class="btn primary" id="chooseClient" type="button">Я клиент</button></div>
   <div id="roleAccessPanel" class="panel hidden" style="margin-top:14px;padding:16px"><h3 id="roleAccessTitle" style="margin:0 0 6px">Аккаунт мастера</h3><p id="roleAccessMessage" class="muted small" aria-live="polite" style="margin:0 0 12px">Выбери регистрацию или вход.</p><div class="row"><button class="btn primary" id="roleRegisterButton" type="button">Создать профиль мастера</button><button class="btn" id="roleLoginButton" type="button">Войти</button><button class="btn" id="roleAccessBack" type="button">Назад</button></div></div>
@@ -1095,14 +1099,14 @@ html.nailora-load-timeout::before{content:"Nailora загружается дол
  <label for="regPhone">Номер телефона *</label><input id="regPhone" type="tel" maxlength="30" placeholder="Например, +49 151 12345678" autocomplete="tel" required>
  <label for="regCountry">Страна *</label><input id="regCountry" maxlength="100" placeholder="Например, Германия" required>
  <label for="regCity">Город / населённый пункт *</label><input id="regCity" maxlength="120" placeholder="Например, Франкфурт-на-Майне" required>
- <div id="masterExtra" class="hidden"><label for="regArea">Район / ориентир (необязательно)</label><input id="regArea" maxlength="100" placeholder="Например, центр города"><label for="regAddress">Адрес оказания услуг *</label><input id="regAddress" maxlength="180" placeholder="Улица, дом, помещение"><p class="muted small">Этот адрес будет показан клиентам в каталоге мастеров вашего города.</p><label for="regSpecialty">Услуги и специализация</label><input id="regSpecialty" maxlength="120" placeholder="Маникюр, покрытие, дизайн"></div>
+ <div id="masterExtra" class="hidden"><label for="regArea">Район / ориентир (необязательно)</label><input id="regArea" maxlength="100" placeholder="Например, центр города"><label for="regAddress">Адрес оказания услуг *</label><input id="regAddress" maxlength="180" placeholder="Улица, дом, помещение"><p class="muted small">Этот адрес будет показан клиентам в каталоге мастеров вашего города.</p><label for="regActivityDirection">Направление деятельности *</label><select id="regActivityDirection" required><option value="Маникюр и педикюр">Маникюр и педикюр</option><option value="Парикмахерские услуги">Парикмахерские услуги</option><option value="Брови и ресницы">Брови и ресницы</option><option value="Массаж">Массаж</option><option value="Косметология">Косметология</option><option value="Визаж">Визаж</option><option value="Эпиляция">Эпиляция</option><option value="Другое">Другое</option></select><p class="muted small">Выбери основное направление. Услуги внутри направления укажешь отдельно.</p><label for="regSpecialty">Услуги и специализация</label><input id="regSpecialty" maxlength="120" placeholder="Например, покрытие, стрижки, окрашивание"></div>
  <div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn primary" type="submit" id="createProfileButton">Создать профиль</button><button class="btn hidden" id="registerOpenLogin" type="button" tabindex="-1" aria-hidden="true">Войти</button><button class="btn" id="backWelcome" type="button">Назад</button></div><p id="registerStatus" class="muted small" aria-live="polite" style="margin-top:10px"></p></form>
  </div></section>
 <section id="verifyEmail" class="wrap hidden" style="max-width:720px;padding-top:6vh"><div class="panel verify-panel"><div class="verify-mark" aria-hidden="true">✉</div><h2 class="verify-title">Подтверди электронную почту</h2><p class="verify-subtitle">Остался всего один небольшой шаг, и можно будет пользоваться Nailora.</p><p id="verifyEmailMessage" class="verify-intro" aria-live="polite">Мы отправили письмо со ссылкой для подтверждения. Открой его, чтобы подтвердить адрес.</p><ol class="verify-steps"><li><strong>Зайди в свою электронную почту</strong><span>Открой почтовый ящик, который указал при регистрации.</span></li><li><strong>Найди письмо от Nailora</strong><span>Если его не видно во входящих, загляни в папку «Спам».</span></li><li><strong>Открой письмо и перейди по ссылке</strong><span>Это подтвердит адрес электронной почты.</span></li></ol><p class="verify-note">После подтверждения вернись в Nailora. Если сессия восстановится успешно, приложение откроет твой профиль автоматически.</p><div class="verify-help small" style="margin-top:16px"><button type="button" id="verifyNoEmailToggle" class="link-button" aria-expanded="false" aria-controls="verifyNoEmailDetails">Письмо не пришло?</button><div id="verifyNoEmailDetails" class="hidden" style="margin-top:10px;padding:14px;border:1px solid #e9dff3;background:#faf7fc;border-radius:12px;text-align:left"><p style="margin:0 0 10px;color:#62566e">Проверь папку «Спам». Если письма там нет, можно отправить ссылку ещё раз здесь. Если аккаунт уже создан, не создавай его повторно.</p><div class="row" style="flex-wrap:wrap"><button type="button" id="resendVerifyEmail" class="btn primary">Отправить письмо ещё раз</button><button type="button" id="verifyBackToRegister" class="btn">Вернуться к регистрации</button></div><p id="verifyHelpStatus" class="muted small" aria-live="polite" style="margin:10px 0 0"></p></div></div></div></section>
 <section id="login" class="wrap hidden" style="max-width:650px;padding-top:5vh"><div class="panel"><h2>Вход в Nailora</h2><form id="loginForm"><div id="loginRoleRow" class="hidden"><label for="loginRole">Тип аккаунта</label><select id="loginRole"><option value="master">Мастер</option><option value="client">Клиент</option></select></div><label for="loginEmail">Email *</label><input id="loginEmail" type="email" required autocomplete="username" maxlength="254"><label for="loginPassword">Пароль *</label><div class="password-field"><input id="loginPassword" type="password" required autocomplete="current-password" maxlength="128"><button class="password-toggle" type="button" data-password-target="loginPassword" aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 7-.4 1.1-1.2 2.3-2.4 3.4"/><path d="M6.6 6.6C4.5 8 3.1 10.1 2.5 12c.5 1.4 1.5 2.8 3 4 1.7 1.4 3.9 2.3 6.5 2.3 1.1 0 2.1-.2 3-.5"/></svg></button></div><div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn primary fixed" type="submit">Войти</button><button class="btn fixed" id="loginOpenRegister" type="button">Зарегистрироваться</button><button class="btn fixed" id="backLogin" type="button">Назад</button></div><p style="margin:12px 0 0"><button class="link-button" id="forgotPasswordButton" type="button">Забыли пароль?</button></p><p id="loginStatus" class="muted small" aria-live="polite"></p></form></div></section>
 <section id="resetPassword" class="wrap hidden" style="max-width:650px;padding-top:5vh"><div class="panel"><h2 id="resetPasswordTitle">Восстановление пароля</h2><div id="requestPasswordReset"><p class="muted">Укажи email аккаунта. Мы отправим письмо со ссылкой для восстановления пароля.</p><form id="requestPasswordResetForm"><label for="resetEmail">Email *</label><input id="resetEmail" type="email" required maxlength="254" autocomplete="email" placeholder="name@example.com"><div class="row" style="margin-top:14px"><button class="btn primary" type="submit" id="sendPasswordResetButton">Отправить ссылку</button><button class="btn" id="backResetRequest" type="button">Назад</button></div><p id="resetRequestStatus" class="muted small" aria-live="polite"></p></form></div><div id="setNewPassword" class="hidden"><p class="muted">Придумай новый пароль для своего аккаунта.</p><form id="setNewPasswordForm"><label for="newPassword">Новый пароль (не менее 8 символов) *</label><input id="newPassword" type="password" minlength="8" maxlength="128" required autocomplete="new-password"><label for="confirmNewPassword">Повтори новый пароль *</label><input id="confirmNewPassword" type="password" minlength="8" maxlength="128" required autocomplete="new-password"><div class="row" style="margin-top:14px"><button class="btn primary" type="submit">Сохранить новый пароль</button></div><p id="newPasswordStatus" class="muted small" aria-live="polite"></p></form></div></div></section>
 <section id="clientApp" class="wrap hidden" style="max-width:850px"><div class="panel"><div class="row profile-header-row"><div class="profile-identity"><img id="clientAvatar" class="profile-avatar-hero hidden" alt="Аватар профиля клиента"><div id="clientAvatarPlaceholder" class="profile-avatar-placeholder" aria-hidden="true">👤</div><div class="profile-nickname" id="clientNickname"></div><p class="profile-greeting" id="clientGreeting"></p></div><div class="header-actions"><button class="btn fixed" id="clientAccount" type="button">Аккаунт и настройки</button></div></div></div>
- <div class="panel" id="masterSearchPanel"><h2>Найти мастера</h2><p class="muted">Выбери страну и город, чтобы найти мастеров, указавших место оказания услуг.</p><div class="row"><div><label for="searchCountry">Страна</label><input id="searchCountry" maxlength="100" placeholder="Страна"/></div><div><label for="searchCity">Город / населённый пункт</label><input id="searchCity" maxlength="120" placeholder="Город или населённый пункт"/></div></div><div class="row" style="margin-top:10px"><button class="btn primary fixed" id="searchMastersButton" type="button">Найти мастеров</button><button class="btn fixed" id="resetMasterSearch" type="button">Мой город</button></div><div id="masterSearchResults" style="margin-top:14px"><p class="muted">Введи страну и город для поиска.</p></div></div>
+ <div class="panel" id="masterSearchPanel"><h2>Найти мастера</h2><p class="muted">Выбери направление деятельности, страну и город, чтобы найти подходящего мастера.</p><label for="searchActivityDirection">Направление деятельности</label><select id="searchActivityDirection"><option value="">Все направления</option><option value="Маникюр и педикюр">Маникюр и педикюр</option><option value="Парикмахерские услуги">Парикмахерские услуги</option><option value="Брови и ресницы">Брови и ресницы</option><option value="Массаж">Массаж</option><option value="Косметология">Косметология</option><option value="Визаж">Визаж</option><option value="Эпиляция">Эпиляция</option><option value="Другое">Другое</option></select><div class="row" style="margin-top:10px"><div><label for="searchCountry">Страна</label><input id="searchCountry" maxlength="100" placeholder="Страна"/></div><div><label for="searchCity">Город / населённый пункт</label><input id="searchCity" maxlength="120" placeholder="Город или населённый пункт"/></div></div><div class="row" style="margin-top:10px"><button class="btn primary fixed" id="searchMastersButton" type="button">Найти мастеров</button><button class="btn fixed" id="resetMasterSearch" type="button">Мой город</button></div><div id="masterSearchResults" style="margin-top:14px"><p class="muted">Введи страну и город для поиска.</p></div></div>
 <div class="panel"><div class="row"><button class="btn fixed" id="clientPrev" type="button">←</button><h2 id="clientMonthTitle" style="text-align:center;margin:0;flex:2"></h2><button class="btn fixed" id="clientNext" type="button">→</button></div><div class="row" style="margin-top:10px"><label style="flex:0 0 150px">Вид календаря<select id="clientCalendarView"><option value="month">Месяц</option><option value="week">Неделя</option></select></label><div class="muted small" style="align-self:end">В ячейках показаны только начало и конец рабочего дня. Занятые дни отмечены цветом, личные данные клиентов скрыты.</div></div><div class="grid" id="clientCalendarGrid" style="margin-top:10px"></div></div>
  <div class="panel"><h2>Расписание выбранного дня</h2><p class="muted small">Показаны только начала записи, для которых хватает времени на услугу. Перерывы и занятое время других клиентов скрыты.</p><div id="clientDaySchedule" class="schedule-list"></div></div></section>
 <div id="masterApp" class="hidden">
@@ -1138,7 +1142,7 @@ html.nailora-load-timeout::before{content:"Nailora загружается дол
 <dialog id="settingsDialog" aria-labelledby="settingsTitle">
  <div class="dialog-head"><div><h2 id="settingsTitle" style="margin:0">Аккаунт и настройки</h2><p class="muted small" style="margin:5px 0 0">Профиль и внешний вид приложения</p></div><button type="button" class="btn fixed" id="closeSettings" aria-label="Закрыть настройки">✕</button></div>
  <div class="dialog-body">
-  <section class="settings-section"><h3>Мой аккаунт</h3><p class="muted small" id="settingsRoleLabel">Тип аккаунта</p><div class="avatar-editor"><img id="settingsAvatarPreview" class="avatar-preview hidden" alt="Аватар профиля"><div id="settingsAvatarPlaceholder" class="avatar-placeholder" aria-hidden="true">👤</div><div style="flex:1"><label for="profileAvatarInput">Аватар профиля</label><input id="profileAvatarInput" type="file" accept="image/*"><p class="photo-picker-help">Выбери фото из галереи. Изображение будет уменьшено для экономии места.</p><button type="button" class="btn danger" id="removeProfileAvatar">Удалить аватар</button></div></div><form id="accountEditForm"><label>Имя</label><input id="settingsName" required maxlength="80"><label>Телефон</label><input id="settingsPhone" type="tel" maxlength="30"><label>Страна *</label><input id="settingsCountry" maxlength="100" required><label>Город / населённый пункт *</label><input id="settingsCity" maxlength="120" required><div id="settingsMasterFields" class="hidden"><label>Район / ориентир</label><input id="settingsArea" maxlength="100"><label>Адрес оказания услуг *</label><input id="settingsAddress" maxlength="180" placeholder="Улица, дом, помещение"><p class="muted small">Этот адрес будет показан клиентам в каталоге мастеров вашего города.</p><label>Услуги и специализация</label><input id="settingsSpecialty" maxlength="120"></div><div class="account-actions"><button class="btn primary" type="submit">Сохранить профиль</button></div></form></section>
+  <section class="settings-section"><h3>Мой аккаунт</h3><p class="muted small" id="settingsRoleLabel">Тип аккаунта</p><div class="avatar-editor"><img id="settingsAvatarPreview" class="avatar-preview hidden" alt="Аватар профиля"><div id="settingsAvatarPlaceholder" class="avatar-placeholder" aria-hidden="true">👤</div><div style="flex:1"><label for="profileAvatarInput">Аватар профиля</label><input id="profileAvatarInput" type="file" accept="image/*"><p class="photo-picker-help">Выбери фото из галереи. Изображение будет уменьшено для экономии места.</p><button type="button" class="btn danger" id="removeProfileAvatar">Удалить аватар</button></div></div><form id="accountEditForm"><label>Имя</label><input id="settingsName" required maxlength="80"><label>Телефон</label><input id="settingsPhone" type="tel" maxlength="30"><label>Страна *</label><input id="settingsCountry" maxlength="100" required><label>Город / населённый пункт *</label><input id="settingsCity" maxlength="120" required><div id="settingsMasterFields" class="hidden"><label>Район / ориентир</label><input id="settingsArea" maxlength="100"><label>Адрес оказания услуг *</label><input id="settingsAddress" maxlength="180" placeholder="Улица, дом, помещение"><p class="muted small">Этот адрес будет показан клиентам в каталоге мастеров вашего города.</p><label for="settingsActivityDirection">Направление деятельности</label><select id="settingsActivityDirection"><option value="Маникюр и педикюр">Маникюр и педикюр</option><option value="Парикмахерские услуги">Парикмахерские услуги</option><option value="Брови и ресницы">Брови и ресницы</option><option value="Массаж">Массаж</option><option value="Косметология">Косметология</option><option value="Визаж">Визаж</option><option value="Эпиляция">Эпиляция</option><option value="Другое">Другое</option></select><label for="settingsSpecialty">Услуги и специализация</label><input id="settingsSpecialty" maxlength="120"></div><div class="account-actions"><button class="btn primary" type="submit">Сохранить профиль</button></div></form></section>
   <section class="settings-section hidden" id="masterReminderSettings"><h3>Напоминания о записях</h3><p class="muted small">Настраиваются мастером. Напоминания работают, пока Nailora открыт в этом браузере; при закрытом приложении для автоматических уведомлений потребуется серверный сервис.</p><label class="check-line"><input type="checkbox" id="masterRemindersEnabled"> Включить напоминания мастеру</label><label for="masterReminderLeadTime">За сколько времени до записи напоминать</label><select id="masterReminderLeadTime"><option value="15">За 15 минут</option><option value="30">За 30 минут</option><option value="60">За 1 час</option><option value="120">За 2 часа</option><option value="1440">За 24 часа</option></select><button type="button" class="btn" id="allowBrowserNotifications" style="margin-top:10px">Разрешить уведомления браузера</button><p class="muted small" id="notificationPermissionStatus" role="status" style="margin-bottom:0">Без системного разрешения напоминание появится внутри открытого приложения.</p></section>
   <section class="settings-section hidden" id="masterCurrencySettings"><h3>Валюта цен услуг</h3><p class="muted small">Выбери валюту для цен услуг, записей и финансов. Изменение валюты меняет только отображение, а не пересчитывает суммы.</p><label for="masterCurrencyChoice">Валюта</label><select id="masterCurrencyChoice"><option value="RUB">RUB — ₽</option><option value="EUR">EUR — €</option><option value="USD">USD — $</option><option value="GBP">GBP — £</option><option value="PLN">PLN — zł</option><option value="UAH">UAH — ₴</option><option value="TRY">TRY — ₺</option><option value="KZT">KZT — ₸</option><option value="CZK">CZK — Kč</option><option value="CHF">CHF</option></select><p class="muted small">Валюта применяется ко всем денежным суммам в этом демопрототипе. При смене валюты числовые суммы автоматически не конвертируются.</p></section>
   <section class="settings-section" id="pushNotificationSettings">
@@ -1239,11 +1243,16 @@ html.nailora-load-timeout::before{content:"Nailora загружается дол
 <dialog id="notificationsDialog" style="max-width:620px;width:calc(100% - 24px);border:1px solid #e9e3ee;border-radius:14px;padding:20px"><div class="row"><h2 style="flex:1;margin:0">Уведомления</h2><button class="btn fixed" id="closeNotifications" type="button">Закрыть</button></div><p class="muted small">Здесь появляются уведомления о создании, изменении и отмене записи. После настройки Supabase прочитанные уведомления удаляются через 90 дней, непрочитанные — через 180 дней.</p><div class="row" style="margin:10px 0 12px"><button class="btn fixed" id="markAllNotificationsRead" type="button">Отметить все прочитанными</button><button class="btn danger fixed" id="deleteReadNotifications" type="button">Удалить прочитанные</button></div><div id="notificationList" style="margin-top:12px"><p class="muted">Загрузка…</p></div></dialog>
 <script>
 const LANGUAGE_KEY='nailoraLanguage_v1';
+// Only languages with complete dedicated interface dictionaries are available in the selector.
 const LANGUAGE_OPTIONS=[
- ['ru','Русский'],['en','English'],['de','Deutsch'],['es','Español'],['fr','Français'],['it','Italiano'],['pt','Português'],['tr','Türkçe'],['uk','Українська'],['pl','Polski'],['nl','Nederlands'],['sv','Svenska'],['ar','العربية'],['zh','中文'],['ja','日本語'],['ko','한국어'],['hi','हिन्दी'],['bn','বাংলা'],['id','Bahasa Indonesia'],['vi','Tiếng Việt'],['th','ไทย'],['fa','فارسی'],['he','עברית'],['el','Ελληνικά'],['ro','Română'],['cs','Čeština'],['hu','Magyar'],['sw','Kiswahili'],['ur','اردو'],['ta','தமிழ்'],['fil','Filipino']
+ ['ru','Русский'],['en','English'],['de','Deutsch'],['es','Español'],['fr','Français'],['it','Italiano'],['pt','Português'],['tr','Türkçe'],['uk','Українська']
 ];
-const LOCALES={ru:'ru-RU',en:'en-US',de:'de-DE',es:'es-ES',fr:'fr-FR',it:'it-IT',pt:'pt-PT',tr:'tr-TR',uk:'uk-UA',pl:'pl-PL',nl:'nl-NL',sv:'sv-SE',ar:'ar',zh:'zh-CN',ja:'ja-JP',ko:'ko-KR',hi:'hi-IN',bn:'bn-BD',id:'id-ID',vi:'vi-VN',th:'th-TH',fa:'fa-IR',he:'he-IL',el:'el-GR',ro:'ro-RO',cs:'cs-CZ',hu:'hu-HU',sw:'sw-KE',ur:'ur-PK',ta:'ta-IN',fil:'fil-PH'};
+const LOCALES={ru:'ru-RU',en:'en-US',de:'de-DE',es:'es-ES',fr:'fr-FR',it:'it-IT',pt:'pt-PT',tr:'tr-TR',uk:'uk-UA'};
 let currentLanguage=localStorage.getItem(LANGUAGE_KEY)||'ru';
+if(!LANGUAGE_OPTIONS.some(([code])=>code===currentLanguage)){
+ currentLanguage='ru';
+ try{localStorage.setItem(LANGUAGE_KEY,'ru')}catch(_){ }
+}
 let appDataReady=false;
 const RU_TEXT={
 'Nailora 💅':{en:'Nailora 💅',de:'Nailora 💅',es:'Nailora 💅',fr:'Nailora 💅',it:'Nailora 💅',pt:'Nailora 💅',tr:'Nailora 💅',uk:'Nailora 💅'},
@@ -1266,7 +1275,7 @@ const RU_TEXT={
 'Язык приложения':{en:'App language',de:'App-Sprache',es:'Idioma de la aplicación',fr:'Langue de l’application',it:'Lingua dell’app',pt:'Idioma da aplicação',tr:'Uygulama dili',uk:'Мова застосунку'},
 'Язык интерфейса':{en:'Interface language',de:'Oberflächensprache',es:'Idioma de la interfaz',fr:'Langue de l’interface',it:'Lingua dell’interfaccia',pt:'Idioma da interface',tr:'Arayüz dili',uk:'Мова інтерфейсу'},
 'Язык этого аккаунта':{en:'Language for this account',de:'Sprache für dieses Konto',es:'Idioma de esta cuenta',fr:'Langue de ce compte',it:'Lingua per questo account',pt:'Idioma desta conta',tr:'Bu hesabın dili',uk:'Мова цього облікового запису'},
-'Интерфейс можно переводить и расширять на новые языки.':{en:'The language catalog can be expanded with more translations.',de:'Der Sprachkatalog kann um weitere Übersetzungen erweitert werden.',es:'El catálogo de idiomas puede ampliarse con más traducciones.',fr:'Le catalogue de langues peut être enrichi avec d’autres traductions.',it:'Il catalogo delle lingue può essere ampliato con altre traduzioni.',pt:'O catálogo de idiomas pode ser ampliado com mais traduções.',tr:'Dil kataloğu yeni çevirilerle genişletilebilir.',uk:'Список мов можна розширювати новими перекладами.'},
+'В списке только языки с готовым переводом интерфейса.':{en:'Only languages with a completed interface translation are listed.',de:'Aufgeführt sind nur Sprachen mit vollständiger Übersetzung der Benutzeroberfläche.',es:'Solo se muestran los idiomas con la traducción completa de la interfaz.',fr:'Seules les langues dont l’interface est entièrement traduite sont affichées.',it:'Sono elencate solo le lingue con la traduzione completa dell’interfaccia.',pt:'A lista inclui apenas idiomas com a tradução completa da interface.',tr:'Listede yalnızca arayüz çevirisi tamamlanmış diller bulunur.',uk:'У списку лише мови з повним перекладом інтерфейсу.'},
 'Я мастер':{en:'I’m a nail artist',de:'Ich bin Nageldesigner/in',es:'Soy profesional de uñas',fr:'Je suis prothésiste ongulaire',it:'Sono una professionista delle unghie',pt:'Sou profissional de unhas',tr:'Ben tırnak uzmanıyım',uk:'Я майстер'},
 'Я клиент':{en:'I’m a client',de:'Ich bin Kunde/Kundin',es:'Soy cliente',fr:'Je suis client·e',it:'Sono cliente',pt:'Sou cliente',tr:'Ben müşteriyim',uk:'Я клієнт'},
 'Демо-прототип. Профили и данные сохраняются только в этом браузере.':{en:'Demo prototype. Profiles and data are saved only in this browser.',de:'Demo-Prototyp. Profile und Daten werden nur in diesem Browser gespeichert.',es:'Prototipo de demostración. Los perfiles y datos solo se guardan en este navegador.',fr:'Prototype de démonstration. Les profils et les données sont enregistrés uniquement dans ce navigateur.',it:'Prototipo demo. Profili e dati vengono salvati solo in questo browser.',pt:'Protótipo de demonstração. Perfis e dados são guardados apenas neste navegador.',tr:'Demo prototipi. Profiller ve veriler yalnızca bu tarayıcıda saklanır.',uk:'Демо-прототип. Профілі та дані зберігаються лише в цьому браузері.'},
@@ -1465,6 +1474,34 @@ Object.assign(RU_TEXT,{
 'Этот адрес будет показан клиентам в каталоге мастеров вашего города.':{en:'This address will be visible to clients in the artist directory for your city.',de:'Diese Adresse wird Kunden im Verzeichnis der Fachkräfte in Ihrer Stadt angezeigt.',es:'Esta dirección será visible para los clientes en el directorio de profesionales de tu ciudad.',fr:'Cette adresse sera visible par les clientes dans l’annuaire de professionnelles de votre ville.',it:'Questo indirizzo sarà visibile ai clienti nell’elenco delle professioniste della tua città.',pt:'Este endereço ficará visível para os clientes no diretório de profissionais da sua cidade.',tr:'Bu adres, şehrinizdeki uzman kataloğunda müşterilere gösterilir.',uk:'Ця адреса буде видима клієнтам у каталозі майстрів вашого міста.'}
 });
 const EXTRA_TEXT={
+'Запись отменена':{en:'Appointment cancelled',de:'Termin abgesagt',es:'Cita cancelada',fr:'Rendez-vous annulé',it:'Appuntamento annullato',pt:'Marcação cancelada',tr:'Randevu iptal edildi',uk:'Запис скасовано'},
+'Запись изменена':{en:'Appointment updated',de:'Termin geändert',es:'Cita modificada',fr:'Rendez-vous modifié',it:'Appuntamento modificato',pt:'Marcação alterada',tr:'Randevu değiştirildi',uk:'Запис змінено'},
+'Новое уведомление':{en:'New notification',de:'Neue Benachrichtigung',es:'Nueva notificación',fr:'Nouvelle notification',it:'Nuova notifica',pt:'Nova notificação',tr:'Yeni bildirim',uk:'Нове сповіщення'},
+'записей за период':{en:'Appointments in period',de:'Termine im Zeitraum',es:'Citas en el período',fr:'Rendez-vous sur la période',it:'Appuntamenti nel periodo',pt:'Marcações no período',tr:'Dönemdeki randevular',uk:'Записи за період'},
+'дней с записями':{en:'Days with appointments',de:'Tage mit Terminen',es:'Días con citas',fr:'Jours avec rendez-vous',it:'Giorni con appuntamenti',pt:'Dias com marcações',tr:'Randevu olan günler',uk:'Днів із записами'},
+'выходных':{en:'Days off',de:'Freie Tage',es:'Días libres',fr:'Jours de repos',it:'Giorni di riposo',pt:'Dias de folga',tr:'İzin günleri',uk:'Вихідних'},
+'оплаченных записей':{en:'Paid appointments',de:'Bezahlte Termine',es:'Citas pagadas',fr:'Rendez-vous payés',it:'Appuntamenti pagati',pt:'Marcações pagas',tr:'Ödenen randevular',uk:'Оплачених записів'},
+'Уведомлений пока нет.':{en:'No notifications yet.',de:'Noch keine Benachrichtigungen.',es:'Todavía no hay notificaciones.',fr:'Aucune notification pour le moment.',it:'Nessuna notifica per ora.',pt:'Ainda não há notificações.',tr:'Henüz bildirim yok.',uk:'Поки немає сповіщень.'},
+'Прочитано':{en:'Read',de:'Gelesen',es:'Leído',fr:'Lu',it:'Letto',pt:'Lido',tr:'Okundu',uk:'Прочитано'},
+'Не прочитано':{en:'Unread',de:'Ungelesen',es:'No leído',fr:'Non lu',it:'Non letto',pt:'Não lido',tr:'Okunmadı',uk:'Не прочитано'},
+'Отметить прочитанным':{en:'Mark as read',de:'Als gelesen markieren',es:'Marcar como leído',fr:'Marquer comme lu',it:'Segna come letto',pt:'Marcar como lido',tr:'Okundu olarak işaretle',uk:'Позначити прочитаним'},
+'Уведомление':{en:'Notification',de:'Benachrichtigung',es:'Notificación',fr:'Notification',it:'Notifica',pt:'Notificação',tr:'Bildirim',uk:'Сповіщення'},
+'Удалить это уведомление?':{en:'Delete this notification?',de:'Diese Benachrichtigung löschen?',es:'¿Eliminar esta notificación?',fr:'Supprimer cette notification ?',it:'Eliminare questa notifica?',pt:'Eliminar esta notificação?',tr:'Bu bildirim silinsin mi?',uk:'Видалити це сповіщення?'},
+'Не удалось отметить уведомление':{en:'Could not mark notification as read',de:'Benachrichtigung konnte nicht als gelesen markiert werden',es:'No se pudo marcar la notificación como leída',fr:'Impossible de marquer la notification comme lue',it:'Impossibile segnare la notifica come letta',pt:'Não foi possível marcar a notificação como lida',tr:'Bildirim okundu olarak işaretlenemedi',uk:'Не вдалося позначити сповіщення прочитаним'},
+'Уведомление не изменено: проверь права доступа в Supabase.':{en:'Notification was not updated. Check Supabase access permissions.',de:'Die Benachrichtigung wurde nicht aktualisiert. Prüfe die Zugriffsrechte in Supabase.',es:'La notificación no se actualizó. Comprueba los permisos de acceso en Supabase.',fr:'La notification n’a pas été mise à jour. Vérifiez les droits d’accès dans Supabase.',it:'La notifica non è stata aggiornata. Controlla i permessi di accesso in Supabase.',pt:'A notificação não foi atualizada. Verifique as permissões de acesso no Supabase.',tr:'Bildirim güncellenmedi. Supabase erişim izinlerini kontrol et.',uk:'Сповіщення не оновлено. Перевір права доступу в Supabase.'},
+'Уведомление удалено.':{en:'Notification deleted.',de:'Benachrichtigung gelöscht.',es:'Notificación eliminada.',fr:'Notification supprimée.',it:'Notifica eliminata.',pt:'Notificação eliminada.',tr:'Bildirim silindi.',uk:'Сповіщення видалено.'},
+'Удаление не разрешено. Сначала выполни SQL-настройку управления уведомлениями.':{en:'Deletion is not allowed. First apply the SQL notification-management setup.',de:'Das Löschen ist nicht erlaubt. Führe zuerst die SQL-Einrichtung für die Benachrichtigungsverwaltung aus.',es:'No se permite eliminar. Primero aplica la configuración SQL para gestionar notificaciones.',fr:'La suppression n’est pas autorisée. Appliquez d’abord la configuration SQL de gestion des notifications.',it:'L’eliminazione non è consentita. Esegui prima la configurazione SQL per la gestione delle notifiche.',pt:'A eliminação não é permitida. Primeiro aplique a configuração SQL de gestão de notificações.',tr:'Silme işlemine izin verilmiyor. Önce bildirim yönetimi SQL kurulumunu uygula.',uk:'Видалення заборонено. Спочатку виконай SQL-налаштування керування сповіщеннями.'},
+'Не удалось отметить уведомления':{en:'Could not mark notifications as read',de:'Benachrichtigungen konnten nicht als gelesen markiert werden',es:'No se pudieron marcar las notificaciones como leídas',fr:'Impossible de marquer les notifications comme lues',it:'Impossibile segnare le notifiche come lette',pt:'Não foi possível marcar as notificações como lidas',tr:'Bildirimler okundu olarak işaretlenemedi',uk:'Не вдалося позначити сповіщення прочитаними'},
+'Непрочитанных уведомлений нет.':{en:'There are no unread notifications.',de:'Es gibt keine ungelesenen Benachrichtigungen.',es:'No hay notificaciones sin leer.',fr:'Aucune notification non lue.',it:'Non ci sono notifiche non lette.',pt:'Não há notificações por ler.',tr:'Okunmamış bildirim yok.',uk:'Немає непрочитаних сповіщень.'},
+'Удалить все прочитанные уведомления? Это действие нельзя отменить.':{en:'Delete all read notifications? This action cannot be undone.',de:'Alle gelesenen Benachrichtigungen löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.',es:'¿Eliminar todas las notificaciones leídas? Esta acción no se puede deshacer.',fr:'Supprimer toutes les notifications lues ? Cette action est irréversible.',it:'Eliminare tutte le notifiche lette? Questa azione non può essere annullata.',pt:'Eliminar todas as notificações lidas? Esta ação não pode ser desfeita.',tr:'Okunmuş tüm bildirimler silinsin mi? Bu işlem geri alınamaz.',uk:'Видалити всі прочитані сповіщення? Цю дію не можна скасувати.'},
+'Не удалось удалить уведомления':{en:'Could not delete notifications',de:'Benachrichtigungen konnten nicht gelöscht werden',es:'No se pudieron eliminar las notificaciones',fr:'Impossible de supprimer les notifications',it:'Impossibile eliminare le notifiche',pt:'Não foi possível eliminar as notificações',tr:'Bildirimler silinemedi',uk:'Не вдалося видалити сповіщення'},
+'Нет прочитанных уведомлений для удаления. Если удаление должно быть доступно, выполни SQL-настройку.':{en:'There are no read notifications to delete. If deletion should be available, apply the SQL setup.',de:'Es gibt keine gelesenen Benachrichtigungen zum Löschen. Wenn das Löschen verfügbar sein soll, führe die SQL-Einrichtung aus.',es:'No hay notificaciones leídas para eliminar. Para habilitar la eliminación, aplica la configuración SQL.',fr:'Aucune notification lue à supprimer. Pour autoriser la suppression, appliquez la configuration SQL.',it:'Non ci sono notifiche lette da eliminare. Per abilitare l’eliminazione, applica la configurazione SQL.',pt:'Não há notificações lidas para eliminar. Para permitir a eliminação, aplique a configuração SQL.',tr:'Silinecek okunmuş bildirim yok. Silme işlemi etkin olmalıysa SQL kurulumunu uygula.',uk:'Немає прочитаних сповіщень для видалення. Щоб дозволити видалення, виконай SQL-налаштування.'},
+'Удалено уведомлений:':{en:'Notifications deleted:',de:'Gelöschte Benachrichtigungen:',es:'Notificaciones eliminadas:',fr:'Notifications supprimées :',it:'Notifiche eliminate:',pt:'Notificações eliminadas:',tr:'Silinen bildirim:',uk:'Видалено сповіщень:'},
+'Создана новая запись':{en:'New appointment created',de:'Neuer Termin erstellt',es:'Nueva cita creada',fr:'Nouveau rendez-vous créé',it:'Nuovo appuntamento creato',pt:'Nova marcação criada',tr:'Yeni randevu oluşturuldu',uk:'Створено новий запис'},
+'Запись подтверждена':{en:'Appointment confirmed',de:'Termin bestätigt',es:'Cita confirmada',fr:'Rendez-vous confirmé',it:'Appuntamento confermato',pt:'Marcação confirmada',tr:'Randevu onaylandı',uk:'Запис підтверджено'},
+'Запись перенесена':{en:'Appointment rescheduled',de:'Termin verschoben',es:'Cita reprogramada',fr:'Rendez-vous reporté',it:'Appuntamento riprogrammato',pt:'Marcação reagendada',tr:'Randevu yeniden planlandı',uk:'Запис перенесено'},
+'Клиент отменил запись':{en:'Client cancelled the appointment',de:'Der Kunde hat den Termin abgesagt',es:'El cliente canceló la cita',fr:'Le client a annulé le rendez-vous',it:'Il cliente ha annullato l’appuntamento',pt:'O cliente cancelou a marcação',tr:'Müşteri randevuyu iptal etti',uk:'Клієнт скасував запис'},
+'Клиент записался на':{en:'Client booked',de:'Kunde hat gebucht:',es:'El cliente reservó',fr:'Le client a réservé',it:'Il cliente ha prenotato',pt:'O cliente marcou',tr:'Müşteri rezervasyon yaptı:',uk:'Клієнт записався на'},
 'Рабочее время на месяц':{en:'Monthly working hours',de:'Arbeitszeiten für den Monat',es:'Horario laboral del mes',fr:'Horaires de travail du mois',it:'Orario di lavoro mensile',pt:'Horário de trabalho mensal',tr:'Aylık çalışma saatleri',uk:'Робочий час на місяць'},
 'Эти часы применяются ко всем дням выбранного месяца, кроме дней, отмеченных как выходные.':{en:'These hours apply to every day of the selected month except marked days off.',de:'Diese Zeiten gelten für alle Tage des ausgewählten Monats außer markierten Ruhetagen.',es:'Este horario se aplica a todos los días del mes seleccionado, excepto los días libres marcados.',fr:'Ces horaires s’appliquent à tous les jours du mois sélectionné, sauf aux jours de congé marqués.',it:'Questi orari si applicano a tutti i giorni del mese selezionato, tranne i giorni di riposo segnati.',pt:'Este horário aplica-se a todos os dias do mês selecionado, exceto aos dias de folga marcados.',tr:'Bu saatler, işaretli izin günleri hariç seçilen ayın tüm günleri için geçerlidir.',uk:'Ці години застосовуються до всіх днів вибраного місяця, крім позначених вихідних.'},
 'Начало рабочего дня':{en:'Workday start',de:'Arbeitsbeginn',es:'Inicio de la jornada',fr:'Début de journée',it:'Inizio giornata lavorativa',pt:'Início do dia de trabalho',tr:'İş başlangıcı',uk:'Початок робочого дня'},
@@ -1622,37 +1659,1474 @@ Object.assign(RU_TEXT,{
 'Не удалось загрузить обращения. Проверь, что SQL-настройка поддержки выполнена.':{en:'Could not load requests. Check that the support SQL setup has been run.',de:'Anfragen konnten nicht geladen werden. Prüfe, ob das Support-SQL ausgeführt wurde.',es:'No se pudieron cargar las solicitudes. Comprueba que se haya ejecutado el SQL de soporte.',fr:'Impossible de charger les demandes. Vérifie que le SQL de support a été exécuté.',it:'Impossibile caricare le richieste. Verifica che sia stato eseguito l’SQL di supporto.',pt:'Não foi possível carregar os pedidos. Verifique se o SQL de suporte foi executado.',tr:'Talepler yüklenemedi. Destek SQL kurulumunun çalıştırıldığını kontrol et.',uk:'Не вдалося завантажити звернення. Перевір, чи виконано SQL для підтримки.'},
 'Не удалось отправить обращение. Проверь SQL-настройку поддержки и повтори попытку.':{en:'Could not send the request. Check the support SQL setup and try again.',de:'Anfrage konnte nicht gesendet werden. Prüfe die Support-SQL-Einrichtung und versuche es erneut.',es:'No se pudo enviar la solicitud. Comprueba la configuración SQL de soporte e inténtalo de nuevo.',fr:'Impossible d’envoyer la demande. Vérifie le SQL de support et réessaie.',it:'Impossibile inviare la richiesta. Controlla la configurazione SQL di supporto e riprova.',pt:'Não foi possível enviar o pedido. Verifique o SQL de suporte e tente novamente.',tr:'Talep gönderilemedi. Destek SQL ayarını kontrol edip tekrar dene.',uk:'Не вдалося надіслати звернення. Перевір SQL для підтримки та повтори спробу.'}
 });
-function t(source){const row=RU_TEXT[source]||EXTRA_TEXT[source];return currentLanguage==='ru'||!row?source:(row[currentLanguage]||row.en||source)}
-function setupLanguageSelect(select){if(!select)return;const current=select.value;select.innerHTML='';LANGUAGE_OPTIONS.forEach(([value,label])=>{const o=document.createElement('option');o.value=value;o.textContent=label;select.append(o)});select.value=LANGUAGESAFE(current)?current:currentLanguage}
+/* v8.85 translation coverage: static UI text, small labels, placeholders and accessibility text. */
+Object.assign(RU_TEXT, {
+  "Выбери оформление": {
+    "en": "Choose a theme",
+    "de": "Wähle ein Design",
+    "es": "Elige un tema",
+    "fr": "Choisissez un thème",
+    "it": "Scegli un tema",
+    "pt": "Escolha um tema",
+    "tr": "Bir tema seç",
+    "uk": "Обери оформлення"
+  },
+  "Тему можно будет изменить позже в настройках. 🌸": {
+    "en": "You can change the theme later in Settings. 🌸",
+    "de": "Du kannst das Design später in den Einstellungen ändern. 🌸",
+    "es": "Podrás cambiar el tema más tarde en Ajustes. 🌸",
+    "fr": "Vous pourrez modifier le thème plus tard dans les paramètres. 🌸",
+    "it": "Potrai cambiare il tema in seguito nelle impostazioni. 🌸",
+    "pt": "Poderá alterar o tema mais tarde nas definições. 🌸",
+    "tr": "Temayı daha sonra Ayarlar bölümünden değiştirebilirsin. 🌸",
+    "uk": "Тему можна буде змінити пізніше в налаштуваннях. 🌸"
+  },
+  "Цветочный шёлк": {
+    "en": "Floral silk",
+    "de": "Blütenseide",
+    "es": "Seda floral",
+    "fr": "Soie fleurie",
+    "it": "Seta floreale",
+    "pt": "Seda floral",
+    "tr": "Çiçekli ipek",
+    "uk": "Квітковий шовк"
+  },
+  "Лавандовый туман": {
+    "en": "Lavender mist",
+    "de": "Lavendelnebel",
+    "es": "Bruma de lavanda",
+    "fr": "Brume de lavande",
+    "it": "Nebbia di lavanda",
+    "pt": "Névoa de lavanda",
+    "tr": "Lavanta sisi",
+    "uk": "Лавандовий туман"
+  },
+  "Цветная дымка": {
+    "en": "Color haze",
+    "de": "Farbschleier",
+    "es": "Bruma de color",
+    "fr": "Brume colorée",
+    "it": "Nebbia colorata",
+    "pt": "Névoa colorida",
+    "tr": "Renkli sis",
+    "uk": "Кольорова імла"
+  },
+  "Мятный сад": {
+    "en": "Mint garden",
+    "de": "Minzgarten",
+    "es": "Jardín de menta",
+    "fr": "Jardin menthe",
+    "it": "Giardino alla menta",
+    "pt": "Jardim de hortelã",
+    "tr": "Nane bahçesi",
+    "uk": "М’ятний сад"
+  },
+  "Нюдовый люкс": {
+    "en": "Nude luxury",
+    "de": "Nude-Luxus",
+    "es": "Lujo nude",
+    "fr": "Luxe nude",
+    "it": "Lusso nude",
+    "pt": "Luxo nude",
+    "tr": "Nude şıklık",
+    "uk": "Нюдовий люкс"
+  },
+  "Аккаунт мастера": {
+    "en": "Master account",
+    "de": "Konto der Fachkraft",
+    "es": "Cuenta del profesional",
+    "fr": "Compte du professionnel",
+    "it": "Account professionista",
+    "pt": "Conta do profissional",
+    "tr": "Uzman hesabı",
+    "uk": "Обліковий запис майстра"
+  },
+  "Выбери регистрацию или вход.": {
+    "en": "Choose registration or sign in.",
+    "de": "Wähle Registrierung oder Anmeldung.",
+    "es": "Elige registrarte o iniciar sesión.",
+    "fr": "Choisissez de vous inscrire ou de vous connecter.",
+    "it": "Scegli se registrarti o accedere.",
+    "pt": "Escolha registar-se ou iniciar sessão.",
+    "tr": "Kayıt olmayı veya giriş yapmayı seç.",
+    "uk": "Обери реєстрацію або вхід."
+  },
+  "Создать профиль мастера": {
+    "en": "Create master profile",
+    "de": "Profil als Fachkraft erstellen",
+    "es": "Crear perfil profesional",
+    "fr": "Créer un profil professionnel",
+    "it": "Crea profilo professionista",
+    "pt": "Criar perfil profissional",
+    "tr": "Uzman profili oluştur",
+    "uk": "Створити профіль майстра"
+  },
+  "Проверка подключения…": {
+    "en": "Checking connection…",
+    "de": "Verbindung wird geprüft…",
+    "es": "Comprobando conexión…",
+    "fr": "Vérification de la connexion…",
+    "it": "Verifica della connessione…",
+    "pt": "A verificar a ligação…",
+    "tr": "Bağlantı kontrol ediliyor…",
+    "uk": "Перевірка підключення…"
+  },
+  "Профили и общие записи синхронизируются через Supabase после входа. Выбери «Я мастер» или «Я клиент», чтобы зарегистрироваться или войти. Локальные черновики остаются в этом браузере.": {
+    "en": "Profiles and shared appointments sync through Supabase after sign-in. Choose “I’m a master” or “I’m a client” to register or sign in. Local drafts remain in this browser.",
+    "de": "Profile und gemeinsame Termine werden nach der Anmeldung über Supabase synchronisiert. Wähle „Ich bin Fachkraft“ oder „Ich bin Kunde“, um dich zu registrieren oder anzumelden. Lokale Entwürfe bleiben in diesem Browser.",
+    "es": "Los perfiles y las citas compartidas se sincronizan mediante Supabase después de iniciar sesión. Elige «Soy profesional» o «Soy cliente» para registrarte o entrar. Los borradores locales permanecen en este navegador.",
+    "fr": "Les profils et les rendez-vous partagés sont synchronisés via Supabase après connexion. Choisissez « Je suis professionnel » ou « Je suis client » pour vous inscrire ou vous connecter. Les brouillons locaux restent dans ce navigateur.",
+    "it": "I profili e gli appuntamenti condivisi si sincronizzano tramite Supabase dopo l’accesso. Scegli «Sono un professionista» o «Sono un cliente» per registrarti o accedere. Le bozze locali restano in questo browser.",
+    "pt": "Os perfis e as marcações partilhadas são sincronizados através do Supabase após o início de sessão. Escolha «Sou profissional» ou «Sou cliente» para se registar ou entrar. Os rascunhos locais permanecem neste navegador.",
+    "tr": "Profiller ve ortak randevular, giriş yaptıktan sonra Supabase üzerinden eşitlenir. Kayıt olmak veya giriş yapmak için “Uzmanım” ya da “Müşteriyim” seç. Yerel taslaklar bu tarayıcıda kalır.",
+    "uk": "Профілі та спільні записи синхронізуються через Supabase після входу. Обери «Я майстер» або «Я клієнт», щоб зареєструватися чи увійти. Локальні чернетки залишаються в цьому браузері."
+  },
+  "Email для входа *": {
+    "en": "Sign-in email *",
+    "de": "E-Mail für die Anmeldung *",
+    "es": "Correo electrónico *",
+    "fr": "E-mail de connexion *",
+    "it": "E-mail di accesso *",
+    "pt": "E-mail de início de sessão *",
+    "tr": "Giriş e-postası *",
+    "uk": "Email для входу *"
+  },
+  "Войти": {
+    "en": "Sign in",
+    "de": "Anmelden",
+    "es": "Iniciar sesión",
+    "fr": "Se connecter",
+    "it": "Accedi",
+    "pt": "Iniciar sessão",
+    "tr": "Giriş yap",
+    "uk": "Увійти"
+  },
+  "Пароль *": {
+    "en": "Password *",
+    "de": "Passwort *",
+    "es": "Contraseña *",
+    "fr": "Mot de passe *",
+    "it": "Password *",
+    "pt": "Palavra-passe *",
+    "tr": "Şifre *",
+    "uk": "Пароль *"
+  },
+  "Пароль (не менее 8 символов) *": {
+    "en": "Password (at least 8 characters) *",
+    "de": "Passwort (mindestens 8 Zeichen) *",
+    "es": "Contraseña (mínimo 8 caracteres) *",
+    "fr": "Mot de passe (8 caractères minimum) *",
+    "it": "Password (almeno 8 caratteri) *",
+    "pt": "Palavra-passe (pelo menos 8 caracteres) *",
+    "tr": "Şifre (en az 8 karakter) *",
+    "uk": "Пароль (не менше 8 символів) *"
+  },
+  "Номер телефона *": {
+    "en": "Phone number *",
+    "de": "Telefonnummer *",
+    "es": "Número de teléfono *",
+    "fr": "Numéro de téléphone *",
+    "it": "Numero di telefono *",
+    "pt": "Número de telefone *",
+    "tr": "Telefon numarası *",
+    "uk": "Номер телефону *"
+  },
+  "Направление деятельности *": {
+    "en": "Business category *",
+    "de": "Tätigkeitsbereich *",
+    "es": "Área de actividad *",
+    "fr": "Domaine d’activité *",
+    "it": "Settore di attività *",
+    "pt": "Área de atividade *",
+    "tr": "Faaliyet alanı *",
+    "uk": "Напрям діяльності *"
+  },
+  "Маникюр и педикюр": {
+    "en": "Manicure and pedicure",
+    "de": "Maniküre und Pediküre",
+    "es": "Manicura y pedicura",
+    "fr": "Manucure et pédicure",
+    "it": "Manicure e pedicure",
+    "pt": "Manicure e pedicure",
+    "tr": "Manikür ve pedikür",
+    "uk": "Манікюр і педикюр"
+  },
+  "Парикмахерские услуги": {
+    "en": "Hair services",
+    "de": "Friseurdienstleistungen",
+    "es": "Servicios de peluquería",
+    "fr": "Services de coiffure",
+    "it": "Servizi di parrucchiere",
+    "pt": "Serviços de cabeleireiro",
+    "tr": "Kuaför hizmetleri",
+    "uk": "Перукарські послуги"
+  },
+  "Брови и ресницы": {
+    "en": "Brows and lashes",
+    "de": "Augenbrauen und Wimpern",
+    "es": "Cejas y pestañas",
+    "fr": "Sourcils et cils",
+    "it": "Sopracciglia e ciglia",
+    "pt": "Sobrancelhas e pestanas",
+    "tr": "Kaş ve kirpik",
+    "uk": "Брови та вії"
+  },
+  "Массаж": {
+    "en": "Massage",
+    "de": "Massage",
+    "es": "Masaje",
+    "fr": "Massage",
+    "it": "Massaggio",
+    "pt": "Massagem",
+    "tr": "Masaj",
+    "uk": "Масаж"
+  },
+  "Косметология": {
+    "en": "Beauty treatments",
+    "de": "Kosmetikbehandlungen",
+    "es": "Cosmetología",
+    "fr": "Soins esthétiques",
+    "it": "Trattamenti estetici",
+    "pt": "Tratamentos estéticos",
+    "tr": "Kozmetoloji",
+    "uk": "Косметологія"
+  },
+  "Визаж": {
+    "en": "Makeup",
+    "de": "Make-up",
+    "es": "Maquillaje",
+    "fr": "Maquillage",
+    "it": "Trucco",
+    "pt": "Maquilhagem",
+    "tr": "Makyaj",
+    "uk": "Візаж"
+  },
+  "Эпиляция": {
+    "en": "Hair removal",
+    "de": "Haarentfernung",
+    "es": "Depilación",
+    "fr": "Épilation",
+    "it": "Depilazione",
+    "pt": "Depilação",
+    "tr": "Epilasyon",
+    "uk": "Епіляція"
+  },
+  "Выбери основное направление. Услуги внутри направления укажешь отдельно.": {
+    "en": "Choose your primary category. You can specify individual services separately.",
+    "de": "Wähle deinen Hauptbereich. Einzelne Leistungen kannst du separat angeben.",
+    "es": "Elige tu categoría principal. Podrás indicar los servicios concretos por separado.",
+    "fr": "Choisissez votre domaine principal. Vous pourrez préciser les prestations séparément.",
+    "it": "Scegli il settore principale. Potrai indicare i singoli servizi separatamente.",
+    "pt": "Escolha a sua área principal. Poderá indicar os serviços específicos separadamente.",
+    "tr": "Ana faaliyet alanını seç. Verdiğin hizmetleri ayrıca belirtebilirsin.",
+    "uk": "Обери основний напрям. Окремі послуги вкажеш додатково."
+  },
+  "Подтверди электронную почту": {
+    "en": "Verify your email address",
+    "de": "Bestätige deine E-Mail-Adresse",
+    "es": "Confirma tu correo electrónico",
+    "fr": "Confirmez votre adresse e-mail",
+    "it": "Conferma il tuo indirizzo e-mail",
+    "pt": "Confirme o seu e-mail",
+    "tr": "E-posta adresini doğrula",
+    "uk": "Підтвердь електронну пошту"
+  },
+  "Остался всего один небольшой шаг, и можно будет пользоваться Nailora.": {
+    "en": "Just one small step left before you can use Nailora.",
+    "de": "Nur noch ein kleiner Schritt, dann kannst du Nailora nutzen.",
+    "es": "Solo queda un pequeño paso para poder usar Nailora.",
+    "fr": "Encore une petite étape avant de pouvoir utiliser Nailora.",
+    "it": "Manca solo un piccolo passaggio per usare Nailora.",
+    "pt": "Falta apenas um pequeno passo para poder usar o Nailora.",
+    "tr": "Nailora’yı kullanmak için yalnızca küçük bir adım kaldı.",
+    "uk": "Залишився лише один невеликий крок, і можна буде користуватися Nailora."
+  },
+  "Мы отправили письмо со ссылкой для подтверждения. Открой его, чтобы подтвердить адрес.": {
+    "en": "We sent an email with a verification link. Open it to confirm your address.",
+    "de": "Wir haben eine E-Mail mit einem Bestätigungslink gesendet. Öffne sie, um deine Adresse zu bestätigen.",
+    "es": "Hemos enviado un correo con un enlace de verificación. Ábrelo para confirmar tu dirección.",
+    "fr": "Nous avons envoyé un e-mail contenant un lien de vérification. Ouvrez-le pour confirmer votre adresse.",
+    "it": "Abbiamo inviato un’e-mail con un link di verifica. Aprila per confermare il tuo indirizzo.",
+    "pt": "Enviámos um e-mail com uma ligação de confirmação. Abra-o para confirmar o seu endereço.",
+    "tr": "Doğrulama bağlantısı içeren bir e-posta gönderdik. Adresini doğrulamak için e-postayı aç.",
+    "uk": "Ми надіслали лист із посиланням для підтвердження. Відкрий його, щоб підтвердити адресу."
+  },
+  "Зайди в свою электронную почту": {
+    "en": "Open your email inbox",
+    "de": "Öffne dein E-Mail-Postfach",
+    "es": "Abre tu bandeja de correo",
+    "fr": "Ouvrez votre boîte e-mail",
+    "it": "Apri la tua casella di posta",
+    "pt": "Abra a sua caixa de e-mail",
+    "tr": "E-posta kutunu aç",
+    "uk": "Зайди до своєї електронної пошти"
+  },
+  "Открой почтовый ящик, который указал при регистрации.": {
+    "en": "Open the email account you used during registration.",
+    "de": "Öffne das Postfach, das du bei der Registrierung angegeben hast.",
+    "es": "Abre la cuenta de correo que indicaste al registrarte.",
+    "fr": "Ouvrez la boîte e-mail indiquée lors de l’inscription.",
+    "it": "Apri la casella e-mail indicata durante la registrazione.",
+    "pt": "Abra a caixa de e-mail que indicou no registo.",
+    "tr": "Kayıt sırasında belirttiğin e-posta hesabını aç.",
+    "uk": "Відкрий поштову скриньку, яку вказав під час реєстрації."
+  },
+  "Найди письмо от Nailora": {
+    "en": "Find the email from Nailora",
+    "de": "Suche die E-Mail von Nailora",
+    "es": "Busca el correo de Nailora",
+    "fr": "Recherchez l’e-mail de Nailora",
+    "it": "Cerca l’e-mail di Nailora",
+    "pt": "Procure o e-mail da Nailora",
+    "tr": "Nailora’dan gelen e-postayı bul",
+    "uk": "Знайди лист від Nailora"
+  },
+  "Если его не видно во входящих, загляни в папку «Спам».": {
+    "en": "If you don’t see it in your inbox, check the Spam folder.",
+    "de": "Wenn du sie nicht im Posteingang findest, prüfe den Spam-Ordner.",
+    "es": "Si no aparece en la bandeja de entrada, revisa la carpeta de spam.",
+    "fr": "S’il n’apparaît pas dans la boîte de réception, vérifiez les courriers indésirables.",
+    "it": "Se non la trovi nella posta in arrivo, controlla la cartella Spam.",
+    "pt": "Se não estiver na caixa de entrada, verifique a pasta Spam.",
+    "tr": "Gelen kutunda görünmüyorsa Spam klasörünü kontrol et.",
+    "uk": "Якщо листа немає у вхідних, перевір папку «Спам»."
+  },
+  "Открой письмо и перейди по ссылке": {
+    "en": "Open the email and follow the link",
+    "de": "Öffne die E-Mail und klicke auf den Link",
+    "es": "Abre el correo y sigue el enlace",
+    "fr": "Ouvrez l’e-mail et suivez le lien",
+    "it": "Apri l’e-mail e segui il link",
+    "pt": "Abra o e-mail e aceda à ligação",
+    "tr": "E-postayı aç ve bağlantıya tıkla",
+    "uk": "Відкрий лист і перейди за посиланням"
+  },
+  "Это подтвердит адрес электронной почты.": {
+    "en": "This will verify your email address.",
+    "de": "Damit wird deine E-Mail-Adresse bestätigt.",
+    "es": "Esto confirmará tu dirección de correo electrónico.",
+    "fr": "Cela confirmera votre adresse e-mail.",
+    "it": "Questo confermerà il tuo indirizzo e-mail.",
+    "pt": "Isto confirmará o seu endereço de e-mail.",
+    "tr": "Bu işlem e-posta adresini doğrular.",
+    "uk": "Це підтвердить адресу електронної пошти."
+  },
+  "После подтверждения вернись в Nailora. Если сессия восстановится успешно, приложение откроет твой профиль автоматически.": {
+    "en": "After verification, return to Nailora. If your session is restored successfully, the app will open your profile automatically.",
+    "de": "Kehre nach der Bestätigung zu Nailora zurück. Wenn die Sitzung erfolgreich wiederhergestellt wird, öffnet die App automatisch dein Profil.",
+    "es": "Después de verificarlo, vuelve a Nailora. Si la sesión se restaura correctamente, la aplicación abrirá tu perfil automáticamente.",
+    "fr": "Après la vérification, revenez à Nailora. Si la session est rétablie, l’application ouvrira automatiquement votre profil.",
+    "it": "Dopo la verifica, torna su Nailora. Se la sessione viene ripristinata correttamente, l’app aprirà automaticamente il tuo profilo.",
+    "pt": "Após a confirmação, volte ao Nailora. Se a sessão for restaurada com sucesso, a aplicação abrirá automaticamente o seu perfil.",
+    "tr": "Doğrulamadan sonra Nailora’ya dön. Oturum başarıyla geri yüklenirse uygulama profilini otomatik açar.",
+    "uk": "Після підтвердження повернися до Nailora. Якщо сеанс відновиться успішно, застосунок автоматично відкриє твій профіль."
+  },
+  "Письмо не пришло?": {
+    "en": "Didn’t receive the email?",
+    "de": "E-Mail nicht erhalten?",
+    "es": "¿No has recibido el correo?",
+    "fr": "Vous n’avez pas reçu l’e-mail ?",
+    "it": "Non hai ricevuto l’e-mail?",
+    "pt": "Não recebeu o e-mail?",
+    "tr": "E-posta gelmedi mi?",
+    "uk": "Лист не надійшов?"
+  },
+  "Проверь папку «Спам». Если письма там нет, можно отправить ссылку ещё раз здесь. Если аккаунт уже создан, не создавай его повторно.": {
+    "en": "Check your Spam folder. If the email isn’t there, you can resend the link here. If your account has already been created, don’t register again.",
+    "de": "Prüfe den Spam-Ordner. Wenn die E-Mail dort nicht ist, kannst du den Link hier erneut senden. Wenn dein Konto bereits erstellt wurde, registriere dich nicht erneut.",
+    "es": "Revisa la carpeta de spam. Si el correo no está allí, puedes volver a enviar el enlace desde aquí. Si ya se creó tu cuenta, no vuelvas a registrarte.",
+    "fr": "Vérifiez les courriers indésirables. Si l’e-mail n’y est pas, vous pouvez renvoyer le lien ici. Si votre compte existe déjà, ne vous réinscrivez pas.",
+    "it": "Controlla la cartella Spam. Se l’e-mail non è lì, puoi inviare di nuovo il link da qui. Se l’account è già stato creato, non registrarti un’altra volta.",
+    "pt": "Verifique a pasta Spam. Se o e-mail não estiver lá, pode reenviar a ligação aqui. Se a conta já tiver sido criada, não volte a registar-se.",
+    "tr": "Spam klasörünü kontrol et. E-posta orada değilse bağlantıyı buradan tekrar gönderebilirsin. Hesabın zaten oluşturulduysa yeniden kayıt olma.",
+    "uk": "Перевір папку «Спам». Якщо листа там немає, можна надіслати посилання ще раз. Якщо акаунт уже створено, не реєструйся повторно."
+  },
+  "Отправить письмо ещё раз": {
+    "en": "Resend email",
+    "de": "E-Mail erneut senden",
+    "es": "Reenviar correo",
+    "fr": "Renvoyer l’e-mail",
+    "it": "Invia di nuovo l’e-mail",
+    "pt": "Reenviar e-mail",
+    "tr": "E-postayı yeniden gönder",
+    "uk": "Надіслати лист ще раз"
+  },
+  "Вернуться к регистрации": {
+    "en": "Back to registration",
+    "de": "Zurück zur Registrierung",
+    "es": "Volver al registro",
+    "fr": "Retour à l’inscription",
+    "it": "Torna alla registrazione",
+    "pt": "Voltar ao registo",
+    "tr": "Kayda dön",
+    "uk": "Повернутися до реєстрації"
+  },
+  "Вход в Nailora": {
+    "en": "Sign in to Nailora",
+    "de": "Bei Nailora anmelden",
+    "es": "Iniciar sesión en Nailora",
+    "fr": "Se connecter à Nailora",
+    "it": "Accedi a Nailora",
+    "pt": "Iniciar sessão no Nailora",
+    "tr": "Nailora’ya giriş yap",
+    "uk": "Вхід до Nailora"
+  },
+  "Зарегистрироваться": {
+    "en": "Register",
+    "de": "Registrieren",
+    "es": "Registrarse",
+    "fr": "S’inscrire",
+    "it": "Registrati",
+    "pt": "Registar-se",
+    "tr": "Kayıt ol",
+    "uk": "Зареєструватися"
+  },
+  "Забыли пароль?": {
+    "en": "Forgot password?",
+    "de": "Passwort vergessen?",
+    "es": "¿Olvidaste tu contraseña?",
+    "fr": "Mot de passe oublié ?",
+    "it": "Password dimenticata?",
+    "pt": "Esqueceu-se da palavra-passe?",
+    "tr": "Şifreni mi unuttun?",
+    "uk": "Забули пароль?"
+  },
+  "Восстановление пароля": {
+    "en": "Password recovery",
+    "de": "Passwort zurücksetzen",
+    "es": "Recuperar contraseña",
+    "fr": "Récupération du mot de passe",
+    "it": "Recupero password",
+    "pt": "Recuperar palavra-passe",
+    "tr": "Şifre kurtarma",
+    "uk": "Відновлення пароля"
+  },
+  "Укажи email аккаунта. Мы отправим письмо со ссылкой для восстановления пароля.": {
+    "en": "Enter your account email. We’ll send a password reset link.",
+    "de": "Gib die E-Mail-Adresse deines Kontos ein. Wir senden dir einen Link zum Zurücksetzen des Passworts.",
+    "es": "Introduce el correo de tu cuenta. Te enviaremos un enlace para restablecer la contraseña.",
+    "fr": "Saisissez l’e-mail de votre compte. Nous vous enverrons un lien de réinitialisation.",
+    "it": "Inserisci l’e-mail del tuo account. Ti invieremo un link per reimpostare la password.",
+    "pt": "Introduza o e-mail da sua conta. Enviaremos uma ligação para redefinir a palavra-passe.",
+    "tr": "Hesabının e-posta adresini gir. Şifre sıfırlama bağlantısı göndereceğiz.",
+    "uk": "Вкажи email акаунта. Ми надішлемо лист із посиланням для відновлення пароля."
+  },
+  "Отправить ссылку": {
+    "en": "Send link",
+    "de": "Link senden",
+    "es": "Enviar enlace",
+    "fr": "Envoyer le lien",
+    "it": "Invia link",
+    "pt": "Enviar ligação",
+    "tr": "Bağlantı gönder",
+    "uk": "Надіслати посилання"
+  },
+  "Придумай новый пароль для своего аккаунта.": {
+    "en": "Create a new password for your account.",
+    "de": "Lege ein neues Passwort für dein Konto fest.",
+    "es": "Crea una nueva contraseña para tu cuenta.",
+    "fr": "Créez un nouveau mot de passe pour votre compte.",
+    "it": "Crea una nuova password per il tuo account.",
+    "pt": "Crie uma nova palavra-passe para a sua conta.",
+    "tr": "Hesabın için yeni bir şifre oluştur.",
+    "uk": "Придумай новий пароль для свого акаунта."
+  },
+  "Новый пароль (не менее 8 символов) *": {
+    "en": "New password (at least 8 characters) *",
+    "de": "Neues Passwort (mindestens 8 Zeichen) *",
+    "es": "Nueva contraseña (mínimo 8 caracteres) *",
+    "fr": "Nouveau mot de passe (8 caractères minimum) *",
+    "it": "Nuova password (almeno 8 caratteri) *",
+    "pt": "Nova palavra-passe (pelo menos 8 caracteres) *",
+    "tr": "Yeni şifre (en az 8 karakter) *",
+    "uk": "Новий пароль (не менше 8 символів) *"
+  },
+  "Повтори новый пароль *": {
+    "en": "Confirm new password *",
+    "de": "Neues Passwort wiederholen *",
+    "es": "Repite la nueva contraseña *",
+    "fr": "Confirmez le nouveau mot de passe *",
+    "it": "Conferma la nuova password *",
+    "pt": "Repita a nova palavra-passe *",
+    "tr": "Yeni şifreyi tekrar gir *",
+    "uk": "Повтори новий пароль *"
+  },
+  "Сохранить новый пароль": {
+    "en": "Save new password",
+    "de": "Neues Passwort speichern",
+    "es": "Guardar nueva contraseña",
+    "fr": "Enregistrer le nouveau mot de passe",
+    "it": "Salva nuova password",
+    "pt": "Guardar nova palavra-passe",
+    "tr": "Yeni şifreyi kaydet",
+    "uk": "Зберегти новий пароль"
+  },
+  "Выбери направление деятельности, страну и город, чтобы найти подходящего мастера.": {
+    "en": "Choose a category, country and city to find the right professional.",
+    "de": "Wähle Tätigkeitsbereich, Land und Stadt, um die passende Fachkraft zu finden.",
+    "es": "Elige el área, el país y la ciudad para encontrar al profesional adecuado.",
+    "fr": "Choisissez le domaine, le pays et la ville pour trouver le professionnel adapté.",
+    "it": "Scegli il settore, il Paese e la città per trovare il professionista giusto.",
+    "pt": "Escolha a área, o país e a cidade para encontrar o profissional adequado.",
+    "tr": "Uygun uzmanı bulmak için faaliyet alanını, ülkeyi ve şehri seç.",
+    "uk": "Обери напрям, країну та місто, щоб знайти потрібного майстра."
+  },
+  "Направление деятельности": {
+    "en": "Business category",
+    "de": "Tätigkeitsbereich",
+    "es": "Área de actividad",
+    "fr": "Domaine d’activité",
+    "it": "Settore di attività",
+    "pt": "Área de atividade",
+    "tr": "Faaliyet alanı",
+    "uk": "Напрям діяльності"
+  },
+  "Все направления": {
+    "en": "All categories",
+    "de": "Alle Bereiche",
+    "es": "Todas las categorías",
+    "fr": "Tous les domaines",
+    "it": "Tutti i settori",
+    "pt": "Todas as áreas",
+    "tr": "Tüm alanlar",
+    "uk": "Усі напрями"
+  },
+  "В ячейках показаны только начало и конец рабочего дня. Занятые дни отмечены цветом, личные данные клиентов скрыты.": {
+    "en": "Cells show only the start and end of the workday. Booked days are highlighted; clients’ personal details are hidden.",
+    "de": "Die Zellen zeigen nur Beginn und Ende des Arbeitstags. Tage mit Terminen sind markiert; persönliche Kundendaten bleiben verborgen.",
+    "es": "Las celdas muestran solo el inicio y el final de la jornada. Los días con citas están resaltados y los datos personales de los clientes permanecen ocultos.",
+    "fr": "Les cases affichent uniquement le début et la fin de la journée de travail. Les jours avec rendez-vous sont signalés ; les données personnelles des clients sont masquées.",
+    "it": "Le celle mostrano solo l’inizio e la fine della giornata lavorativa. I giorni con appuntamenti sono evidenziati; i dati personali dei clienti restano nascosti.",
+    "pt": "As células mostram apenas o início e o fim do dia de trabalho. Os dias com marcações são destacados e os dados pessoais dos clientes ficam ocultos.",
+    "tr": "Hücrelerde yalnızca iş gününün başlangıcı ve bitişi gösterilir. Randevulu günler renkle belirtilir; müşterilerin kişisel bilgileri gizlenir.",
+    "uk": "У клітинках показано лише початок і кінець робочого дня. Дні із записами позначені кольором, особисті дані клієнтів приховані."
+  },
+  "Показаны только начала записи, для которых хватает времени на услугу. Перерывы и занятое время других клиентов скрыты.": {
+    "en": "Only appointment start times with enough time for the service are shown. Breaks and other clients’ booked times are hidden.",
+    "de": "Angezeigt werden nur Startzeiten, für die die Dauer der Leistung ausreicht. Pausen und bereits gebuchte Zeiten anderer Kunden bleiben verborgen.",
+    "es": "Solo se muestran las horas de inicio en las que hay tiempo suficiente para el servicio. Los descansos y las horas ocupadas por otros clientes están ocultos.",
+    "fr": "Seules les heures de début disposant d’assez de temps pour la prestation sont affichées. Les pauses et les créneaux occupés par d’autres clients sont masqués.",
+    "it": "Sono mostrati solo gli orari di inizio che consentono di completare il servizio. Le pause e gli orari occupati da altri clienti sono nascosti.",
+    "pt": "São apresentados apenas os horários de início com tempo suficiente para o serviço. As pausas e os horários ocupados por outros clientes ficam ocultos.",
+    "tr": "Yalnızca hizmet için yeterli süre bulunan başlangıç saatleri gösterilir. Molalar ve diğer müşterilerin dolu saatleri gizlenir.",
+    "uk": "Показано лише час початку запису, для якого вистачає часу на послугу. Перерви та зайнятий час інших клієнтів приховані."
+  },
+  "ВЫБРАННЫЙ ДЕНЬ": {
+    "en": "SELECTED DAY",
+    "de": "AUSGEWÄHLTER TAG",
+    "es": "DÍA SELECCIONADO",
+    "fr": "JOUR SÉLECTIONNÉ",
+    "it": "GIORNO SELEZIONATO",
+    "pt": "DIA SELECIONADO",
+    "tr": "SEÇİLİ GÜN",
+    "uk": "ОБРАНИЙ ДЕНЬ"
+  },
+  "записей на выбранную дату": {
+    "en": "appointments on selected date",
+    "de": "Termine am ausgewählten Datum",
+    "es": "citas en la fecha seleccionada",
+    "fr": "rendez-vous à la date choisie",
+    "it": "appuntamenti nella data selezionata",
+    "pt": "marcações na data selecionada",
+    "tr": "seçilen tarihteki randevu",
+    "uk": "записів на обрану дату"
+  },
+  "записей": {
+    "en": "appointments",
+    "de": "Termine",
+    "es": "citas",
+    "fr": "rendez-vous",
+    "it": "appuntamenti",
+    "pt": "marcações",
+    "tr": "randevu",
+    "uk": "записів"
+  },
+  "Ближайшая запись": {
+    "en": "Next appointment",
+    "de": "Nächster Termin",
+    "es": "Próxima cita",
+    "fr": "Prochain rendez-vous",
+    "it": "Prossimo appuntamento",
+    "pt": "Próxima marcação",
+    "tr": "Sonraki randevu",
+    "uk": "Найближчий запис"
+  },
+  "Предстоящих записей нет": {
+    "en": "No upcoming appointments",
+    "de": "Keine bevorstehenden Termine",
+    "es": "No hay próximas citas",
+    "fr": "Aucun rendez-vous à venir",
+    "it": "Nessun appuntamento imminente",
+    "pt": "Não há marcações futuras",
+    "tr": "Yaklaşan randevu yok",
+    "uk": "Майбутніх записів немає"
+  },
+  "Нажми, чтобы настроить": {
+    "en": "Click to configure",
+    "de": "Zum Einrichten klicken",
+    "es": "Haz clic para configurar",
+    "fr": "Cliquez pour configurer",
+    "it": "Fai clic per configurare",
+    "pt": "Clique para configurar",
+    "tr": "Ayarlamak için tıkla",
+    "uk": "Натисни, щоб налаштувати"
+  },
+  "Нажми на день, чтобы открыть записи. Дважды коснись даты (или дважды щёлкни), чтобы настроить рабочие интервалы, в том числе с перерывами. Удерживай день около секунды, чтобы отметить или снять выходной.": {
+    "en": "Tap a day to view appointments. Double-tap or double-click a date to set working intervals, including breaks. Press and hold a day for about a second to mark or clear a day off.",
+    "de": "Tippe auf einen Tag, um Termine anzuzeigen. Tippe zweimal oder doppelklicke auf ein Datum, um Arbeitsintervalle einschließlich Pausen festzulegen. Halte einen Tag etwa eine Sekunde gedrückt, um einen Ruhetag zu markieren oder aufzuheben.",
+    "es": "Pulsa un día para ver las citas. Toca dos veces o haz doble clic en una fecha para configurar los intervalos de trabajo, incluidos los descansos. Mantén pulsado un día durante aproximadamente un segundo para marcar o quitar un día libre.",
+    "fr": "Touchez un jour pour afficher les rendez-vous. Touchez deux fois ou double-cliquez sur une date pour définir les plages de travail, y compris les pauses. Maintenez un jour environ une seconde pour marquer ou retirer un jour de repos.",
+    "it": "Tocca un giorno per visualizzare gli appuntamenti. Tocca due volte o fai doppio clic su una data per impostare gli intervalli di lavoro, comprese le pause. Tieni premuto un giorno per circa un secondo per segnare o rimuovere un giorno libero.",
+    "pt": "Toque num dia para ver as marcações. Toque duas vezes ou faça duplo clique numa data para definir intervalos de trabalho, incluindo pausas. Mantenha um dia premido durante cerca de um segundo para marcar ou remover uma folga.",
+    "tr": "Randevuları görmek için güne dokun. Molalar dâhil çalışma aralıklarını ayarlamak için tarihe çift dokun veya çift tıkla. İzin gününü işaretlemek ya da kaldırmak için günü yaklaşık bir saniye basılı tut.",
+    "uk": "Натисни на день, щоб відкрити записи. Двічі торкнися дати (або двічі клацни), щоб налаштувати робочі інтервали, зокрема з перервами. Утримуй день близько секунди, щоб позначити або скасувати вихідний."
+  },
+  "Нажми на свободный интервал, чтобы добавить клиента. Удерживай свободную ячейку около секунды, чтобы заблокировать время. Заблокированную ячейку можно разблокировать таким же удержанием.": {
+    "en": "Tap a free interval to add a client. Press and hold an available slot for about a second to block it. Press and hold it again to unblock it.",
+    "de": "Tippe auf einen freien Zeitraum, um einen Kunden hinzuzufügen. Halte einen freien Zeitraum etwa eine Sekunde gedrückt, um ihn zu sperren. Durch erneutes Gedrückthalten kannst du ihn wieder freigeben.",
+    "es": "Pulsa un intervalo libre para añadir un cliente. Mantén pulsado un espacio disponible durante aproximadamente un segundo para bloquearlo. Manténlo pulsado de nuevo para desbloquearlo.",
+    "fr": "Touchez un créneau libre pour ajouter un client. Maintenez un créneau disponible environ une seconde pour le bloquer. Répétez l’opération pour le débloquer.",
+    "it": "Tocca un intervallo libero per aggiungere un cliente. Tieni premuto uno slot libero per circa un secondo per bloccarlo. Tienilo premuto di nuovo per sbloccarlo.",
+    "pt": "Toque num intervalo livre para adicionar um cliente. Mantenha um horário livre premido durante cerca de um segundo para o bloquear. Repita para o desbloquear.",
+    "tr": "Müşteri eklemek için boş bir aralığa dokun. Bir saati engellemek için boş aralığı yaklaşık bir saniye basılı tut. Engeli kaldırmak için tekrar basılı tut.",
+    "uk": "Натисни на вільний інтервал, щоб додати клієнта. Утримуй вільну клітинку близько секунди, щоб заблокувати час. Повтори утримання, щоб розблокувати його."
+  },
+  "Нажми, чтобы свернуть или раскрыть": {
+    "en": "Click to collapse or expand",
+    "de": "Zum Ein- oder Ausklappen klicken",
+    "es": "Haz clic para contraer o ampliar",
+    "fr": "Cliquez pour réduire ou développer",
+    "it": "Fai clic per comprimere o espandere",
+    "pt": "Clique para recolher ou expandir",
+    "tr": "Daraltmak veya genişletmek için tıkla",
+    "uk": "Натисни, щоб згорнути або розгорнути"
+  },
+  "Настрой длительность каждой услуги. При выборе услуги клиентом время записи рассчитывается автоматически.": {
+    "en": "Set the duration of each service. The appointment time is calculated automatically when a client selects a service.",
+    "de": "Lege die Dauer jeder Leistung fest. Wenn ein Kunde eine Leistung auswählt, wird die Terminzeit automatisch berechnet.",
+    "es": "Configura la duración de cada servicio. Al elegir un servicio, la hora de la cita se calcula automáticamente.",
+    "fr": "Définissez la durée de chaque prestation. L’horaire du rendez-vous est calculé automatiquement lorsque le client choisit une prestation.",
+    "it": "Imposta la durata di ogni servizio. Quando il cliente sceglie un servizio, l’orario dell’appuntamento viene calcolato automaticamente.",
+    "pt": "Defina a duração de cada serviço. Ao escolher um serviço, a hora da marcação é calculada automaticamente.",
+    "tr": "Her hizmetin süresini ayarla. Müşteri bir hizmet seçtiğinde randevu süresi otomatik hesaplanır.",
+    "uk": "Налаштуй тривалість кожної послуги. Коли клієнт обирає послугу, час запису розраховується автоматично."
+  },
+  "Отзывы оставляются клиентами по прошедшим записям. В демоверсии они сохраняются только в этом браузере.": {
+    "en": "Clients can leave reviews for completed appointments. In the demo, reviews are saved only in this browser.",
+    "de": "Kunden können abgeschlossene Termine bewerten. In der Demo werden Bewertungen nur in diesem Browser gespeichert.",
+    "es": "Los clientes pueden dejar reseñas sobre citas realizadas. En la demo, se guardan solo en este navegador.",
+    "fr": "Les clients peuvent laisser un avis après un rendez-vous terminé. Dans la démo, les avis sont enregistrés uniquement dans ce navigateur.",
+    "it": "I clienti possono lasciare recensioni dopo gli appuntamenti completati. Nella demo vengono salvate solo in questo browser.",
+    "pt": "Os clientes podem deixar avaliações após marcações concluídas. Na demonstração, ficam guardadas apenas neste navegador.",
+    "tr": "Müşteriler tamamlanan randevular için yorum bırakabilir. Demo sürümünde yorumlar yalnızca bu tarayıcıda saklanır.",
+    "uk": "Клієнти можуть залишати відгуки після завершених записів. У демоверсії вони зберігаються лише в цьому браузері."
+  },
+  "Прикрепить фото из галереи": {
+    "en": "Attach a photo from the gallery",
+    "de": "Foto aus der Galerie anhängen",
+    "es": "Adjuntar una foto de la galería",
+    "fr": "Joindre une photo de la galerie",
+    "it": "Allega una foto dalla galleria",
+    "pt": "Anexar uma fotografia da galeria",
+    "tr": "Galeriden fotoğraf ekle",
+    "uk": "Додати фото з галереї"
+  },
+  "До 3 фотографий к комментарию. Фото автоматически сжимаются.": {
+    "en": "Up to 3 photos per comment. Photos are compressed automatically.",
+    "de": "Bis zu 3 Fotos pro Kommentar. Die Fotos werden automatisch komprimiert.",
+    "es": "Hasta 3 fotos por comentario. Las fotos se comprimen automáticamente.",
+    "fr": "Jusqu’à 3 photos par commentaire. Les photos sont automatiquement compressées.",
+    "it": "Fino a 3 foto per commento. Le foto vengono compresse automaticamente.",
+    "pt": "Até 3 fotografias por comentário. As fotografias são comprimidas automaticamente.",
+    "tr": "Yorum başına en fazla 3 fotoğraf. Fotoğraflar otomatik sıkıştırılır.",
+    "uk": "До 3 фотографій до коментаря. Фото автоматично стискаються."
+  },
+  "Обычная цена": {
+    "en": "Regular price",
+    "de": "Normalpreis",
+    "es": "Precio habitual",
+    "fr": "Prix habituel",
+    "it": "Prezzo normale",
+    "pt": "Preço habitual",
+    "tr": "Normal fiyat",
+    "uk": "Звичайна ціна"
+  },
+  "Аватар профиля": {
+    "en": "Profile avatar",
+    "de": "Profilbild",
+    "es": "Avatar del perfil",
+    "fr": "Avatar du profil",
+    "it": "Avatar del profilo",
+    "pt": "Avatar do perfil",
+    "tr": "Profil fotoğrafı",
+    "uk": "Аватар профілю"
+  },
+  "Выбери фото из галереи. Изображение будет уменьшено для экономии места.": {
+    "en": "Choose a photo from your gallery. The image will be resized to save space.",
+    "de": "Wähle ein Foto aus deiner Galerie. Das Bild wird verkleinert, um Speicherplatz zu sparen.",
+    "es": "Elige una foto de tu galería. La imagen se reducirá para ahorrar espacio.",
+    "fr": "Choisissez une photo dans votre galerie. L’image sera réduite pour économiser de l’espace.",
+    "it": "Scegli una foto dalla galleria. L’immagine verrà ridimensionata per risparmiare spazio.",
+    "pt": "Escolha uma fotografia da galeria. A imagem será reduzida para poupar espaço.",
+    "tr": "Galerinden bir fotoğraf seç. Görüntü yerden tasarruf etmek için küçültülür.",
+    "uk": "Обери фото з галереї. Зображення буде зменшено для економії місця."
+  },
+  "Удалить аватар": {
+    "en": "Remove avatar",
+    "de": "Profilbild entfernen",
+    "es": "Eliminar avatar",
+    "fr": "Supprimer l’avatar",
+    "it": "Rimuovi avatar",
+    "pt": "Remover avatar",
+    "tr": "Profil fotoğrafını kaldır",
+    "uk": "Видалити аватар"
+  },
+  "🎮 Мини-игры": {
+    "en": "🎮 Mini-games",
+    "de": "🎮 Minispiele",
+    "es": "🎮 Minijuegos",
+    "fr": "🎮 Mini-jeux",
+    "it": "🎮 Minigiochi",
+    "pt": "🎮 Mini-jogos",
+    "tr": "🎮 Mini oyunlar",
+    "uk": "🎮 Мініігри"
+  },
+  "Немного развлечения, пока ждёшь свою запись.": {
+    "en": "A little entertainment while you wait for your appointment.",
+    "de": "Ein bisschen Unterhaltung, während du auf deinen Termin wartest.",
+    "es": "Un poco de entretenimiento mientras esperas tu cita.",
+    "fr": "Un peu de divertissement en attendant votre rendez-vous.",
+    "it": "Un po’ di svago mentre aspetti il tuo appuntamento.",
+    "pt": "Um pouco de diversão enquanto espera pela sua marcação.",
+    "tr": "Randevunu beklerken biraz eğlence.",
+    "uk": "Трохи розваг, поки чекаєш на свій запис."
+  },
+  "Играть в тетрис": {
+    "en": "Play Tetris",
+    "de": "Tetris spielen",
+    "es": "Jugar al Tetris",
+    "fr": "Jouer à Tetris",
+    "it": "Gioca a Tetris",
+    "pt": "Jogar Tetris",
+    "tr": "Tetris oyna",
+    "uk": "Грати в тетріс"
+  },
+  "Оформление Nailora": {
+    "en": "Nailora appearance",
+    "de": "Nailora-Design",
+    "es": "Apariencia de Nailora",
+    "fr": "Apparence de Nailora",
+    "it": "Aspetto di Nailora",
+    "pt": "Aparência do Nailora",
+    "tr": "Nailora görünümü",
+    "uk": "Оформлення Nailora"
+  },
+  "Выбери одну из пяти тем. Она сразу применится и сохранится в этом браузере.": {
+    "en": "Choose one of five themes. It will be applied immediately and saved in this browser.",
+    "de": "Wähle eines der fünf Designs. Es wird sofort angewendet und in diesem Browser gespeichert.",
+    "es": "Elige uno de los cinco temas. Se aplicará inmediatamente y se guardará en este navegador.",
+    "fr": "Choisissez l’un des cinq thèmes. Il sera appliqué immédiatement et enregistré dans ce navigateur.",
+    "it": "Scegli uno dei cinque temi. Verrà applicato subito e salvato in questo browser.",
+    "pt": "Escolha um dos cinco temas. Será aplicado imediatamente e guardado neste navegador.",
+    "tr": "Beş temadan birini seç. Hemen uygulanır ve bu tarayıcıya kaydedilir.",
+    "uk": "Обери одну з п’яти тем. Її буде застосовано одразу й збережено в цьому браузері."
+  },
+  "Дополнительный фон": {
+    "en": "Additional background",
+    "de": "Zusätzlicher Hintergrund",
+    "es": "Fondo adicional",
+    "fr": "Arrière-plan supplémentaire",
+    "it": "Sfondo aggiuntivo",
+    "pt": "Fundo adicional",
+    "tr": "Ek arka plan",
+    "uk": "Додаткове тло"
+  },
+  "Выбранная тема сохраняется при повторном входе и используется в аккаунтах мастера и клиента на этом устройстве.": {
+    "en": "Your selected theme is kept when you sign in again and is used for both master and client accounts on this device.",
+    "de": "Dein ausgewähltes Design bleibt bei der nächsten Anmeldung erhalten und wird auf diesem Gerät für Fachkraft- und Kundenkonten verwendet.",
+    "es": "El tema seleccionado se conserva al volver a iniciar sesión y se utiliza en las cuentas de profesional y cliente de este dispositivo.",
+    "fr": "Le thème choisi est conservé lors de la prochaine connexion et utilisé pour les comptes professionnels et clients sur cet appareil.",
+    "it": "Il tema scelto viene mantenuto al prossimo accesso ed è usato per gli account professionista e cliente su questo dispositivo.",
+    "pt": "O tema escolhido mantém-se quando voltar a iniciar sessão e é utilizado nas contas de profissional e cliente neste dispositivo.",
+    "tr": "Seçtiğin tema yeniden giriş yaptığında korunur ve bu cihazdaki uzman ve müşteri hesaplarında kullanılır.",
+    "uk": "Обрана тема зберігається після повторного входу та використовується в акаунтах майстра й клієнта на цьому пристрої."
+  },
+  "Удалить аккаунт": {
+    "en": "Delete account",
+    "de": "Konto löschen",
+    "es": "Eliminar cuenta",
+    "fr": "Supprimer le compte",
+    "it": "Elimina account",
+    "pt": "Eliminar conta",
+    "tr": "Hesabı sil",
+    "uk": "Видалити акаунт"
+  },
+  "Удаление аккаунта безвозвратно удалит ваш профиль и связанные с ним данные Nailora на сервере. После удаления войти в этот аккаунт будет невозможно.": {
+    "en": "Deleting your account permanently removes your profile and associated Nailora data from the server. You will no longer be able to sign in to this account.",
+    "de": "Beim Löschen deines Kontos werden dein Profil und die damit verbundenen Nailora-Daten dauerhaft vom Server entfernt. Danach kannst du dich nicht mehr mit diesem Konto anmelden.",
+    "es": "Al eliminar la cuenta, tu perfil y los datos asociados de Nailora se borrarán permanentemente del servidor. Después no podrás volver a iniciar sesión en esta cuenta.",
+    "fr": "La suppression du compte efface définitivement votre profil et les données Nailora associées du serveur. Vous ne pourrez plus vous connecter à ce compte.",
+    "it": "L’eliminazione dell’account rimuove definitivamente dal server il profilo e i dati Nailora associati. Non sarà più possibile accedere a questo account.",
+    "pt": "A eliminação da conta remove permanentemente do servidor o seu perfil e os dados Nailora associados. Depois disso, não poderá voltar a iniciar sessão nesta conta.",
+    "tr": "Hesabın silinmesi profilini ve ilişkili Nailora verilerini sunucudan kalıcı olarak kaldırır. Silme işleminden sonra bu hesaba tekrar giriş yapamazsın.",
+    "uk": "Видалення акаунта назавжди прибере з сервера ваш профіль і пов’язані з ним дані Nailora. Після цього увійти до цього акаунта буде неможливо."
+  },
+  "🎮 Тетрис Nailora": {
+    "en": "🎮 Nailora Tetris",
+    "de": "🎮 Nailora Tetris",
+    "es": "🎮 Tetris de Nailora",
+    "fr": "🎮 Tetris Nailora",
+    "it": "🎮 Tetris Nailora",
+    "pt": "🎮 Tetris Nailora",
+    "tr": "🎮 Nailora Tetris",
+    "uk": "🎮 Тетріс Nailora"
+  },
+  "Собирай линии и побей свой рекорд": {
+    "en": "Clear lines and beat your high score",
+    "de": "Bilde Reihen und übertreffe deinen Rekord",
+    "es": "Completa líneas y supera tu récord",
+    "fr": "Complétez des lignes et battez votre record",
+    "it": "Completa le linee e supera il tuo record",
+    "pt": "Complete linhas e bata o seu recorde",
+    "tr": "Satırları tamamla ve rekorunu kır",
+    "uk": "Складай лінії та побий свій рекорд"
+  },
+  "Очки": {
+    "en": "Score",
+    "de": "Punkte",
+    "es": "Puntuación",
+    "fr": "Score",
+    "it": "Punteggio",
+    "pt": "Pontuação",
+    "tr": "Puan",
+    "uk": "Очки"
+  },
+  "Линии": {
+    "en": "Lines",
+    "de": "Linien",
+    "es": "Líneas",
+    "fr": "Lignes",
+    "it": "Linee",
+    "pt": "Linhas",
+    "tr": "Satır",
+    "uk": "Лінії"
+  },
+  "Рекорд": {
+    "en": "Best",
+    "de": "Rekord",
+    "es": "Récord",
+    "fr": "Record",
+    "it": "Record",
+    "pt": "Recorde",
+    "tr": "Rekor",
+    "uk": "Рекорд"
+  },
+  "Готов играть?": {
+    "en": "Ready to play?",
+    "de": "Bereit zu spielen?",
+    "es": "¿Listo para jugar?",
+    "fr": "Prêt à jouer ?",
+    "it": "Pronto a giocare?",
+    "pt": "Pronto para jogar?",
+    "tr": "Oynamaya hazır mısın?",
+    "uk": "Готовий грати?"
+  },
+  "Нажми на поле, чтобы начать": {
+    "en": "Tap the board to start",
+    "de": "Tippe auf das Spielfeld, um zu starten",
+    "es": "Pulsa el tablero para empezar",
+    "fr": "Touchez le terrain pour commencer",
+    "it": "Tocca il campo per iniziare",
+    "pt": "Toque no tabuleiro para começar",
+    "tr": "Başlamak için oyun alanına dokun",
+    "uk": "Натисни на поле, щоб почати"
+  },
+  "На компьютере: стрелки для движения, ↑ для поворота, пробел для сброса, P для паузы. На телефоне используй кнопки ниже.": {
+    "en": "Computer: arrow keys to move, ↑ to rotate, Space to drop, P to pause. On a phone, use the buttons below.",
+    "de": "Computer: Pfeiltasten zum Bewegen, ↑ zum Drehen, Leertaste zum Fallenlassen, P zum Pausieren. Auf dem Smartphone die Schaltflächen unten verwenden.",
+    "es": "Ordenador: flechas para mover, ↑ para girar, espacio para soltar, P para pausar. En el móvil, usa los botones de abajo.",
+    "fr": "Ordinateur : flèches pour déplacer, ↑ pour tourner, espace pour faire tomber, P pour mettre en pause. Sur téléphone, utilisez les boutons ci-dessous.",
+    "it": "Computer: frecce per muovere, ↑ per ruotare, spazio per far cadere, P per mettere in pausa. Sul telefono usa i pulsanti qui sotto.",
+    "pt": "Computador: setas para mover, ↑ para rodar, espaço para largar, P para pausar. No telemóvel, use os botões abaixo.",
+    "tr": "Bilgisayar: hareket için ok tuşları, döndürmek için ↑, düşürmek için Boşluk, duraklatmak için P. Telefonda aşağıdaki düğmeleri kullan.",
+    "uk": "Комп’ютер: стрілки для руху, ↑ для повороту, пробіл для скидання, P для паузи. На телефоні використовуй кнопки нижче."
+  },
+  "Подготовь сообщение для SMS": {
+    "en": "Prepare an SMS message",
+    "de": "SMS-Nachricht vorbereiten",
+    "es": "Preparar mensaje SMS",
+    "fr": "Préparer un SMS",
+    "it": "Prepara un messaggio SMS",
+    "pt": "Preparar mensagem SMS",
+    "tr": "SMS mesajı hazırla",
+    "uk": "Підготувати SMS-повідомлення"
+  },
+  "Сообщение не отправляется автоматически. Откроется приложение SMS, где нужно проверить текст и нажать «Отправить». На компьютере поддержка SMS зависит от настроенных приложений.": {
+    "en": "The message is not sent automatically. Your SMS app will open so you can review the text and tap Send. Desktop SMS support depends on configured apps.",
+    "de": "Die Nachricht wird nicht automatisch gesendet. Deine SMS-App wird geöffnet, damit du den Text prüfen und auf Senden tippen kannst. Die SMS-Unterstützung am Computer hängt von den eingerichteten Apps ab.",
+    "es": "El mensaje no se envía automáticamente. Se abrirá la aplicación de SMS para revisar el texto y pulsar Enviar. La compatibilidad con SMS en el ordenador depende de las aplicaciones configuradas.",
+    "fr": "Le message n’est pas envoyé automatiquement. Votre application SMS s’ouvrira pour vérifier le texte et appuyer sur Envoyer. La prise en charge des SMS sur ordinateur dépend des applications configurées.",
+    "it": "Il messaggio non viene inviato automaticamente. Si aprirà l’app SMS per controllare il testo e premere Invia. Il supporto SMS sul computer dipende dalle app configurate.",
+    "pt": "A mensagem não é enviada automaticamente. A aplicação de SMS será aberta para rever o texto e tocar em Enviar. O suporte de SMS no computador depende das aplicações configuradas.",
+    "tr": "Mesaj otomatik gönderilmez. Metni kontrol edip Gönder’e basman için SMS uygulaman açılır. Bilgisayarda SMS desteği yapılandırılmış uygulamalara bağlıdır.",
+    "uk": "Повідомлення не надсилається автоматично. Відкриється SMS-застосунок, де потрібно перевірити текст і натиснути «Надіслати». Підтримка SMS на комп’ютері залежить від налаштованих програм."
+  },
+  "Рабочие интервалы дня": {
+    "en": "Daily working intervals",
+    "de": "Arbeitsintervalle des Tages",
+    "es": "Intervalos de trabajo del día",
+    "fr": "Plages de travail du jour",
+    "it": "Intervalli di lavoro giornalieri",
+    "pt": "Intervalos de trabalho do dia",
+    "tr": "Günlük çalışma aralıkları",
+    "uk": "Робочі інтервали дня"
+  },
+  "Укажи только время, когда мастер действительно принимает клиентов. Перерывы между интервалами не будут доступны для бронирования.": {
+    "en": "Enter only the times when the professional actually accepts clients. Breaks between intervals will not be available for booking.",
+    "de": "Gib nur die Zeiten an, zu denen die Fachkraft tatsächlich Kunden empfängt. Pausen zwischen den Intervallen können nicht gebucht werden.",
+    "es": "Indica solo las horas en las que el profesional atiende realmente a clientes. Los descansos entre intervalos no estarán disponibles para reservas.",
+    "fr": "Indiquez uniquement les heures pendant lesquelles le professionnel reçoit réellement des clients. Les pauses entre les plages ne seront pas réservables.",
+    "it": "Indica solo gli orari in cui il professionista riceve effettivamente i clienti. Le pause tra gli intervalli non saranno prenotabili.",
+    "pt": "Indique apenas os horários em que o profissional recebe efetivamente clientes. As pausas entre intervalos não estarão disponíveis para marcação.",
+    "tr": "Uzmanın gerçekten müşteri kabul ettiği saatleri belirt. Aralıklardaki molalar randevuya açık olmaz.",
+    "uk": "Вкажи лише час, коли майстер справді приймає клієнтів. Перерви між інтервалами будуть недоступні для бронювання."
+  },
+  "+ Добавить интервал": {
+    "en": "+ Add interval",
+    "de": "+ Intervall hinzufügen",
+    "es": "+ Añadir intervalo",
+    "fr": "+ Ajouter un intervalle",
+    "it": "+ Aggiungi intervallo",
+    "pt": "+ Adicionar intervalo",
+    "tr": "+ Aralık ekle",
+    "uk": "+ Додати інтервал"
+  },
+  "Например: 08:00–10:00 и 12:00–14:00.": {
+    "en": "For example: 08:00–10:00 and 12:00–14:00.",
+    "de": "Zum Beispiel: 08:00–10:00 und 12:00–14:00.",
+    "es": "Por ejemplo: 08:00–10:00 y 12:00–14:00.",
+    "fr": "Par exemple : 08:00–10:00 et 12:00–14:00.",
+    "it": "Ad esempio: 08:00–10:00 e 12:00–14:00.",
+    "pt": "Por exemplo: 08:00–10:00 e 12:00–14:00.",
+    "tr": "Örneğin: 08:00–10:00 ve 12:00–14:00.",
+    "uk": "Наприклад: 08:00–10:00 та 12:00–14:00."
+  },
+  "Сохранить расписание дня": {
+    "en": "Save daily schedule",
+    "de": "Tagesplan speichern",
+    "es": "Guardar horario del día",
+    "fr": "Enregistrer les horaires du jour",
+    "it": "Salva orario giornaliero",
+    "pt": "Guardar horário do dia",
+    "tr": "Günlük programı kaydet",
+    "uk": "Зберегти розклад дня"
+  },
+  "Выбранный интервал": {
+    "en": "Selected interval",
+    "de": "Ausgewähltes Intervall",
+    "es": "Intervalo seleccionado",
+    "fr": "Intervalle sélectionné",
+    "it": "Intervallo selezionato",
+    "pt": "Intervalo selecionado",
+    "tr": "Seçilen aralık",
+    "uk": "Обраний інтервал"
+  },
+  "Услуга *": {
+    "en": "Service *",
+    "de": "Dienstleistung *",
+    "es": "Servicio *",
+    "fr": "Prestation *",
+    "it": "Servizio *",
+    "pt": "Serviço *",
+    "tr": "Hizmet *",
+    "uk": "Послуга *"
+  },
+  "Цена: 0,00": {
+    "en": "Price: 0.00",
+    "de": "Preis: 0,00",
+    "es": "Precio: 0,00",
+    "fr": "Prix : 0,00",
+    "it": "Prezzo: 0,00",
+    "pt": "Preço: 0,00",
+    "tr": "Fiyat: 0,00",
+    "uk": "Ціна: 0,00"
+  },
+  "Комментарий (необязательно)": {
+    "en": "Comment (optional)",
+    "de": "Kommentar (optional)",
+    "es": "Comentario (opcional)",
+    "fr": "Commentaire (facultatif)",
+    "it": "Commento (facoltativo)",
+    "pt": "Comentário (opcional)",
+    "tr": "Yorum (isteğe bağlı)",
+    "uk": "Коментар (необов’язково)"
+  },
+  "Запись будет добавлена в этот календарь сразу. Если выбранная длительность пересекается с другим приёмом или заблокированным временем, приложение попросит выбрать другой интервал.": {
+    "en": "The appointment will be added to this calendar immediately. If its duration overlaps another appointment or a blocked time, the app will ask you to choose another slot.",
+    "de": "Der Termin wird sofort in diesen Kalender eingetragen. Wenn sich die Dauer mit einem anderen Termin oder einer gesperrten Zeit überschneidet, wirst du gebeten, einen anderen Zeitraum zu wählen.",
+    "es": "La cita se añadirá inmediatamente a este calendario. Si su duración coincide con otra cita o con un horario bloqueado, la aplicación te pedirá que elijas otro intervalo.",
+    "fr": "Le rendez-vous sera ajouté immédiatement à ce calendrier. Si sa durée chevauche un autre rendez-vous ou une période bloquée, l’application vous demandera de choisir un autre créneau.",
+    "it": "L’appuntamento verrà aggiunto subito a questo calendario. Se la durata si sovrappone a un altro appuntamento o a un orario bloccato, l’app ti chiederà di scegliere un altro intervallo.",
+    "pt": "A marcação será adicionada imediatamente a este calendário. Se a duração coincidir com outra marcação ou com um horário bloqueado, a aplicação pedirá que escolha outro intervalo.",
+    "tr": "Randevu hemen bu takvime eklenir. Süre başka bir randevuyla veya engellenmiş zamanla çakışırsa uygulama başka bir aralık seçmeni ister.",
+    "uk": "Запис одразу буде додано до цього календаря. Якщо обрана тривалість перетинається з іншим прийомом або заблокованим часом, застосунок попросить обрати інший інтервал."
+  },
+  "Оценка": {
+    "en": "Rating",
+    "de": "Bewertung",
+    "es": "Valoración",
+    "fr": "Évaluation",
+    "it": "Valutazione",
+    "pt": "Avaliação",
+    "tr": "Değerlendirme",
+    "uk": "Оцінка"
+  },
+  "5 из 5": {
+    "en": "5 out of 5",
+    "de": "5 von 5",
+    "es": "5 de 5",
+    "fr": "5 sur 5",
+    "it": "5 su 5",
+    "pt": "5 em 5",
+    "tr": "5 üzerinden 5",
+    "uk": "5 із 5"
+  },
+  "Уведомления": {
+    "en": "Notifications",
+    "de": "Benachrichtigungen",
+    "es": "Notificaciones",
+    "fr": "Notifications",
+    "it": "Notifiche",
+    "pt": "Notificações",
+    "tr": "Bildirimler",
+    "uk": "Сповіщення"
+  },
+  "Здесь появляются уведомления о создании, изменении и отмене записи. После настройки Supabase прочитанные уведомления удаляются через 90 дней, непрочитанные — через 180 дней.": {
+    "en": "Notifications about created, changed and cancelled appointments appear here. After Supabase is configured, read notifications are deleted after 90 days and unread ones after 180 days.",
+    "de": "Hier erscheinen Benachrichtigungen über erstellte, geänderte und stornierte Termine. Nach der Supabase-Einrichtung werden gelesene Benachrichtigungen nach 90 Tagen und ungelesene nach 180 Tagen gelöscht.",
+    "es": "Aquí aparecen las notificaciones de citas creadas, modificadas y canceladas. Tras configurar Supabase, las notificaciones leídas se eliminan después de 90 días y las no leídas después de 180 días.",
+    "fr": "Les notifications concernant la création, la modification et l’annulation des rendez-vous apparaissent ici. Après configuration de Supabase, les notifications lues sont supprimées après 90 jours et les non lues après 180 jours.",
+    "it": "Qui compaiono le notifiche relative agli appuntamenti creati, modificati o annullati. Dopo la configurazione di Supabase, le notifiche lette vengono eliminate dopo 90 giorni e quelle non lette dopo 180 giorni.",
+    "pt": "Aqui aparecem notificações sobre marcações criadas, alteradas e canceladas. Após configurar o Supabase, as notificações lidas são eliminadas após 90 dias e as não lidas após 180 dias.",
+    "tr": "Oluşturulan, değiştirilen ve iptal edilen randevuların bildirimleri burada görünür. Supabase yapılandırıldıktan sonra okunan bildirimler 90, okunmayanlar 180 gün sonra silinir.",
+    "uk": "Тут з’являються сповіщення про створення, зміну та скасування записів. Після налаштування Supabase прочитані сповіщення видаляються через 90 днів, непрочитані — через 180 днів."
+  },
+  "Отметить все прочитанными": {
+    "en": "Mark all as read",
+    "de": "Alle als gelesen markieren",
+    "es": "Marcar todo como leído",
+    "fr": "Tout marquer comme lu",
+    "it": "Segna tutto come letto",
+    "pt": "Marcar tudo como lido",
+    "tr": "Tümünü okundu olarak işaretle",
+    "uk": "Позначити все прочитаним"
+  },
+  "Удалить прочитанные": {
+    "en": "Delete read notifications",
+    "de": "Gelesene löschen",
+    "es": "Eliminar notificaciones leídas",
+    "fr": "Supprimer les notifications lues",
+    "it": "Elimina notifiche lette",
+    "pt": "Eliminar notificações lidas",
+    "tr": "Okunan bildirimleri sil",
+    "uk": "Видалити прочитані"
+  },
+  "Загрузка…": {
+    "en": "Loading…",
+    "de": "Wird geladen…",
+    "es": "Cargando…",
+    "fr": "Chargement…",
+    "it": "Caricamento…",
+    "pt": "A carregar…",
+    "tr": "Yükleniyor…",
+    "uk": "Завантаження…"
+  },
+  "Придумай пароль": {
+    "en": "Create a password",
+    "de": "Passwort erstellen",
+    "es": "Crea una contraseña",
+    "fr": "Créez un mot de passe",
+    "it": "Crea una password",
+    "pt": "Crie uma palavra-passe",
+    "tr": "Şifre oluştur",
+    "uk": "Придумай пароль"
+  },
+  "Показать пароль": {
+    "en": "Show password",
+    "de": "Passwort anzeigen",
+    "es": "Mostrar contraseña",
+    "fr": "Afficher le mot de passe",
+    "it": "Mostra password",
+    "pt": "Mostrar palavra-passe",
+    "tr": "Şifreyi göster",
+    "uk": "Показати пароль"
+  },
+  "Например, +49 151 12345678": {
+    "en": "For example, +49 151 12345678",
+    "de": "Zum Beispiel: +49 151 12345678",
+    "es": "Por ejemplo, +49 151 12345678",
+    "fr": "Par exemple : +49 151 12345678",
+    "it": "Ad esempio: +49 151 12345678",
+    "pt": "Por exemplo: +49 151 12345678",
+    "tr": "Örneğin: +49 151 12345678",
+    "uk": "Наприклад, +49 151 12345678"
+  },
+  "Например, покрытие, стрижки, окрашивание": {
+    "en": "For example, gel polish, haircuts, colouring",
+    "de": "Zum Beispiel: Gel-Lack, Haarschnitte, Färben",
+    "es": "Por ejemplo, esmaltado, cortes, coloración",
+    "fr": "Par exemple : vernis semi-permanent, coupes, coloration",
+    "it": "Ad esempio: semipermanente, tagli, colorazione",
+    "pt": "Por exemplo, verniz gel, cortes, coloração",
+    "tr": "Örneğin, kalıcı oje, saç kesimi, boyama",
+    "uk": "Наприклад, покриття, стрижки, фарбування"
+  },
+  "Город или населённый пункт": {
+    "en": "City or town",
+    "de": "Stadt oder Ort",
+    "es": "Ciudad o localidad",
+    "fr": "Ville ou commune",
+    "it": "Città o località",
+    "pt": "Cidade ou localidade",
+    "tr": "Şehir veya yerleşim yeri",
+    "uk": "Місто або населений пункт"
+  },
+  "Например, пожелания к дизайну": {
+    "en": "For example, design preferences",
+    "de": "Zum Beispiel: Designwünsche",
+    "es": "Por ejemplo, preferencias de diseño",
+    "fr": "Par exemple : préférences de décoration",
+    "it": "Ad esempio, preferenze per il design",
+    "pt": "Por exemplo, preferências de design",
+    "tr": "Örneğin, tasarım tercihleri",
+    "uk": "Наприклад, побажання щодо дизайну"
+  },
+  "Расскажи о своём опыте": {
+    "en": "Tell us about your experience",
+    "de": "Erzähle von deiner Erfahrung",
+    "es": "Cuéntanos tu experiencia",
+    "fr": "Parlez-nous de votre expérience",
+    "it": "Raccontaci la tua esperienza",
+    "pt": "Conte-nos a sua experiência",
+    "tr": "Deneyimini anlat",
+    "uk": "Розкажи про свій досвід"
+  },
+  "Тема приложения": {
+    "en": "App theme",
+    "de": "App-Design",
+    "es": "Tema de la aplicación",
+    "fr": "Thème de l’application",
+    "it": "Tema dell’app",
+    "pt": "Tema da aplicação",
+    "tr": "Uygulama teması",
+    "uk": "Тема застосунку"
+  },
+  "Аватар профиля клиента": {
+    "en": "Client profile avatar",
+    "de": "Profilbild des Kunden",
+    "es": "Avatar del perfil del cliente",
+    "fr": "Avatar du profil client",
+    "it": "Avatar del profilo cliente",
+    "pt": "Avatar do perfil do cliente",
+    "tr": "Müşteri profil fotoğrafı",
+    "uk": "Аватар профілю клієнта"
+  },
+  "Аватар профиля мастера": {
+    "en": "Master profile avatar",
+    "de": "Profilbild der Fachkraft",
+    "es": "Avatar del perfil profesional",
+    "fr": "Avatar du profil professionnel",
+    "it": "Avatar del profilo professionista",
+    "pt": "Avatar do perfil profissional",
+    "tr": "Uzman profil fotoğrafı",
+    "uk": "Аватар профілю майстра"
+  },
+  "Сводка мастера": {
+    "en": "Master overview",
+    "de": "Übersicht der Fachkraft",
+    "es": "Resumen del profesional",
+    "fr": "Aperçu du professionnel",
+    "it": "Riepilogo professionista",
+    "pt": "Resumo do profissional",
+    "tr": "Uzman özeti",
+    "uk": "Зведення майстра"
+  },
+  "Закрыть настройки": {
+    "en": "Close settings",
+    "de": "Einstellungen schließen",
+    "es": "Cerrar ajustes",
+    "fr": "Fermer les paramètres",
+    "it": "Chiudi impostazioni",
+    "pt": "Fechar definições",
+    "tr": "Ayarları kapat",
+    "uk": "Закрити налаштування"
+  },
+  "QR-код для открытия Nailora": {
+    "en": "QR code to open Nailora",
+    "de": "QR-Code zum Öffnen von Nailora",
+    "es": "Código QR para abrir Nailora",
+    "fr": "Code QR pour ouvrir Nailora",
+    "it": "Codice QR per aprire Nailora",
+    "pt": "Código QR para abrir o Nailora",
+    "tr": "Nailora’yı açmak için QR kodu",
+    "uk": "QR-код для відкриття Nailora"
+  },
+  "Закрыть игру": {
+    "en": "Close game",
+    "de": "Spiel schließen",
+    "es": "Cerrar juego",
+    "fr": "Fermer le jeu",
+    "it": "Chiudi gioco",
+    "pt": "Fechar jogo",
+    "tr": "Oyunu kapat",
+    "uk": "Закрити гру"
+  },
+  "Игровое поле тетриса": {
+    "en": "Tetris game board",
+    "de": "Tetris-Spielfeld",
+    "es": "Tablero de Tetris",
+    "fr": "Plateau de Tetris",
+    "it": "Campo di gioco Tetris",
+    "pt": "Tabuleiro de Tetris",
+    "tr": "Tetris oyun alanı",
+    "uk": "Ігрове поле тетрісу"
+  },
+  "Управление тетрисом": {
+    "en": "Tetris controls",
+    "de": "Tetris-Steuerung",
+    "es": "Controles de Tetris",
+    "fr": "Commandes de Tetris",
+    "it": "Controlli di Tetris",
+    "pt": "Controlos do Tetris",
+    "tr": "Tetris kontrolleri",
+    "uk": "Керування тетрісом"
+  },
+  "Влево": {
+    "en": "Left",
+    "de": "Links",
+    "es": "Izquierda",
+    "fr": "Gauche",
+    "it": "Sinistra",
+    "pt": "Esquerda",
+    "tr": "Sola",
+    "uk": "Ліворуч"
+  },
+  "Повернуть фигуру": {
+    "en": "Rotate piece",
+    "de": "Figur drehen",
+    "es": "Girar pieza",
+    "fr": "Tourner la pièce",
+    "it": "Ruota pezzo",
+    "pt": "Rodar peça",
+    "tr": "Şekli döndür",
+    "uk": "Повернути фігуру"
+  },
+  "Вправо": {
+    "en": "Right",
+    "de": "Rechts",
+    "es": "Derecha",
+    "fr": "Droite",
+    "it": "Destra",
+    "pt": "Direita",
+    "tr": "Sağa",
+    "uk": "Праворуч"
+  },
+  "Ускорить падение": {
+    "en": "Speed up fall",
+    "de": "Fall beschleunigen",
+    "es": "Acelerar caída",
+    "fr": "Accélérer la chute",
+    "it": "Accelera caduta",
+    "pt": "Acelerar queda",
+    "tr": "Düşüşü hızlandır",
+    "uk": "Прискорити падіння"
+  },
+  "Сбросить фигуру вниз": {
+    "en": "Drop piece",
+    "de": "Figur sofort absenken",
+    "es": "Soltar pieza",
+    "fr": "Faire tomber la pièce",
+    "it": "Fai cadere il pezzo",
+    "pt": "Largar peça",
+    "tr": "Şekli aşağı bırak",
+    "uk": "Опустити фігуру вниз"
+  },
+  "Оценка от 1 до 5": {
+    "en": "Rating from 1 to 5",
+    "de": "Bewertung von 1 bis 5",
+    "es": "Valoración del 1 al 5",
+    "fr": "Note de 1 à 5",
+    "it": "Valutazione da 1 a 5",
+    "pt": "Avaliação de 1 a 5",
+    "tr": "1 ile 5 arası puan",
+    "uk": "Оцінка від 1 до 5"
+  },
+  "1 звёзд": {
+    "en": "1 star",
+    "de": "1 Stern",
+    "es": "1 estrella",
+    "fr": "1 étoile",
+    "it": "1 stella",
+    "pt": "1 estrela",
+    "tr": "1 yıldız",
+    "uk": "1 зірка"
+  },
+  "2 звёзд": {
+    "en": "2 stars",
+    "de": "2 Sterne",
+    "es": "2 estrellas",
+    "fr": "2 étoiles",
+    "it": "2 stelle",
+    "pt": "2 estrelas",
+    "tr": "2 yıldız",
+    "uk": "2 зірки"
+  },
+  "3 звёзд": {
+    "en": "3 stars",
+    "de": "3 Sterne",
+    "es": "3 estrellas",
+    "fr": "3 étoiles",
+    "it": "3 stelle",
+    "pt": "3 estrelas",
+    "tr": "3 yıldız",
+    "uk": "3 зірки"
+  },
+  "4 звёзд": {
+    "en": "4 stars",
+    "de": "4 Sterne",
+    "es": "4 estrellas",
+    "fr": "4 étoiles",
+    "it": "4 stelle",
+    "pt": "4 estrelas",
+    "tr": "4 yıldız",
+    "uk": "4 зірки"
+  },
+  "5 звёзд": {
+    "en": "5 stars",
+    "de": "5 Sterne",
+    "es": "5 estrellas",
+    "fr": "5 étoiles",
+    "it": "5 stelle",
+    "pt": "5 estrelas",
+    "tr": "5 yıldız",
+    "uk": "5 зірок"
+  }
+});
+
+Object.assign(RU_TEXT,{
+ 'Готово к регистрации или входу':{
+  en:'Ready to register or sign in',de:'Bereit zur Registrierung oder Anmeldung',es:'Listo para registrarte o iniciar sesión',fr:'Prêt à s’inscrire ou à se connecter',it:'Pronto per registrarti o accedere',pt:'Pronto para se registar ou iniciar sessão',tr:'Kaydolmaya veya giriş yapmaya hazır',uk:'Готово до реєстрації або входу'
+ },
+ 'Введи email и пароль аккаунта мастера.':{
+  en:'Enter the email and password for the artist account.',de:'Gib die E-Mail-Adresse und das Passwort deines Fachkraftkontos ein.',es:'Introduce el correo electrónico y la contraseña de la cuenta del profesional.',fr:'Saisissez l’adresse e-mail et le mot de passe du compte professionnel.',it:'Inserisci l’e-mail e la password dell’account professionale.',pt:'Introduza o e-mail e a palavra-passe da conta profissional.',tr:'Uzman hesabının e-posta adresini ve şifresini girin.',uk:'Введи email і пароль облікового запису майстра.'
+ },
+ 'Введи email и пароль аккаунта клиента.':{
+  en:'Enter the email and password for the client account.',de:'Gib die E-Mail-Adresse und das Passwort deines Kundenkontos ein.',es:'Introduce el correo electrónico y la contraseña de la cuenta de cliente.',fr:'Saisissez l’adresse e-mail et le mot de passe du compte client.',it:'Inserisci l’e-mail e la password dell’account cliente.',pt:'Introduza o e-mail e a palavra-passe da conta de cliente.',tr:'Müşteri hesabının e-posta adresini ve şifresini girin.',uk:'Введи email і пароль облікового запису клієнта.'
+ },
+ 'Введи email и пароль. Если пароль забыт, можно запросить письмо для восстановления.':{
+  en:'Enter your email and password. If you forgot your password, you can request a password-reset email.',de:'Gib deine E-Mail-Adresse und dein Passwort ein. Wenn du dein Passwort vergessen hast, kannst du eine E-Mail zum Zurücksetzen anfordern.',es:'Introduce tu correo electrónico y contraseña. Si olvidaste la contraseña, puedes solicitar un correo para restablecerla.',fr:'Saisissez votre adresse e-mail et votre mot de passe. En cas d’oubli, vous pouvez demander un e-mail de réinitialisation.',it:'Inserisci e-mail e password. Se hai dimenticato la password, puoi richiedere un’email per reimpostarla.',pt:'Introduza o e-mail e a palavra-passe. Se se esqueceu da palavra-passe, pode pedir um e-mail para a redefinir.',tr:'E-posta adresini ve şifreni gir. Şifreni unuttuysan sıfırlama e-postası isteyebilirsin.',uk:'Введи email і пароль. Якщо забув пароль, можеш запросити лист для його відновлення.'
+ },
+ 'Выбран вход: мастер. Введи email и пароль.':{
+  en:'Artist sign-in selected. Enter your email and password.',de:'Anmeldung als Fachkraft ausgewählt. Gib deine E-Mail-Adresse und dein Passwort ein.',es:'Has elegido iniciar sesión como profesional. Introduce tu correo y contraseña.',fr:'Connexion professionnelle sélectionnée. Saisissez votre e-mail et votre mot de passe.',it:'Hai scelto l’accesso professionale. Inserisci e-mail e password.',pt:'Selecionou o acesso profissional. Introduza o e-mail e a palavra-passe.',tr:'Uzman girişi seçildi. E-posta adresini ve şifreni gir.',uk:'Обрано вхід майстра. Введи email і пароль.'
+ },
+ 'Выбран вход: клиент. Введи email и пароль.':{
+  en:'Client sign-in selected. Enter your email and password.',de:'Anmeldung als Kunde ausgewählt. Gib deine E-Mail-Adresse und dein Passwort ein.',es:'Has elegido iniciar sesión como cliente. Introduce tu correo y contraseña.',fr:'Connexion client sélectionnée. Saisissez votre e-mail et votre mot de passe.',it:'Hai scelto l’accesso cliente. Inserisci e-mail e password.',pt:'Selecionou o acesso de cliente. Introduza o e-mail e a palavra-passe.',tr:'Müşteri girişi seçildi. E-posta adresini ve şifreni gir.',uk:'Обрано вхід клієнта. Введи email і пароль.'
+ }
+});
+
+function t(source){
+ const text=String(source??'');
+ const row=RU_TEXT[text]||EXTRA_TEXT[text];
+ return currentLanguage==='ru'||!row?text:(row[currentLanguage]||row.en||text);
+}
+let translationReverseCache=null;
+function getTranslationReverseIndex(){
+ if(translationReverseCache)return translationReverseCache;
+ translationReverseCache={};
+ for(const [source,row] of Object.entries({...RU_TEXT,...EXTRA_TEXT})){
+  for(const [lang,value] of Object.entries(row||{})){
+   if(!value||typeof value!=='string')continue;
+   const index=translationReverseCache[lang]||(translationReverseCache[lang]=new Map());
+   if(!index.has(value))index.set(value,source);
+  }
+ }
+ return translationReverseCache;
+}
+function canonicalTranslationSource(value,language=currentLanguage){
+ const clean=String(value??'').trim();
+ if(!clean)return clean;
+ if(RU_TEXT[clean]||EXTRA_TEXT[clean])return clean;
+ const reverse=getTranslationReverseIndex()[language];
+ return reverse?.get(clean)||clean;
+}
+function setupLanguageSelect(select){if(!select)return;const current=select.value;select.innerHTML='';LANGUAGE_OPTIONS.forEach(([value,label])=>{const o=document.createElement('option');o.value=value;o.textContent=label;select.append(o)});select.value=LANGUAGESAFE(current)?current:(LANGUAGESAFE(currentLanguage)?currentLanguage:'ru')}
 function LANGUAGESAFE(code){return LANGUAGE_OPTIONS.some(x=>x[0]===code)}
 function formatMonth(date){return new Intl.DateTimeFormat(LOCALES[currentLanguage]||currentLanguage,{month:'long'}).format(date)}
 function formatDate(date){return new Intl.DateTimeFormat(LOCALES[currentLanguage]||currentLanguage,{year:'numeric',month:'long',day:'numeric'}).format(date)}
 function localizedWeekdays(){return Array.from({length:7},(_,i)=>{const d=new Date(2024,0,1+i);return new Intl.DateTimeFormat(LOCALES[currentLanguage]||currentLanguage,{weekday:'short'}).format(d)})}
-function translatePage(){
+function translatePage(root=document.body){
+ if(!root)return;
  document.documentElement.lang=currentLanguage;
  document.documentElement.dir=RTL_LANGS.has(currentLanguage)?'rtl':'ltr';
- const walk=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
- while(walk.nextNode()){
-  const node=walk.currentNode, parent=node.parentElement;
+ const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+ while(walker.nextNode()){
+  const node=walker.currentNode, parent=node.parentElement;
   if(!parent||parent.closest('script,style,[data-no-translate]'))continue;
-  if(!originalTextNodes.has(node))originalTextNodes.set(node,node.nodeValue);
-  const original=originalTextNodes.get(node), trimmed=original.trim();
-  if(!trimmed)continue;
-  const translated=t(trimmed);const before=original.match(/^\s*/)?.[0]||'',after=original.match(/\s*$/)?.[0]||'';
-  node.nodeValue=before+translated+after;
+  let record=originalTextNodes.get(node);
+  if(!record){
+   const raw=node.nodeValue||'',before=raw.match(/^\s*/)?.[0]||'',after=raw.match(/\s*$/)?.[0]||'',clean=raw.trim();
+   record={source:canonicalTranslationSource(clean,currentLanguage),before,after};
+   originalTextNodes.set(node,record);
+  }
+  if(!record.source)continue;
+  const translated=record.before+t(record.source)+record.after;
+  if(node.nodeValue!==translated)node.nodeValue=translated;
  }
- document.querySelectorAll('input[placeholder],textarea[placeholder],[title],[aria-label]').forEach(el=>{
-  ['placeholder','title','aria-label'].forEach(attr=>{if(!el.hasAttribute(attr))return;if(!originalAttributes.has(el))originalAttributes.set(el,{});const saved=originalAttributes.get(el);if(!(attr in saved))saved[attr]=el.getAttribute(attr);el.setAttribute(attr,t(saved[attr]))})
+ const attrSelector='input[placeholder],textarea[placeholder],[title],[aria-label]';
+ root.querySelectorAll?.(attrSelector).forEach(el=>{
+  ['placeholder','title','aria-label'].forEach(attr=>{
+   if(!el.hasAttribute(attr))return;
+   let saved=originalAttributes.get(el);
+   if(!saved){saved={};originalAttributes.set(el,saved)}
+   if(!(attr in saved))saved[attr]=canonicalTranslationSource(el.getAttribute(attr),currentLanguage);
+   const translated=t(saved[attr]);
+   if(el.getAttribute(attr)!==translated)el.setAttribute(attr,translated);
+  });
  });
- document.title=currentLanguage==='ru'?'Nailora · поиск мастеров · версия 8.48':'Nailora · find a nail artist · version 8.48';
- if($('languageChoice'))$('languageChoice').value=currentLanguage;
- if($('settingsLanguageChoice'))$('settingsLanguageChoice').value=currentLanguage;
+ if(root===document.body){
+  document.title=currentLanguage==='ru'?'Nailora · поиск мастеров · версия 8.88':'Nailora · professional booking · version 8.88';
+  if($('languageChoice'))$('languageChoice').value=currentLanguage;
+  if($('settingsLanguageChoice'))$('settingsLanguageChoice').value=currentLanguage;
+ }
 }
+let translationObserver=null,translationUpdateQueued=false;
+function queueTranslationUpdate(){
+ if(translationUpdateQueued)return;
+ translationUpdateQueued=true;
+ Promise.resolve().then(()=>{
+  translationUpdateQueued=false;
+  translatePage();
+ });
+}
+function installTranslationObserver(){
+ if(translationObserver||!document.body||typeof MutationObserver==='undefined')return;
+ translationObserver=new MutationObserver(records=>{
+  const relevant=records.some(record=>{
+   const target=record.target?.nodeType===Node.TEXT_NODE?record.target.parentElement:record.target;
+   if(target?.closest?.('script,style,[data-no-translate]'))return false;
+   if(record.type==='attributes'&&!['placeholder','title','aria-label'].includes(record.attributeName))return false;
+   return true;
+  });
+  if(relevant)queueTranslationUpdate();
+ });
+ translationObserver.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['placeholder','title','aria-label']});
+}
+installTranslationObserver();
 function greetingPrefix(role){const greetings={ru:{master:'Здравствуйте, ',client:'Привет, '},en:{master:'Hello, ',client:'Hi, '},de:{master:'Hallo, ',client:'Hallo, '},es:{master:'Hola, ',client:'Hola, '},fr:{master:'Bonjour, ',client:'Bonjour, '},it:{master:'Ciao, ',client:'Ciao, '},pt:{master:'Olá, ',client:'Olá, '},tr:{master:'Merhaba, ',client:'Merhaba, '},uk:{master:'Вітаю, ',client:'Привіт, '}};return greetings[currentLanguage]?.[role]||greetings.en[role]}
 function normalizeNickname(value,name,role='client'){let n=String(value||'').trim().replace(/\s+/g,'_').slice(0,40);if(!n)n=String(name||'').trim().replace(/\s+/g,'_').slice(0,40);if(!n)n=role==='master'?'nailora_master':'nailora_client';return n.startsWith('@')?n:'@'+n}
 function profileNickname(role){const p=profiles[role]||{};const name=String(p.name||'').trim();return name||(role==='master'?(currentLanguage==='ru'?'Мастер':'Artist'):(currentLanguage==='ru'?'Клиент':'Client'))}
 function refreshRoleGreetings(){if(!activeRole)return;const p=profiles[activeRole]||{};const nickname=profileNickname(activeRole);const nickEl=$(activeRole==='master'?'masterNickname':'clientNickname');if(nickEl)nickEl.textContent=nickname;if(activeRole==='master')$('masterGreeting').textContent=greetingPrefix('master')+(p.name||(currentLanguage==='ru'?'мастер':'artist'))+' · '+t('Календарь, клиенты и финансы');else $('clientGreeting').textContent=greetingPrefix('client')+(p.name||(currentLanguage==='ru'?'клиент':'client'))+'!'}
-function setLanguage(language,save=true){currentLanguage=LANGUAGESAFE(language)?language:'en';if(save)localStorage.setItem(LANGUAGE_KEY,currentLanguage);translatePage();if(appDataReady){refreshRoleGreetings();renderAll();if(activeRole==='client'){renderMasterSearch()}}}
+function setLanguage(language,save=true){currentLanguage=LANGUAGESAFE(language)?language:'ru';if(save)localStorage.setItem(LANGUAGE_KEY,currentLanguage);if(appDataReady){refreshRoleGreetings();renderAll();if(activeRole==='client'){renderMasterSearch()}}updateNotificationEntryButtons();translatePage();}
 
 const $=id=>document.getElementById(id);
 document.querySelectorAll('[data-password-target]').forEach(button=>{button.addEventListener('click',()=>{const input=$(button.dataset.passwordTarget);if(!input)return;const show=input.type==='password';input.type=show?'text':'password';button.innerHTML=show?"<svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/></svg>":"<svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 3l18 18\"/><path d=\"M10.6 10.6a2 2 0 0 0 2.8 2.8\"/><path d=\"M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 7-.4 1.1-1.2 2.3-2.4 3.4\"/><path d=\"M6.6 6.6C4.5 8 3.1 10.1 2.5 12c.5 1.4 1.5 2.8 3 4 1.7 1.4 3.9 2.3 6.5 2.3 1.1 0 2.1-.2 3-.5\"/></svg>";button.setAttribute('aria-label',show?'Скрыть пароль':'Показать пароль');button.title=show?'Скрыть пароль':'Показать пароль';button.setAttribute('aria-pressed',String(show));input.focus({preventScroll:true});});});
@@ -1689,6 +3163,7 @@ function saveRegistrationDraft(role){
  const ids=['regName','regPhone','regCountry','regCity','regArea','regAddress','regSpecialty','regEmail'];
  const draft={...(registrationDrafts[role]||{})};
  ids.forEach(id=>{const el=$(id);if(el)draft[id.replace(/^reg/,'').replace(/^./,c=>c.toLowerCase())]=el.value;});
+ const direction=$('regActivityDirection');if(direction)draft.activityDirection=direction.value;
  // Never retain the registration password in a draft.
  delete draft.password;
  registrationDrafts[role]=draft;
@@ -1699,7 +3174,7 @@ function beginRegistration(role){
  const profile=profiles[role]||{},draft=registrationDrafts[role]||{};
  $('registerTitle').textContent=t(role==='master'?'Регистрация мастера':'Регистрация клиента');
  $('masterExtra').classList.toggle('hidden',role!=='master');$('regAddress').required=role==='master';
- $('regName').value=draft.name??profile.name??'';$('regPhone').value=draft.phone??profile.phone??'';$('regCountry').value=draft.country??profile.country??'';$('regCity').value=draft.city??profile.city??profile.area??'';$('regArea').value=draft.area??profile.area??'';$('regAddress').value=draft.address??profile.address??'';$('regSpecialty').value=draft.specialty??profile.specialty??'';$('regEmail').value=draft.email??profile.email??'';
+ $('regName').value=draft.name??profile.name??'';$('regPhone').value=draft.phone??profile.phone??'';$('regCountry').value=draft.country??profile.country??'';$('regCity').value=draft.city??profile.city??profile.area??'';$('regArea').value=draft.area??profile.area??'';$('regAddress').value=draft.address??profile.address??'';$('regSpecialty').value=draft.specialty??profile.specialty??'';$('regActivityDirection').value=draft.activityDirection??profile.activityDirection??'Маникюр и педикюр';$('regEmail').value=draft.email??profile.email??'';
  $('regPassword').value='';$('registerStatus').textContent='';showOnly('register');
 }
 function openRegistrationFromLogin(){
@@ -1717,13 +3192,13 @@ function returnFromRegistrationToLogin(){
 }
 $('verifyNoEmailToggle').onclick=()=>{const details=$('verifyNoEmailDetails'),toggle=$('verifyNoEmailToggle'),opening=details.classList.contains('hidden');details.classList.toggle('hidden',!opening);toggle.setAttribute('aria-expanded',String(opening));};
 $('verifyBackToRegister').onclick=()=>{const pending=readPendingVerification();const role=pending?.role||chosenRole||selectedEntryRole||'client';const email=String(pending?.email||$('regEmail')?.value||profiles[role]?.email||'').trim();beginRegistration(role);if(email)$('regEmail').value=email;$('registerStatus').textContent='Если аккаунт уже создан, не создавай его повторно. Для нового письма вернись на экран подтверждения.';$('regEmail').focus();};
-function prepareLogin(role){selectedEntryRole=role;chosenRole=role;$('loginRole').value=role;$('loginRole').disabled=true;$('loginEmail').value=String($('regEmail')?.value||profiles[role]?.email||'').trim();$('loginPassword').value='';$('loginStatus').textContent='Введи email и пароль аккаунта '+(role==='master'?'мастера':'клиента')+'.';showOnly('login')}
+function prepareLogin(role){selectedEntryRole=role;chosenRole=role;$('loginRole').value=role;$('loginRole').disabled=true;$('loginEmail').value=String($('regEmail')?.value||profiles[role]?.email||'').trim();$('loginPassword').value='';$('loginStatus').textContent=t(role==='master'?'Введи email и пароль аккаунта мастера.':'Введи email и пароль аккаунта клиента.');showOnly('login')}
 function openPasswordRecovery(){const email=String($('loginEmail')?.value||$('regEmail')?.value||profiles[chosenRole||selectedEntryRole||'client']?.email||'').trim();$('resetEmail').value=email;$('requestPasswordReset').classList.remove('hidden');$('setNewPassword').classList.add('hidden');$('resetRequestStatus').textContent='';$('newPasswordStatus').textContent='';showOnly('resetPassword');if(!email)$('resetEmail').focus()}
-$('forgotPasswordButton').onclick=openPasswordRecovery;$('backResetRequest').onclick=()=>{showOnly('login');$('loginStatus').textContent='Введи email и пароль. Если пароль забыт, можно запросить письмо для восстановления.'};
+$('forgotPasswordButton').onclick=openPasswordRecovery;$('backResetRequest').onclick=()=>{showOnly('login');$('loginStatus').textContent=t('Введи email и пароль. Если пароль забыт, можно запросить письмо для восстановления.')};
 $('requestPasswordResetForm').onsubmit=async e=>{e.preventDefault();const email=$('resetEmail').value.trim().toLowerCase(),status=$('resetRequestStatus'),button=$('sendPasswordResetButton');if(!cloud){status.textContent='Supabase не загрузился. Проверь интернет и повтори попытку.';return}button.disabled=true;status.textContent='Отправляю письмо…';try{const redirectTo=getEmailRedirectUrl();const {error}=await cloud.auth.resetPasswordForEmail(email,redirectTo?{redirectTo}:{});if(error)throw error;status.textContent='Если аккаунт с таким адресом существует, письмо для восстановления отправлено. Проверь входящие и папку «Спам».';}catch(err){console.error('Password recovery request failed',err);status.textContent='Не удалось отправить письмо: '+(err?.message||'ошибка Supabase');}finally{button.disabled=false}};
 $('setNewPasswordForm').onsubmit=async e=>{e.preventDefault();const password=$('newPassword').value,confirm=$('confirmNewPassword').value,status=$('newPasswordStatus');if(password.length<8){status.textContent='Пароль должен содержать не менее 8 символов.';return}if(password!==confirm){status.textContent='Пароли не совпадают.';return}if(!cloud){status.textContent='Supabase не загрузился. Проверь интернет и повтори попытку.';return}status.textContent='Сохраняю новый пароль…';try{const {error}=await cloud.auth.updateUser({password});if(error)throw error;sessionStorage.removeItem('nailoraPasswordRecoveryActive');await cloud.auth.signOut();$('loginEmail').value=$('resetEmail').value.trim().toLowerCase();$('loginPassword').value='';$('loginRole').disabled=false;$('loginRole').value=chosenRole||selectedEntryRole||'client';showOnly('login');$('loginStatus').textContent='Пароль изменён. Теперь войди с новым паролем.';}catch(err){console.error('Password update failed',err);status.textContent='Не удалось изменить пароль: '+(err?.message||'ссылка могла истечь. Запроси новое письмо.')}};
 
-$('chooseMaster').onclick=()=>prepareLogin('master');$('chooseClient').onclick=()=>prepareLogin('client');$('roleRegisterButton').onclick=()=>beginRegistration(selectedEntryRole||'master');$('roleLoginButton').onclick=()=>prepareLogin(selectedEntryRole||'master');$('roleAccessBack').onclick=()=>{$('roleAccessPanel').classList.add('hidden');selectedEntryRole='master';};$('backWelcome').onclick=returnFromRegistrationToLogin;['regName','regPhone','regCountry','regCity','regArea','regAddress','regSpecialty','regEmail'].forEach(id=>{$(id).addEventListener('input',()=>saveRegistrationDraft(chosenRole||selectedEntryRole||'master'));});$('registerOpenLogin').onclick=()=>prepareLogin(chosenRole||selectedEntryRole||'client');$('loginOpenRegister').onclick=openRegistrationFromLogin;$('loginRole').onchange=()=>{chosenRole=$('loginRole').value;$('loginStatus').textContent='Выбран вход: '+(chosenRole==='master'?'мастер':'клиент')+'. Введи email и пароль.'};$('backLogin').onclick=()=>{const role=$('loginRole').value||selectedEntryRole||'client';$('loginRole').disabled=false;chosenRole=role;selectedEntryRole=role;$('roleAccessPanel').classList.add('hidden');showOnly('welcome');};
+$('chooseMaster').onclick=()=>prepareLogin('master');$('chooseClient').onclick=()=>prepareLogin('client');$('roleRegisterButton').onclick=()=>beginRegistration(selectedEntryRole||'master');$('roleLoginButton').onclick=()=>prepareLogin(selectedEntryRole||'master');$('roleAccessBack').onclick=()=>{$('roleAccessPanel').classList.add('hidden');selectedEntryRole='master';};$('backWelcome').onclick=returnFromRegistrationToLogin;['regName','regPhone','regCountry','regCity','regArea','regAddress','regSpecialty','regEmail'].forEach(id=>{$(id).addEventListener('input',()=>saveRegistrationDraft(chosenRole||selectedEntryRole||'master'));});$('registerOpenLogin').onclick=()=>prepareLogin(chosenRole||selectedEntryRole||'client');$('loginOpenRegister').onclick=openRegistrationFromLogin;$('loginRole').onchange=()=>{chosenRole=$('loginRole').value;$('loginStatus').textContent=t(chosenRole==='master'?'Выбран вход: мастер. Введи email и пароль.':'Выбран вход: клиент. Введи email и пароль.')};$('backLogin').onclick=()=>{const role=$('loginRole').value||selectedEntryRole||'client';$('loginRole').disabled=false;chosenRole=role;selectedEntryRole=role;$('roleAccessPanel').classList.add('hidden');showOnly('welcome');};
 const NAILORA_SUPABASE_URL='https://frtdsqzgepcasojzcynd.supabase.co';
 const NAILORA_SUPABASE_KEY='sb_publishable_-1TkkaMKrUdXmKfApv_8ew_Ao4e2GVk';
 let cloud=null,cloudUser=null,cloudMasterDirectory=[],selectedCloudMasterId='',cloudScheduleData=null,cloudBookedSlots=[],cloudNotifications=[],cloudPollTimer=null,cloudScheduleLoading=false,cloudScheduleLoadError='',cloudScheduleWarning='';
@@ -1745,8 +3220,8 @@ function getEmailRedirectUrl(){return 'https://antonmachehin.github.io/Nailora/'
 function getAuthLinkErrorCode(){try{const query=new URLSearchParams(window.location.search||'');const hash=new URLSearchParams(String(window.location.hash||'').replace(/^#/,'') );return query.get('error_code')||hash.get('error_code')||''}catch(_){return ''}}
 function isPasswordRecoveryCallback(){try{const query=new URLSearchParams(window.location.search||'');const hash=new URLSearchParams(String(window.location.hash||'').replace(/^#/,'') );return query.get('type')==='recovery'||hash.get('type')==='recovery'}catch(_){return false}}
 function cloudReady(){return !!(cloud&&cloudUser&&profiles[activeRole]?.cloudId)}
-function setCloudStatus(message){const el=$('cloudStatus');if(el)el.textContent=message}
-function profileFromCloudRow(role,row){return {name:row.name||'',phone:row.phone||'',country:row.country||'',city:row.city||'',area:row.area||'',address:row.address||'',specialty:row.specialty||'',avatar:row.avatar_url||profiles[role]?.avatar||'',avatarUrl:row.avatar_url||profiles[role]?.avatarUrl||'',email:row.email||cloudUser?.email||'',cloudId:row.id,profileId:row.id,authUserId:row.auth_user_id,language:currentLanguage,...(role==='master'?{currency:profiles.master?.currency||'RUB'}:{})}}
+function setCloudStatus(message){const el=$('cloudStatus');if(el)el.textContent=t(message)}
+function profileFromCloudRow(role,row){return {name:row.name||'',phone:row.phone||'',country:row.country||'',city:row.city||'',area:row.area||'',address:row.address||'',specialty:row.specialty||'',activityDirection:row.activity_direction||(role==='master'&&String(row.id||'')===String(profiles.master?.cloudId||'')?profiles.master?.activityDirection:'')||'',avatar:row.avatar_url||profiles[role]?.avatar||'',avatarUrl:row.avatar_url||profiles[role]?.avatarUrl||'',email:row.email||cloudUser?.email||'',cloudId:row.id,profileId:row.id,authUserId:row.auth_user_id,language:currentLanguage,...(role==='master'?{currency:profiles.master?.currency||'RUB'}:{})}}
 async function ensureCloudProfile(role, profile, user=cloudUser){if(!cloud||!user)throw new Error('Сначала войди в аккаунт Supabase.');const table=role==='master'?'masters':'clients';const row={auth_user_id:user.id,email:user.email||profile.email||null,name:profile.name||'',phone:profile.phone||'',country:profile.country||'',city:profile.city||'',area:role==='master'?(profile.area||''):null,address:role==='master'?(profile.address||''):null,specialty:role==='master'?(profile.specialty||''):null,timezone_name:(Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'),avatar_url:(typeof profile.avatar==='string'&&/^https:\/\//i.test(profile.avatar)?profile.avatar.split('?')[0]:(profile.avatarUrl||null)),updated_at:new Date().toISOString()};const {data:rows,error}=await cloud.from(table).upsert(row,{onConflict:'auth_user_id'}).select('*');if(error)throw error;const saved=Array.isArray(rows)?rows[0]:rows;if(!saved?.id)throw new Error('Supabase не вернул ID профиля.');profiles[role]={...profile,...profileFromCloudRow(role,saved),email:user.email||profile.email};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));return profiles[role]}
 async function syncCurrentProfile(){if(!cloud||!cloudUser||!activeRole||!profiles[activeRole])return;try{await ensureCloudProfile(activeRole,profiles[activeRole]);setCloudStatus('Подключено · '+(cloudUser.email||'аккаунт'));}catch(err){console.error(err);showAppToast('Профиль сохранён в браузере, но не синхронизирован: '+(err.message||'ошибка Supabase'));}}
 // Store each account's IANA time zone on the server when that role is opened.
@@ -1815,13 +3290,13 @@ $('registerForm').onsubmit=async e=>{
  const phone=String($('regPhone').value||'').trim();
  const registrationRole=chosenRole||selectedEntryRole||'client';
  const previous=profiles[registrationRole]||{};
- const profile={...previous,name:$('regName').value.trim(),phone,country:$('regCountry').value.trim(),city:$('regCity').value.trim(),area:registrationRole==='master'? $('regArea').value.trim():(previous.area||''),address:registrationRole==='master'? $('regAddress').value.trim():(previous.address||''),specialty:registrationRole==='master'? $('regSpecialty').value.trim():(previous.specialty||''),email,language:currentLanguage};
+ const profile={...previous,name:$('regName').value.trim(),phone,country:$('regCountry').value.trim(),city:$('regCity').value.trim(),area:registrationRole==='master'? $('regArea').value.trim():(previous.area||''),address:registrationRole==='master'? $('regAddress').value.trim():(previous.address||''),specialty:registrationRole==='master'? $('regSpecialty').value.trim():(previous.specialty||''),activityDirection:registrationRole==='master'? $('regActivityDirection').value:(previous.activityDirection||''),email,language:currentLanguage};
  if(!profile.name||!profile.country||!profile.city||!profile.phone){status.textContent='Заполни имя, телефон, страну и город.';return}
  if(registrationRole==='master'&&!profile.address){status.textContent='Укажи адрес оказания услуг.';return}
  if(!cloud){status.textContent='Supabase не загрузился. Проверь интернет и повтори попытку.';return}
  const submit=$('createProfileButton');submit.disabled=true;
  try{
-  const signupOptions={data:{role:registrationRole,name:profile.name,phone:profile.phone,country:profile.country,city:profile.city,area:profile.area||'',address:profile.address||'',specialty:profile.specialty||''},...confirmationEmailRedirectOptions()};
+  const signupOptions={data:{role:registrationRole,name:profile.name,phone:profile.phone,country:profile.country,city:profile.city,area:profile.area||'',address:profile.address||'',specialty:profile.specialty||'',activity_direction:profile.activityDirection||''},...confirmationEmailRedirectOptions()};
   const {data:result,error}=await cloud.auth.signUp({email,password,options:signupOptions});
   if(error)throw error;
   if(!result.user)throw new Error('Supabase не создал пользователя.');
@@ -1930,17 +3405,19 @@ async function loadCloudScheduleForMaster(master){
 function retryCloudScheduleLoad(){const master=cloudMasterDirectory.find(m=>String(m.cloudId||m.profileId||'')===String(selectedCloudMasterId));if(master)loadCloudScheduleForMaster(master)}
 
 function remoteSlotToLocal(r){const st=new Date(r.start_time),en=new Date(r.end_time);return {id:String(r.local_id||r.id),cloudId:String(r.id),cloudMasterId:selectedCloudMasterId,cloudClientId:'',_cloudRemote:true,source:'client-booking',name:'',phone:'',service:r.service_name||'',date:iso(st),time:minutesToTime(st.getHours()*60+st.getMinutes()),durationMinutes:Math.max(15,Math.round((en-st)/60000)||Number(r.duration_minutes)||60),price:Number(r.price)||0,paid:false,status:r.status||'booked',isOwn:!!r.is_own,clientProfileId:r.is_own?getClientProfileId(true):'',serviceId:''}}
-async function refreshCloudNotifications(showNew=false){if(!cloudReady())return;const role=activeRole,field=role==='master'?'master_id':'client_id',profileId=profiles[role].cloudId;try{const {data:rows,error}=await cloud.from('notifications').select('*').eq(field,profileId).order('created_at',{ascending:false}).limit(50);if(error)throw error;const previous=new Set(cloudNotifications.map(n=>String(n.id)));cloudNotifications=rows||[];renderCloudNotificationList();const newEvents=cloudNotifications.filter(n=>!previous.has(String(n.id))&&!n.is_read);if(showNew&&newEvents.length){const newer=newEvents[0];if(activeRole==='master')await refreshCloudDataForRole('master');else if(selectedCloudMasterId){const master=cloudMasterDirectory.find(m=>String(m.cloudId)===selectedCloudMasterId)||{cloudId:selectedCloudMasterId};await loadCloudScheduleForMaster(master)}showAppToast('🔔 '+(newer.message||'Новое уведомление'));}}catch(err){console.warn('Notification fetch failed:',err.message)}}
-function renderCloudNotificationList(){const list=$('notificationList');if(!list)return;if(!cloudNotifications.length){list.innerHTML='<p class="muted">Уведомлений пока нет.</p>';return}list.innerHTML=cloudNotifications.map(n=>`<article class="card"><strong>${escapeHtml(n.type==='appointment_cancelled'?'Запись отменена':n.type==='appointment_created'?'Новая запись':n.type==='appointment_updated'?'Запись изменена':'Уведомление')}</strong><div>${escapeHtml(n.message||'')}</div><div class="muted small">${escapeHtml(n.created_at?new Date(n.created_at).toLocaleString():'')}${n.is_read?' · Прочитано':' · Не прочитано'}</div><div class="row" style="margin-top:8px">${!n.is_read?`<button class="btn fixed" type="button" data-notification-action="read" data-notification-id="${escapeHtml(n.id)}">Отметить прочитанным</button>`:''}<button class="btn danger fixed" type="button" data-notification-action="delete" data-notification-id="${escapeHtml(n.id)}">Удалить</button></div></article>`).join('')}
-async function markCloudNotificationRead(id){if(!cloudReady())return;const field=activeRole==='master'?'master_id':'client_id';const profileId=profiles[activeRole].cloudId;const {data,error}=await cloud.from('notifications').update({is_read:true}).eq('id',id).eq(field,profileId).select('id');if(error){showAppToast('Не удалось отметить уведомление: '+error.message);return}if(!data?.length){showAppToast('Уведомление не изменено: проверь права доступа в Supabase.');return}await refreshCloudNotifications(false)}
-async function deleteCloudNotification(id){if(!cloudReady())return;const field=activeRole==='master'?'master_id':'client_id';const profileId=profiles[activeRole].cloudId;if(!confirm('Удалить это уведомление?'))return;const {data,error}=await cloud.from('notifications').delete().eq('id',id).eq(field,profileId).select('id');if(error){showAppToast('Не удалось удалить уведомление: '+error.message);return}if(!data?.length){showAppToast('Удаление не разрешено. Сначала выполни SQL-настройку управления уведомлениями.');return}cloudNotifications=cloudNotifications.filter(n=>String(n.id)!==String(id));renderCloudNotificationList();showAppToast('Уведомление удалено.')}
-async function markAllCloudNotificationsRead(){if(!cloudReady())return;const field=activeRole==='master'?'master_id':'client_id';const profileId=profiles[activeRole].cloudId;const {data,error}=await cloud.from('notifications').update({is_read:true}).eq(field,profileId).eq('is_read',false).select('id');if(error){showAppToast('Не удалось отметить уведомления: '+error.message);return}await refreshCloudNotifications(false);showAppToast(data?.length?'Все уведомления отмечены прочитанными.':'Непрочитанных уведомлений нет.')}
-async function deleteReadCloudNotifications(){if(!cloudReady())return;if(!confirm('Удалить все прочитанные уведомления? Это действие нельзя отменить.'))return;const field=activeRole==='master'?'master_id':'client_id';const profileId=profiles[activeRole].cloudId;const {data,error}=await cloud.from('notifications').delete().eq(field,profileId).eq('is_read',true).select('id');if(error){showAppToast('Не удалось удалить уведомления: '+error.message);return}if(!data?.length){showAppToast('Нет прочитанных уведомлений для удаления. Если удаление должно быть доступно, выполни SQL-настройку.');return}await refreshCloudNotifications(false);showAppToast('Удалено уведомлений: '+data.length)}
+function translateNotificationMessage(value){let message=String(value||'').trim();if(!message)return '';const exact=t(message);if(exact!==message)return exact;const replacements=[['Создана новая запись',t('Создана новая запись')],['Запись подтверждена',t('Запись подтверждена')],['Запись перенесена',t('Запись перенесена')],['Клиент отменил запись',t('Клиент отменил запись')],['Клиент записался на',t('Клиент записался на')],['Новая запись',t('Новая запись')],['Запись отменена',t('Запись отменена')],['Запись изменена',t('Запись изменена')]];for(const [source,target] of replacements){if(target!==source)message=message.split(source).join(target)}return message}
+function updateNotificationEntryButtons(){document.querySelectorAll('[data-nailora-notifications-button]').forEach(button=>{button.textContent='🔔 '+t('Уведомления')})}
+async function refreshCloudNotifications(showNew=false){if(!cloudReady())return;const role=activeRole,field=role==='master'?'master_id':'client_id',profileId=profiles[role].cloudId;try{const {data:rows,error}=await cloud.from('notifications').select('*').eq(field,profileId).order('created_at',{ascending:false}).limit(50);if(error)throw error;const previous=new Set(cloudNotifications.map(n=>String(n.id)));cloudNotifications=rows||[];renderCloudNotificationList();const newEvents=cloudNotifications.filter(n=>!previous.has(String(n.id))&&!n.is_read);if(showNew&&newEvents.length){const newer=newEvents[0];if(activeRole==='master')await refreshCloudDataForRole('master');else if(selectedCloudMasterId){const master=cloudMasterDirectory.find(m=>String(m.cloudId)===selectedCloudMasterId)||{cloudId:selectedCloudMasterId};await loadCloudScheduleForMaster(master)}showAppToast('🔔 '+(translateNotificationMessage(newer.message)||t('Новое уведомление')));}}catch(err){console.warn('Notification fetch failed:',err.message)}}
+function renderCloudNotificationList(){const list=$('notificationList');if(!list)return;if(!cloudNotifications.length){list.innerHTML=`<p class="muted">${escapeHtml(t('Уведомлений пока нет.'))}</p>`;return}list.innerHTML=cloudNotifications.map(n=>{const title=n.type==='appointment_cancelled'?t('Запись отменена'):n.type==='appointment_created'?t('Новая запись'):n.type==='appointment_updated'?t('Запись изменена'):t('Уведомление');const date=n.created_at?new Date(n.created_at).toLocaleString(LOCALES[currentLanguage]||currentLanguage):'';return `<article class="card"><strong>${escapeHtml(title)}</strong><div>${escapeHtml(translateNotificationMessage(n.message))}</div><div class="muted small">${escapeHtml(date)}${n.is_read?' · '+t('Прочитано'):' · '+t('Не прочитано')}</div><div class="row" style="margin-top:8px">${!n.is_read?`<button class="btn fixed" type="button" data-notification-action="read" data-notification-id="${escapeHtml(n.id)}">${escapeHtml(t('Отметить прочитанным'))}</button>`:''}<button class="btn danger fixed" type="button" data-notification-action="delete" data-notification-id="${escapeHtml(n.id)}">${escapeHtml(t('Удалить'))}</button></div></article>`}).join('')}
+async function markCloudNotificationRead(id){if(!cloudReady())return;const field=activeRole==='master'?'master_id':'client_id';const profileId=profiles[activeRole].cloudId;const {data,error}=await cloud.from('notifications').update({is_read:true}).eq('id',id).eq(field,profileId).select('id');if(error){showAppToast(t('Не удалось отметить уведомление')+': '+error.message);return}if(!data?.length){showAppToast(t('Уведомление не изменено: проверь права доступа в Supabase.'));return}await refreshCloudNotifications(false)}
+async function deleteCloudNotification(id){if(!cloudReady())return;const field=activeRole==='master'?'master_id':'client_id';const profileId=profiles[activeRole].cloudId;if(!confirm(t('Удалить это уведомление?')))return;const {data,error}=await cloud.from('notifications').delete().eq('id',id).eq(field,profileId).select('id');if(error){showAppToast(t('Не удалось удалить уведомления')+': '+error.message);return}if(!data?.length){showAppToast(t('Удаление не разрешено. Сначала выполни SQL-настройку управления уведомлениями.'));return}cloudNotifications=cloudNotifications.filter(n=>String(n.id)!==String(id));renderCloudNotificationList();showAppToast(t('Уведомление удалено.'))}
+async function markAllCloudNotificationsRead(){if(!cloudReady())return;const field=activeRole==='master'?'master_id':'client_id';const profileId=profiles[activeRole].cloudId;const {data,error}=await cloud.from('notifications').update({is_read:true}).eq(field,profileId).eq('is_read',false).select('id');if(error){showAppToast(t('Не удалось отметить уведомления')+': '+error.message);return}await refreshCloudNotifications(false);showAppToast(data?.length?t('Все уведомления отмечены прочитанными.'):t('Непрочитанных уведомлений нет.'))}
+async function deleteReadCloudNotifications(){if(!cloudReady())return;if(!confirm(t('Удалить все прочитанные уведомления? Это действие нельзя отменить.')))return;const field=activeRole==='master'?'master_id':'client_id';const profileId=profiles[activeRole].cloudId;const {data,error}=await cloud.from('notifications').delete().eq(field,profileId).eq('is_read',true).select('id');if(error){showAppToast(t('Не удалось удалить уведомления')+': '+error.message);return}if(!data?.length){showAppToast(t('Нет прочитанных уведомлений для удаления. Если удаление должно быть доступно, выполни SQL-настройку.'));return}await refreshCloudNotifications(false);showAppToast(t('Удалено уведомлений:')+' '+data.length)}
 $('notificationList').addEventListener('click',e=>{const button=e.target.closest('button[data-notification-action]');if(!button)return;const id=button.dataset.notificationId;if(button.dataset.notificationAction==='read')markCloudNotificationRead(id);else if(button.dataset.notificationAction==='delete')deleteCloudNotification(id)});
 $('markAllNotificationsRead').onclick=markAllCloudNotificationsRead;$('deleteReadNotifications').onclick=deleteReadCloudNotifications;
 $('closeNotifications').onclick=()=>$('notificationsDialog').close();$('notificationsDialog').addEventListener('click',e=>{if(e.target===$('notificationsDialog'))$('notificationsDialog').close()});
 function openCloudNotifications(){refreshCloudNotifications(false).then(()=>{if(typeof $('notificationsDialog').showModal==='function')$('notificationsDialog').showModal();else $('notificationsDialog').setAttribute('open','')})}
-const _masterAccountOriginal=$('masterAccount').innerHTML,_clientAccountOriginal=$('clientAccount').innerHTML;const masterNotifButton=document.createElement('button');masterNotifButton.type='button';masterNotifButton.className='btn fixed';masterNotifButton.textContent='🔔 Уведомления';masterNotifButton.onclick=openCloudNotifications;$('masterAccount').parentElement.insertBefore(masterNotifButton,$('masterAccount'));const clientNotifButton=masterNotifButton.cloneNode(true);clientNotifButton.onclick=openCloudNotifications;$('clientAccount').parentElement.insertBefore(clientNotifButton,$('clientAccount'));
+const _masterAccountOriginal=$('masterAccount').innerHTML,_clientAccountOriginal=$('clientAccount').innerHTML;const masterNotifButton=document.createElement('button');masterNotifButton.type='button';masterNotifButton.className='btn fixed';masterNotifButton.dataset.nailoraNotificationsButton='true';masterNotifButton.onclick=openCloudNotifications;$('masterAccount').parentElement.insertBefore(masterNotifButton,$('masterAccount'));const clientNotifButton=masterNotifButton.cloneNode(true);clientNotifButton.onclick=openCloudNotifications;$('clientAccount').parentElement.insertBefore(clientNotifButton,$('clientAccount'));updateNotificationEntryButtons();
 function startCloudPolling(){if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=setInterval(()=>{if(cloudReady())refreshCloudNotifications(true)},30000)}
 // Initialize calendar state before any asynchronous auth restoration can render the app.
 let cursor=new Date();cursor.setDate(1);
@@ -2103,7 +3580,7 @@ async function logout(){
  }
 }
 
-function openSettings(){if(!activeRole)return;const p=profiles[activeRole]||{};renderProfileAvatar(activeRole);$('settingsLanguageChoice').value=p.language||currentLanguage;$('settingsRoleLabel').textContent=t(activeRole==='master'?'Тип аккаунта: Мастер':'Тип аккаунта: Клиент');$('settingsName').value=p.name||'';$('settingsPhone').value=p.phone||'';$('settingsCountry').value=p.country||'';$('settingsCity').value=p.city||p.area||'';$('settingsMasterFields').classList.toggle('hidden',activeRole!=='master');$('masterReminderSettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencySettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencyChoice').value=CURRENCY_CODES.includes(String((profiles.master||{}).currency||'RUB').toUpperCase())?String((profiles.master||{}).currency||'RUB').toUpperCase():'RUB';$('settingsAddress').required=activeRole==='master';$('settingsArea').value=p.area||'';$('settingsAddress').value=p.address||'';$('settingsSpecialty').value=p.specialty||'';const reminderPrefs=getMasterReminderPrefs();$('masterRemindersEnabled').checked=!!reminderPrefs.enabled;$('masterReminderLeadTime').value=String(reminderPrefs.minutes||60);$('masterReminderLeadTime').disabled=!reminderPrefs.enabled;refreshNotificationPermissionStatus();applyUiSettings();if(typeof $('settingsDialog').showModal==='function')$('settingsDialog').showModal();else $('settingsDialog').setAttribute('open','');refreshPushSettingsStatus()}
+function openSettings(){if(!activeRole)return;const p=profiles[activeRole]||{};renderProfileAvatar(activeRole);$('settingsLanguageChoice').value=p.language||currentLanguage;$('settingsRoleLabel').textContent=t(activeRole==='master'?'Тип аккаунта: Мастер':'Тип аккаунта: Клиент');$('settingsName').value=p.name||'';$('settingsPhone').value=p.phone||'';$('settingsCountry').value=p.country||'';$('settingsCity').value=p.city||p.area||'';$('settingsMasterFields').classList.toggle('hidden',activeRole!=='master');$('masterReminderSettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencySettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencyChoice').value=CURRENCY_CODES.includes(String((profiles.master||{}).currency||'RUB').toUpperCase())?String((profiles.master||{}).currency||'RUB').toUpperCase():'RUB';$('settingsAddress').required=activeRole==='master';$('settingsArea').value=p.area||'';$('settingsAddress').value=p.address||'';$('settingsSpecialty').value=p.specialty||'';$('settingsActivityDirection').value=p.activityDirection||'Маникюр и педикюр';const reminderPrefs=getMasterReminderPrefs();$('masterRemindersEnabled').checked=!!reminderPrefs.enabled;$('masterReminderLeadTime').value=String(reminderPrefs.minutes||60);$('masterReminderLeadTime').disabled=!reminderPrefs.enabled;refreshNotificationPermissionStatus();applyUiSettings();if(typeof $('settingsDialog').showModal==='function')$('settingsDialog').showModal();else $('settingsDialog').setAttribute('open','');refreshPushSettingsStatus()}
 $('masterAccount').onclick=openSettings;$('clientAccount').onclick=openSettings;
 $('closeSettings').onclick=()=>$('settingsDialog').close();$('settingsDone').onclick=()=>$('settingsDialog').close();$('settingsLogout').onclick=logout;
 
@@ -2399,7 +3876,7 @@ window.addEventListener('load',()=>{registerNailoraServiceWorker().catch(err=>co
 // Theme buttons use data-theme-choice; the old themeChoice select no longer exists.
 const backgroundChoice=$('backgroundChoice');if(backgroundChoice)backgroundChoice.onchange=()=>{uiSettings.background=backgroundChoice.value;persistUiSettings()};
 $('masterCurrencyChoice').onchange=async()=>{if(activeRole!=='master')return;const currency=String($('masterCurrencyChoice').value||'RUB').toUpperCase();if(!CURRENCY_CODES.includes(currency))return;const nextProfiles={...profiles,master:{...(profiles.master||{}),currency}};if(persistProfilesSafely(nextProfiles)){refreshCurrencyLabels();renderAll();if(cloudReady()){if(!profiles.master?.cloudId){showAppToast('Валюта сохранена на этом устройстве, но не удалось найти облачный профиль мастера.');return}const synced=await syncMasterScheduleToCloud();if(!synced){showAppToast('Валюта сохранена на этом устройстве, но не удалось передать её клиентам.');return}}showAppToast(t('Валюта цен сохранена.'))}};
-$('accountEditForm').onsubmit=e=>{e.preventDefault();if(!activeRole)return;const old=profiles[activeRole]||{};profiles[activeRole]={...old,name:$('settingsName').value.trim(),phone:$('settingsPhone').value.trim(),country:$('settingsCountry').value.trim(),city:$('settingsCity').value.trim(),area:activeRole==='master'? $('settingsArea').value.trim():(old.area||''),address:activeRole==='master'? $('settingsAddress').value.trim():(old.address||''),specialty:activeRole==='master'? $('settingsSpecialty').value.trim():(old.specialty||'')};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));refreshRoleGreetings();renderProfileAvatar(activeRole);if(activeRole==='master')renderMasterReviews();if(activeRole==='client'){$('searchCountry').value=profiles.client.country;$('searchCity').value=profiles.client.city;renderMasterSearch()}syncCurrentProfile();alert(t('Данные аккаунта сохранены.'))};
+$('accountEditForm').onsubmit=e=>{e.preventDefault();if(!activeRole)return;const old=profiles[activeRole]||{};profiles[activeRole]={...old,name:$('settingsName').value.trim(),phone:$('settingsPhone').value.trim(),country:$('settingsCountry').value.trim(),city:$('settingsCity').value.trim(),area:activeRole==='master'? $('settingsArea').value.trim():(old.area||''),address:activeRole==='master'? $('settingsAddress').value.trim():(old.address||''),specialty:activeRole==='master'? $('settingsSpecialty').value.trim():(old.specialty||''),activityDirection:activeRole==='master'? $('settingsActivityDirection').value:(old.activityDirection||'')};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));refreshRoleGreetings();renderProfileAvatar(activeRole);if(activeRole==='master')renderMasterReviews();if(activeRole==='client'){$('searchCountry').value=profiles.client.country;$('searchCity').value=profiles.client.city;renderMasterSearch()}syncCurrentProfile();alert(t('Данные аккаунта сохранены.'))};
 applyUiSettings();setLanguage(currentLanguage,false);
 function moveClientMonth(delta){if($('clientCalendarView')?.value==='week'){const d=new Date((clientSelectedDate||iso(new Date()))+'T12:00:00');d.setDate(d.getDate()+delta*7);clientSelectedDate=iso(d);clientCursor=new Date(d.getFullYear(),d.getMonth(),1)}else{clientCursor.setMonth(clientCursor.getMonth()+delta);clientSelectedDate=iso(new Date(clientCursor.getFullYear(),clientCursor.getMonth(),1))}renderClientCalendar()}
 $('clientCalendarView').onchange=()=>{if($('clientCalendarView').value==='week'){const d=new Date((clientSelectedDate||iso(new Date()))+'T12:00:00');clientCursor=new Date(d.getFullYear(),d.getMonth(),1)}renderClientCalendar()};
@@ -2578,16 +4055,21 @@ async function renderMasterSearch(){
  let found=[];
  if(cloud&&cloudUser){try{const {data:rows,error}=await cloud.from('nailora_master_public_directory').select('*').eq('is_active',true).ilike('country',country).ilike('city',city).limit(100);if(error)throw error;found=(rows||[]).map(r=>({...profileFromCloudRow('master',r),cloudId:r.id,profileId:r.id,masterId:r.id,phone:r.phone||'',avatar:r.avatar_url||'',avatarUrl:r.avatar_url||'',reviews:[]}));cloudMasterDirectory=found;}catch(err){console.error(err);box.innerHTML=`<p class="muted">Не удалось загрузить мастеров из Supabase: ${escapeHtml(err.message||'ошибка')}</p>`;translatePage();return}}
  else {const master=profiles.master||null;const masterCity=master?.city||master?.area||'',masterCountry=master?.country||'';found=master&&cityMatches(masterCity,city)&&countryKey(masterCountry)===countryKey(country)?[master]:[];cloudMasterDirectory=found;}
+ const selectedDirection=String($('searchActivityDirection')?.value||'').trim();
+ const directoryFound=found;
+ if(selectedDirection)found=found.filter(m=>String(m.activityDirection||'').trim()===selectedDirection);
+ cloudMasterDirectory=found;
  if(selectedClientMasterKey&&!found.some(m=>masterSelectionKey(m)===selectedClientMasterKey)){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;renderClientCalendar()}
- if(!found.length){box.innerHTML=`<p class="muted">${escapeHtml(t('Мастеров в выбранном городе пока нет.'))}</p><p class="muted small">${cloudUser?'В этом городе пока нет опубликованных профилей мастеров.':'Для общего каталога между устройствами войди в аккаунт Nailora.'}</p>`;translatePage();return}
- box.innerHTML=found.map(m=>{const avatar=isAvatarImage(m.avatar)?`<img class="master-card-avatar" src="${escapeHtml(m.avatar)}" alt="Аватар мастера">`:`<div class="master-card-avatar-placeholder" aria-hidden="true">👤</div>`;const chosen=selectedClientMasterKey===masterSelectionKey(m);return `<article class="card"><div class="master-card-head">${avatar}<div style="flex:1;min-width:0"><h3>${escapeHtml(profileNicknameFor(m,'master'))}</h3><div>${escapeHtml(m.specialty||t('Специализация не указана'))}</div><div class="muted" style="margin-top:6px">📍 ${escapeHtml([m.city||m.area,m.country].filter(Boolean).join(', '))}</div><div style="margin-top:5px"><strong>${escapeHtml(t('Адрес оказания услуг'))}:</strong> ${escapeHtml(m.address||t('Адрес не указан'))}</div>${m.area?`<div class="muted small">${escapeHtml(t('Район / ориентир'))}: ${escapeHtml(m.area)}</div>`:''}</div></div><div class="rating-summary">${ratingSummaryHtml(m)}</div><div class="review-list master-card-reviews">${renderReviewCards(m,2)}</div><div class="row" style="margin-top:10px"><button class="btn primary fixed" type="button" onclick="chooseMasterForBooking('${escapeHtml(m.cloudId||m.profileId||'')}')">${escapeHtml(t(chosen?'Снять выбор':'Выбрать мастера'))}</button>${String(m.phone||'').trim()?`<a class="btn fixed" href="tel:${escapeHtml(String(m.phone).replace(/[^0-9+*#,;]/g,''))}">${escapeHtml(t('Позвонить'))}</a>`:`<button class="btn fixed" type="button" disabled>${escapeHtml(t('Позвонить'))}</button>`}</div></article>`}).join('');translatePage();
+ if(!found.length){const msg=directoryFound.length&&selectedDirection?'В этом городе пока нет мастеров с выбранным направлением.':'Мастеров в выбранном городе пока нет.';box.innerHTML=`<p class="muted">${escapeHtml(t(msg))}</p><p class="muted small">${cloudUser?'В этом городе пока нет опубликованных профилей мастеров с таким направлением.':'Для общего каталога между устройствами войди в аккаунт Nailora.'}</p>`;translatePage();return}
+ box.innerHTML=found.map(m=>{const avatar=isAvatarImage(m.avatar)?`<img class="master-card-avatar" src="${escapeHtml(m.avatar)}" alt="Аватар мастера">`:`<div class="master-card-avatar-placeholder" aria-hidden="true">👤</div>`;const chosen=selectedClientMasterKey===masterSelectionKey(m);return `<article class="card"><div class="master-card-head">${avatar}<div style="flex:1;min-width:0"><h3>${escapeHtml(profileNicknameFor(m,'master'))}</h3><div class="muted small">${escapeHtml(m.activityDirection||'Направление не указано')}</div><div>${escapeHtml(m.specialty||t('Специализация не указана'))}</div><div class="muted" style="margin-top:6px">📍 ${escapeHtml([m.city||m.area,m.country].filter(Boolean).join(', '))}</div><div style="margin-top:5px"><strong>${escapeHtml(t('Адрес оказания услуг'))}:</strong> ${escapeHtml(m.address||t('Адрес не указан'))}</div>${m.area?`<div class="muted small">${escapeHtml(t('Район / ориентир'))}: ${escapeHtml(m.area)}</div>`:''}</div></div><div class="rating-summary">${ratingSummaryHtml(m)}</div><div class="review-list master-card-reviews">${renderReviewCards(m,2)}</div><div class="row" style="margin-top:10px"><button class="btn primary fixed" type="button" onclick="chooseMasterForBooking('${escapeHtml(m.cloudId||m.profileId||'')}')">${escapeHtml(t(chosen?'Снять выбор':'Выбрать мастера'))}</button>${String(m.phone||'').trim()?`<a class="btn fixed" href="tel:${escapeHtml(String(m.phone).replace(/[^0-9+*#,;]/g,''))}">${escapeHtml(t('Позвонить'))}</a>`:`<button class="btn fixed" type="button" disabled>${escapeHtml(t('Позвонить'))}</button>`}</div></article>`}).join('');translatePage();
 }
 
 async function chooseMasterForBooking(cloudId=''){const master=cloudMasterDirectory.find(m=>String(m.cloudId||m.profileId||'')===String(cloudId))||profiles.master;if(!master)return;const key=masterSelectionKey(master);if(selectedClientMasterKey===key){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';renderMasterSearch();renderClientCalendar();showAppToast(t('Выбор мастера снят. Выбери мастера, чтобы открыть расписание.'));return}selectedClientMasterKey=key;selectedCloudMasterId=cloudUser?String(master.cloudId||master.profileId||master.masterId||''):'';cloudScheduleData=null;cloudBookedSlots=[];cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';const today=iso(new Date());let ds=clientSelectedDate>=today&&!isDayOff(clientSelectedDate)?clientSelectedDate:nextAvailableDate(today);if(!ds)ds=today;clientSelectedDate=ds;clientCursor=new Date(ds+'T12:00:00');clientCursor.setDate(1);renderMasterSearch();if(cloudUser&&selectedCloudMasterId){await loadCloudScheduleForMaster(master)}renderClientCalendar();$('clientDaySchedule').scrollIntoView({behavior:'smooth',block:'center'});showAppToast(t('Мастер выбран. Нажми на свободный интервал, чтобы забронировать время.'));}
 $('searchMastersButton').onclick=renderMasterSearch;
+$('searchActivityDirection').onchange=renderMasterSearch;
 $('searchCountry').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();renderMasterSearch()}});
 $('searchCity').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();renderMasterSearch()}});
-$('resetMasterSearch').onclick=()=>{$('searchCountry').value=profiles.client?.country||'';$('searchCity').value=profiles.client?.city||profiles.client?.area||'';renderMasterSearch()};
+$('resetMasterSearch').onclick=()=>{$('searchCountry').value=profiles.client?.country||'';$('searchCity').value=profiles.client?.city||profiles.client?.area||'';$('searchActivityDirection').value='';renderMasterSearch()};
 
 function selectClientScheduleDay(ds){if(!ds)return;clientSelectedDate=ds;clientCursor=new Date(ds+'T12:00:00');clientCursor.setDate(1);renderClientCalendar();const target=$('clientDaySchedule');if(target)target.scrollIntoView({behavior:'smooth',block:'start'})}
 function clientDayLabel(ds){const d=new Date(ds+'T12:00:00');return new Intl.DateTimeFormat(LOCALES[currentLanguage]||currentLanguage,{weekday:'short',day:'numeric',month:'short'}).format(d)}
