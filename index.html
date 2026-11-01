@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="ru">
+<!-- Nailora v8.93: fix saved-master persistence via the existing client-profile upsert and reinforce own-row RLS access. Based on v8.92. -->
 <!-- Nailora v8.92: add a client-owned saved-masters list synchronized through Supabase. Based on v8.91. -->
 <!-- Nailora v8.91: open attached appointment-comment photos in an in-app lightbox on tap. Based on v8.90. -->
 <!-- Nailora v8.90: sync up to 3 compressed appointment-comment photos through Supabase and restore them across devices. Based on v8.89. -->
@@ -4096,13 +4097,19 @@ function favoriteMasterSnapshot(m){return {cloudId:String(m.cloudId||m.profileId
 function mapMasterDirectoryRow(r){return {...profileFromCloudRow('master',r),cloudId:r.id,profileId:r.id,masterId:r.id,phone:r.phone||'',avatar:r.avatar_url||'',avatarUrl:r.avatar_url||'',reviews:[]}}
 async function persistFavoriteMasterIds(ids){
  const clean=Array.from(new Set((Array.isArray(ids)?ids:[]).map(x=>String(x||'').trim()).filter(Boolean))).slice(0,100);
- if(cloudReady()&&activeRole==='client'){
-  const {data:updated,error}=await cloud.from('clients').update({favorite_masters:clean,updated_at:new Date().toISOString()}).eq('auth_user_id',cloudUser.id).select('id,favorite_masters').maybeSingle();
-  if(error)throw error;
-  if(!updated)throw new Error('Supabase не подтвердил сохранение списка. Проверь SQL-настройку v8.92.');
+ if(cloud&&cloudUser&&activeRole==='client'){
+  // Use the same auth_user_id upsert path already used to create/synchronize
+  // client profiles. This also repairs a missing client row instead of
+  // silently accepting an UPDATE that matched zero rows.
+  const current={...(profiles.client||{}),favoriteMasterIds:clean};
+  const saved=await ensureCloudProfile('client',current,cloudUser);
+  const confirmed=Array.isArray(saved?.favoriteMasterIds)?saved.favoriteMasterIds.map(x=>String(x)):[];
+  if(JSON.stringify(confirmed)!==JSON.stringify(clean)){
+   throw new Error('Supabase сохранил профиль, но не вернул обновлённый список мастеров. Обнови страницу и проверь поле favorite_masters в таблице clients.');
+  }
  }
  profiles.client={...(profiles.client||{}),favoriteMasterIds:clean};
- try{localStorage.setItem(ROLE_KEY,JSON.stringify(profiles))}catch(e){throw new Error('Список сохранён в Supabase, но не удалось обновить локальный кэш.')}
+ try{localStorage.setItem(ROLE_KEY,JSON.stringify(profiles))}catch(e){throw new Error('Список сохранён в Supabase, но не удалось обновить локальный кэш браузера.')}
  return clean;
 }
 async function toggleFavoriteMaster(cloudId=''){
