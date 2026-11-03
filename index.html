@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="ru">
+<!-- v8.96: persist paid/completed appointment history in Supabase, restore legacy local states, and keep visits visible on days off. Based on v8.95. -->
 <!-- Nailora v8.95: update welcome-screen wording; preserve app logic and Supabase integration. Based on v8.94. -->
 <!-- Nailora v8.92: add a client-owned saved-masters list synchronized through Supabase. Based on v8.91. -->
 <!-- Nailora v8.91: open attached appointment-comment photos in an in-app lightbox on tap. Based on v8.90. -->
@@ -92,6 +93,10 @@ body[data-theme="dark"] #shareNailoraDialog .dialog-head{border-color:var(--bord
 body[data-theme="dark"] #clientReminderDialog,body[data-theme="dark"] #reminderToast{background:#25212d;color:#f4eff8;border-color:#403849}
 
 .profile-avatar-header{width:50px;height:50px;object-fit:cover;border-radius:50%;border:2px solid #d9d1e1;flex:0 0 50px;background:#f2edf7}.avatar-editor{display:flex;align-items:center;gap:14px;margin:12px 0 16px}.avatar-preview,.avatar-placeholder{width:82px;height:82px;flex:0 0 82px;border-radius:50%;object-fit:cover;border:2px solid #d9d1e1;background:#f2edf7}.avatar-placeholder{display:grid;place-items:center;font-size:30px;color:#8b7c9b}.photo-picker-help{margin:5px 0 8px;font-size:12px;color:var(--muted-color,#786e80)}.photo-preview-grid{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px}.photo-preview-item{position:relative;width:88px;height:88px;border-radius:10px;overflow:hidden;border:1px solid var(--border-color,#e9e2ee);background:var(--soft-bg,#f2edf7)}.photo-preview-item img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}.photo-preview-item button{position:absolute;top:4px;right:4px;width:25px;height:25px;border:0;border-radius:50%;background:#fff;color:#8d2525;font-weight:bold;cursor:pointer;box-shadow:0 1px 5px #0002}.schedule-photos{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.schedule-photos img{width:58px;height:58px;object-fit:cover;border-radius:7px;border:1px solid #d8cde4;cursor:zoom-in}.photo-lightbox{box-sizing:border-box;width:min(96vw,1200px);max-width:96vw;max-height:94vh;max-height:94dvh;padding:48px 12px 12px;border:1px solid rgba(255,255,255,.18);border-radius:16px;background:rgba(18,16,22,.97);color:#fff;overflow:hidden;box-shadow:0 24px 80px #0008}.photo-lightbox::backdrop{background:rgba(10,8,14,.82);backdrop-filter:blur(3px)}.photo-lightbox img{display:block;max-width:100%;max-height:calc(90vh - 60px);max-height:calc(90dvh - 60px);width:auto;height:auto;object-fit:contain;margin:0 auto;border-radius:8px}.photo-lightbox-close{position:absolute;top:8px;right:8px;width:34px;height:34px;border:1px solid #ffffff55;border-radius:50%;background:#ffffff18;color:#fff;font-size:24px;line-height:1;cursor:pointer}.photo-lightbox-close:focus-visible{outline:2px solid #fff;outline-offset:3px}.schedule-note{display:block;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px}
+/* v8.96: completed visits remain visible in the calendar history. */
+.schedule-row.completed{background:rgba(236,253,243,.88);border-color:#b7e4c7}
+#daySchedule .schedule-row.completed::before{background:#2e8b57}
+body[data-theme="dark"] .schedule-row.completed{background:#20332a;border-color:#365c45}
 /* Почасовое расписание и месячный график */
 .schedule-list{display:grid;gap:7px;margin-top:12px}.schedule-row{display:grid;grid-template-columns:125px minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid var(--border-color,#e9e2ee);border-radius:10px;padding:9px 11px;background:var(--panel-bg,#fff)}.schedule-time{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}.schedule-info{min-width:0}.schedule-info strong{display:block;font-size:14px;overflow-wrap:anywhere}.schedule-info small{display:block;color:var(--muted-color,#786e80);margin-top:3px;overflow-wrap:anywhere}.schedule-row.free{background:#f0faf3;border-color:#c4e7ce}.schedule-row.busy{background:#f3edfb;border-color:#d9caef}.schedule-row.off{background:#fff0f0;border-color:#f0caca}.schedule-row.warning{background:#fff7e6;border-color:#ead6a5}.schedule-row .btn{padding:7px 9px;font-size:12px}.month-overview{display:grid;gap:6px;max-height:560px;overflow:auto}.month-day-row{display:grid;grid-template-columns:minmax(105px,1fr) minmax(0,2fr);gap:10px;align-items:center;border:1px solid var(--border-color,#e9e2ee);border-radius:9px;padding:9px 10px;background:var(--panel-bg,#fff);text-align:left;color:inherit}.month-day-row.off{background:#fff0f0;border-color:#f0caca}.month-day-date{font-size:13px;font-weight:700}.month-day-detail{font-size:12px;color:var(--muted-color,#786e80);overflow-wrap:anywhere}.month-day-row:focus-visible,.day:focus-visible{outline:2px solid #71529a;outline-offset:2px}.schedule-header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.schedule-badges{display:flex;gap:6px;flex-wrap:wrap}.schedule-badge{display:inline-block;border-radius:999px;padding:4px 8px;font-size:11px;background:var(--soft-bg,#eee8f5)}.schedule-empty{padding:10px;color:var(--muted-color,#786e80);font-size:13px}
 @media(max-width:600px){.schedule-row{grid-template-columns:92px minmax(0,1fr);gap:7px;padding:8px}.schedule-row>.schedule-actions{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}.month-day-row{grid-template-columns:1fr;gap:4px}.schedule-time{font-size:12px}}
@@ -3359,9 +3364,31 @@ async function refreshCloudDataForRole(role){
  const m=profiles.master;if(!m?.cloudId)return;
  const {data:rows,error}=await cloud.from('appointments').select('*').eq('master_id',m.cloudId).neq('status','cancelled').order('start_time',{ascending:true});
  if(error){console.error('Appointment refresh failed:',error);showAppToast('Не удалось загрузить записи мастера: '+(error.message||'ошибка Supabase'));return;}
+ const cachedAppointments=Array.isArray(data.appointments)?data.appointments.slice():[];
  const remoteLocalIds=new Set((rows||[]).map(r=>String(r.local_id||r.id)));
- const localOnly=(data.appointments||[]).filter(a=>!a.cloudId&&!a._cloudRemote&&!remoteLocalIds.has(String(a.id)));
- const mapped=(rows||[]).map(remoteAppointmentToLocal);
+ const localOnly=cachedAppointments.filter(a=>!a.cloudId&&!a._cloudRemote&&!remoteLocalIds.has(String(a.id)));
+ const cachedByCloudId=new Map();
+ const cachedByLocalId=new Map();
+ for(const cached of cachedAppointments){
+  if(cached?.cloudId)cachedByCloudId.set(String(cached.cloudId),cached);
+  if(cached?.id)cachedByLocalId.set(String(cached.id),cached);
+ }
+ const legacyStateToRepair=[];
+ const mapped=(rows||[]).map(row=>{
+  const appointment=remoteAppointmentToLocal(row);
+  const cached=cachedByCloudId.get(String(row.id))||cachedByLocalId.get(String(row.local_id||row.id));
+  if(cached){
+   // Older builds kept these flags locally but did not send them to Supabase.
+   // Preserve explicit user choices and write them back to the new cloud columns.
+   let needsRepair=false;
+   if((cached.paid===true||cached.paid==='true')&&!appointment.paid){appointment.paid=true;needsRepair=true;}
+   if(normalizeAppointmentStatus(cached.status)==='completed'&&appointment.status!=='completed'){
+    appointment.status='completed';needsRepair=true;
+   }
+   if(needsRepair)legacyStateToRepair.push(appointment);
+  }
+  return appointment;
+ });
  // Automatically materialize a master-side client card for every cloud booking, including bookings created by clients on another device.
  for(const appointment of mapped){
   const card=ensureClientCard({name:appointment.name||'',phone:appointment.phone||'',service:appointment.service||'',price:appointment.price??''});
@@ -3388,11 +3415,76 @@ async function refreshCloudDataForRole(role){
  }
  try{localStorage.setItem(KEY,JSON.stringify(data))}catch(_){}
  renderAll();
+ // Repair only records for which this browser has an explicit older paid/completed choice.
+ // This avoids guessing that every past booking was actually attended.
+ for(const appointment of legacyStateToRepair){
+  await syncCloudAppointment(appointment,'master','upsert');
+ }
 }
-function remoteAppointmentToLocal(r){const st=new Date(r.start_time),en=new Date(r.end_time);const date=iso(st),time=minutesToTime(st.getHours()*60+st.getMinutes()),durationMinutes=Math.max(15,Math.round((en-st)/60000)||Number(r.duration_minutes)||60);return {id:String(r.local_id||r.id),cloudId:String(r.id),cloudClientId:r.client_id||'',cloudMasterId:r.master_id||'',_cloudRemote:true,clientId:'',clientProfileId:r.client_id===profiles.client?.cloudId?getClientProfileId(true):'',source:'client-booking',name:r.client_name||'Клиент',phone:r.client_phone||'',service:r.service_name||'Маникюр',date,time,durationMinutes,price:Number(r.price)||0,paid:false,notes:r.notes||'',status:r.status||'booked',serviceId:'',photos:Array.isArray(r.photos)?r.photos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS):[]}}
+function normalizeAppointmentStatus(value){const status=String(value||'booked').trim().toLowerCase();return status==='completed'?'completed':status==='cancelled'?'cancelled':'booked'}
+function remoteAppointmentToLocal(r){
+ const st=new Date(r.start_time),en=new Date(r.end_time);
+ const date=iso(st),time=minutesToTime(st.getHours()*60+st.getMinutes());
+ const durationMinutes=Math.max(15,Math.round((en-st)/60000)||Number(r.duration_minutes)||60);
+ return {
+  id:String(r.local_id||r.id),cloudId:String(r.id),cloudClientId:r.client_id||'',cloudMasterId:r.master_id||'',
+  _cloudRemote:true,clientId:'',clientProfileId:r.client_id===profiles.client?.cloudId?getClientProfileId(true):'',
+  source:'client-booking',name:r.client_name||'Клиент',phone:r.client_phone||'',service:r.service_name||'Маникюр',
+  date,time,durationMinutes,price:Number(r.price)||0,paid:r.paid===true||r.paid==='true',
+  notes:r.notes||'',status:normalizeAppointmentStatus(r.status),serviceId:'',
+  photos:Array.isArray(r.photos)?r.photos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS):[]
+ };
+}
 async function syncMasterScheduleToCloud(){if(!cloudReady()||activeRole!=='master')return false;const id=profiles.master.cloudId;const payload={master_id:id,schedule_data:{daysOff:data.daysOff||[],monthlyHours:data.monthlyHours||{},availabilityByDate:data.availabilityByDate||{},blockedSlots:data.blockedSlots||[],services:(data.services||[]).map(s=>({id:String(s.id),name:s.name,durationMinutes:Number(s.durationMinutes)||60,price:Number(s.price)||0})),currency:getPriceCurrency()},updated_at:new Date().toISOString()};const {error}=await cloud.from('nailora_master_schedule').upsert(payload,{onConflict:'master_id'});if(error){console.warn('Schedule sync:',error.message);return false}return true}
 function asIsoTime(date,time){return new Date(String(date)+'T'+String(time||'00:00')+':00').toISOString()}
-async function syncCloudAppointment(ap,role=activeRole,eventType='upsert'){if(!cloudReady()||!ap)return false;try{if(eventType==='cancel'){let q=cloud.from('appointments').update({status:'cancelled',updated_at:new Date().toISOString()});if(ap.cloudId)q=q.eq('id',String(ap.cloudId));else q=q.eq('local_id',String(ap.id));if(role==='master'){const ownMasterId=profiles.master?.cloudId;if(!ownMasterId)throw new Error('Не найден облачный профиль мастера.');q=q.eq('master_id',String(ownMasterId))}else{const ownClientId=profiles.client?.cloudId,masterId=selectedCloudMasterId||ap.cloudMasterId;if(!ownClientId||!masterId)throw new Error('Не найден облачный профиль клиента или мастера.');q=q.eq('master_id',String(masterId)).eq('client_id',String(ownClientId))}const {data:updated,error}=await q.select('id').maybeSingle();if(error)throw error;if(!updated)throw new Error('Запись не найдена в Supabase или отмена запрещена политикой доступа. Проверь SQL-настройку v8.31.');return true}const masterId=role==='master'?profiles.master?.cloudId:(selectedCloudMasterId||ap.cloudMasterId),clientId=role==='client'?profiles.client?.cloudId:(ap.cloudClientId||data.clients.find(c=>String(c.id)===String(ap.clientId))?.cloudId||null);if(!masterId)throw new Error('Не выбран облачный профиль мастера.');const start=asIsoTime(ap.date,ap.time),end=new Date(new Date(start).getTime()+appointmentDurationMinutes(ap)*60000).toISOString();const remoteId=ap.cloudId||(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(String(ap.id))?String(ap.id):undefined);const payload={...(remoteId?{id:remoteId}:{}),local_id:String(ap.id),master_id:masterId,client_id:clientId,service_name:String(ap.service||'Маникюр'),start_time:start,end_time:end,status:'booked',duration_minutes:appointmentDurationMinutes(ap),client_name:String(ap.name||''),client_phone:String(ap.phone||''),price:Number(ap.price)||0,notes:String(ap.notes||''),photos:Array.isArray(ap.photos)?ap.photos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS):[],updated_at:new Date().toISOString()};const {data:row,error}=await cloud.from('appointments').upsert(payload,{onConflict:'local_id'}).select('*').single();if(error)throw error;ap.cloudId=row.id;ap.cloudClientId=row.client_id||'';ap.cloudMasterId=row.master_id;ap._cloudRemote=true;try{localStorage.setItem(KEY,JSON.stringify(data))}catch(_){}setCloudStatus('Подключено · изменения сохранены');return true;}catch(err){console.error('Appointment sync failed',err);showAppToast('Не удалось синхронизировать запись: '+(err.message||'ошибка базы'));return false;}}
+async function syncCloudAppointment(ap,role=activeRole,eventType='upsert'){
+ if(!cloudReady()||!ap)return false;
+ try{
+  if(eventType==='cancel'){
+   let q=cloud.from('appointments').update({status:'cancelled',updated_at:new Date().toISOString()});
+   if(ap.cloudId)q=q.eq('id',String(ap.cloudId));else q=q.eq('local_id',String(ap.id));
+   if(role==='master'){
+    const ownMasterId=profiles.master?.cloudId;
+    if(!ownMasterId)throw new Error('Не найден облачный профиль мастера.');
+    q=q.eq('master_id',String(ownMasterId));
+   }else{
+    const ownClientId=profiles.client?.cloudId,masterId=selectedCloudMasterId||ap.cloudMasterId;
+    if(!ownClientId||!masterId)throw new Error('Не найден облачный профиль клиента или мастера.');
+    q=q.eq('master_id',String(masterId)).eq('client_id',String(ownClientId));
+   }
+   const {data:updated,error}=await q.select('id').maybeSingle();
+   if(error)throw error;
+   if(!updated)throw new Error('Запись не найдена в Supabase или отмена запрещена политикой доступа. Проверь SQL-настройку v8.31.');
+   return true;
+  }
+  const masterId=role==='master'?profiles.master?.cloudId:(selectedCloudMasterId||ap.cloudMasterId);
+  const clientId=role==='client'?profiles.client?.cloudId:(ap.cloudClientId||data.clients.find(c=>String(c.id)===String(ap.clientId))?.cloudId||null);
+  if(!masterId)throw new Error('Не выбран облачный профиль мастера.');
+  const start=asIsoTime(ap.date,ap.time);
+  const end=new Date(new Date(start).getTime()+appointmentDurationMinutes(ap)*60000).toISOString();
+  const remoteId=ap.cloudId||(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(String(ap.id))?String(ap.id):undefined);
+  const payload={
+   ...(remoteId?{id:remoteId}:{}),local_id:String(ap.id),master_id:masterId,client_id:clientId,
+   service_name:String(ap.service||'Маникюр'),start_time:start,end_time:end,
+   status:normalizeAppointmentStatus(ap.status),paid:ap.paid===true,
+   duration_minutes:appointmentDurationMinutes(ap),client_name:String(ap.name||''),
+   client_phone:String(ap.phone||''),price:Number(ap.price)||0,notes:String(ap.notes||''),
+   photos:Array.isArray(ap.photos)?ap.photos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS):[],
+   updated_at:new Date().toISOString()
+  };
+  const {data:row,error}=await cloud.from('appointments').upsert(payload,{onConflict:'local_id'}).select('*').single();
+  if(error)throw error;
+  ap.cloudId=row.id;ap.cloudClientId=row.client_id||'';ap.cloudMasterId=row.master_id;
+  ap.paid=row.paid===true||row.paid==='true';ap.status=normalizeAppointmentStatus(row.status);ap._cloudRemote=true;
+  try{localStorage.setItem(KEY,JSON.stringify(data))}catch(_){}
+  setCloudStatus('Подключено · изменения сохранены');
+  return true;
+ }catch(err){
+  console.error('Appointment sync failed',err);
+  showAppToast('Не удалось синхронизировать запись: '+(err.message||'ошибка базы'));
+  return false;
+ }
+}
 async function loadCloudScheduleForMaster(master){
  if(!cloud||!master?.cloudId)return;
  selectedCloudMasterId=String(master.cloudId);
@@ -4041,7 +4133,7 @@ if($('view').value==='week'){
 for(let i=0;i<first;i++){let blank=document.createElement('div');grid.append(blank)}
 for(let i=0;i<total;i++){
  let d;if($('view').value==='week'){d=new Date(start);d.setDate(start.getDate()+i)}else d=new Date(cursor.getFullYear(),cursor.getMonth(),i+1);
- let ds=iso(d),ap=data.appointments.filter(a=>a.date===ds),off=isDayOff(ds),isToday=ds===iso(new Date());
+ let ds=iso(d),ap=data.appointments.filter(a=>a.date===ds&&a.status!=='cancelled'),off=isDayOff(ds),isToday=ds===iso(new Date());
  let b=document.createElement('button');b.type='button';b.className='day'+(isToday?' today':'')+(ap.length?' has':'')+(off?' off':'')+(ds===selectedDate?' selected':'');
  const wh=getMonthHours(ds),dayWindows=masterAvailabilityIntervals(ds),windowLabel=formatAvailabilityIntervals(dayWindows,true)||t('График не задан');
  b.innerHTML=`<span class="num">${d.getDate()}</span>${off?`<small>${escapeHtml(t('Выходной'))}</small>`:`<small class="day-hours"><span class="hours-long">${escapeHtml(formatAvailabilityIntervals(dayWindows)||t('График не задан'))}</span><span class="hours-compact">${escapeHtml(windowLabel)}</span></small>`}${ap.length?`<span class="day-legend"><span class="legend-dot" aria-hidden="true">●</span><span class="legend-count">${ap.length}</span><span class="legend-label">${escapeHtml(t(ap.length===1?'запись':'записей'))}</span></span>`:''}`;
@@ -4278,22 +4370,59 @@ function clientDailyScheduleHtml(date){
  if(!rows.length&&!outsideHtml)return `<div class="schedule-empty">${escapeHtml(t('Нет свободных интервалов, в которые помещается хотя бы одна услуга.'))}</div>`;
  return `${cloudScheduleWarning?`<div class="client-schedule-hint">${escapeHtml(cloudScheduleWarning)}</div>`:''}<div class="schedule-list">${rows.join('')}</div>${outsideHtml}`;
 }
-function dailyScheduleHtml(date,clientView=false){if(clientView)return clientDailyScheduleHtml(date);const windows=masterAvailabilityIntervals(date),dayAppointments=getAppointmentsOn(date).map(a=>({...a,_interval:appointmentInterval(a)})),rows=[];if(isDayOff(date)){const h=getMonthHours(date);rows.push(`<div class="schedule-row off"><div class="schedule-time">${escapeHtml(formatAvailabilityIntervals(windows)||`${h.start}–${h.end}`)}</div><div class="schedule-info"><strong>${escapeHtml(t('Выходной'))}</strong><small>${escapeHtml(t('Записи на этот день останутся в списке мастера.'))}</small></div></div>`)}else{for(const win of windows){const ws=timeToMinutes(win.start),we=timeToMinutes(win.end),visible=dayAppointments.filter(a=>a._interval.end>ws&&a._interval.start<we).sort((a,b)=>a._interval.start-b._interval.start);let cursor=ws;for(const ap of visible){const st=Math.max(ws,ap._interval.start),en=Math.min(we,ap._interval.end);if(en<=st)continue;if(st<cursor){rows.push(scheduleRowHtml(st,en,'warning',`${t('Занято')}: ${ap.name||''}`,ap.service||'',ap.id,date,false));continue}appendGapRows(rows,date,cursor,st,false);rows.push(scheduleRowHtml(st,Math.max(st+1,en),'busy',ap.name||t('Занято'),[ap.service,ap.phone].filter(Boolean).join(' · '),ap.id,date,false));cursor=Math.max(cursor,en)}appendGapRows(rows,date,cursor,we,false)}}const outside=dayAppointments.filter(a=>!windows.some(w=>a._interval.start>=timeToMinutes(w.start)&&a._interval.end<=timeToMinutes(w.end)));let outsideHtml='';if(outside.length)outsideHtml=`<div class="schedule-empty">${escapeHtml(t('Есть записи за пределами рабочего времени:'))}</div>`+outside.map(ap=>scheduleRowHtml(ap._interval.start,ap._interval.end,'warning',ap.name||t('Занято'),[ap.service,t('Это время выходит за рабочие часы.')].filter(Boolean).join(' · '),ap.id,date,false)).join('');if(!rows.length&&!outsideHtml)return `<div class="schedule-empty">${escapeHtml(t('На этот день записей пока нет. Дважды щёлкни дату в календаре, чтобы настроить рабочие интервалы.'))}</div>`;return `<div class="schedule-list">${rows.join('')}</div>${outsideHtml}`}
+function dailyScheduleHtml(date,clientView=false){
+ if(clientView)return clientDailyScheduleHtml(date);
+ const windows=masterAvailabilityIntervals(date);
+ const dayAppointments=getAppointmentsOn(date).map(a=>({...a,_interval:appointmentInterval(a)}));
+ const rows=[];
+ const dayIsOff=isDayOff(date);
+ if(dayIsOff){
+  const h=getMonthHours(date);
+  rows.push(`<div class="schedule-row off"><div class="schedule-time">${escapeHtml(formatAvailabilityIntervals(windows)||`${h.start}–${h.end}`)}</div><div class="schedule-info"><strong>${escapeHtml(t('Выходной'))}</strong><small>${escapeHtml(t('Записи на этот день останутся в списке мастера.'))}</small></div></div>`);
+  // A day-off marker must not hide a booking that was already made for this date.
+  for(const ap of dayAppointments){
+   rows.push(scheduleRowHtml(ap._interval.start,ap._interval.end,'warning',ap.name||t('Занято'),[ap.service,ap.phone].filter(Boolean).join(' · '),ap.id,date,false));
+  }
+ }else{
+  for(const win of windows){
+   const ws=timeToMinutes(win.start),we=timeToMinutes(win.end);
+   const visible=dayAppointments.filter(a=>a._interval.end>ws&&a._interval.start<we).sort((a,b)=>a._interval.start-b._interval.start);
+   let cursor=ws;
+   for(const ap of visible){
+    const st=Math.max(ws,ap._interval.start),en=Math.min(we,ap._interval.end);
+    if(en<=st)continue;
+    if(st<cursor){rows.push(scheduleRowHtml(st,en,'warning',`${t('Занято')}: ${ap.name||''}`,ap.service||'',ap.id,date,false));continue;}
+    appendGapRows(rows,date,cursor,st,false);
+    rows.push(scheduleRowHtml(st,Math.max(st+1,en),'busy',ap.name||t('Занято'),[ap.service,ap.phone].filter(Boolean).join(' · '),ap.id,date,false));
+    cursor=Math.max(cursor,en);
+   }
+   appendGapRows(rows,date,cursor,we,false);
+  }
+ }
+ const outside=dayIsOff?[]:dayAppointments.filter(a=>!windows.some(w=>a._interval.start>=timeToMinutes(w.start)&&a._interval.end<=timeToMinutes(w.end)));
+ const outsideHtml=outside.length?`<div class="schedule-empty">${escapeHtml(t('Есть записи за пределами рабочего времени:'))}</div>`+outside.map(ap=>scheduleRowHtml(ap._interval.start,ap._interval.end,'warning',ap.name||t('Занято'),[ap.service,t('Это время выходит за рабочие часы.')].filter(Boolean).join(' · '),ap.id,date,false)).join(''):'';
+ if(!rows.length&&!outsideHtml)return `<div class="schedule-empty">${escapeHtml(t('На этот день записей пока нет. Дважды щёлкни дату в календаре, чтобы настроить рабочие интервалы.'))}</div>`;
+ return `<div class="schedule-list">${rows.join('')}</div>${outsideHtml}`;
+}
 function scheduleRowHtml(start,end,kind,label,detail='',appointmentId=null,date=null,clientView=false,blockId=null,slotServiceId=''){
  const ap=appointmentId?data.appointments.find(a=>String(a.id)===String(appointmentId)):null;
  let actions='';
- if(ap&&!clientView){actions=`<div class="schedule-actions"><button class="btn fixed" type="button" onclick="togglePaid('${escapeHtml(ap.id)}')">${escapeHtml(ap.paid?t('Снять оплату'):t('Отметить оплату'))}</button><button class="btn fixed" type="button" onclick="editAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="cancelMasterAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Отменить запись'))}</button><button class="btn fixed" type="button" onclick="remindAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Напомнить клиенту'))}</button></div>`}
+ if(ap&&!clientView){
+  const completionLabel=normalizeAppointmentStatus(ap.status)==='completed'?'Вернуть в запланированные':'Отметить приём состоявшимся';
+  actions=`<div class="schedule-actions"><button class="btn fixed" type="button" onclick="toggleAppointmentCompleted('${escapeHtml(ap.id)}')">${escapeHtml(t(completionLabel))}</button><button class="btn fixed" type="button" onclick="togglePaid('${escapeHtml(ap.id)}')">${escapeHtml(ap.paid?t('Снять оплату'):t('Отметить оплату'))}</button><button class="btn fixed" type="button" onclick="editAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="cancelMasterAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Отменить запись'))}</button><button class="btn fixed" type="button" onclick="remindAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Напомнить клиенту'))}</button></div>`
+ }
  else if(ap&&clientView&&clientOwnsAppointment(ap)){const existingReview=getReviewForAppointment(ap);const reviewAction=appointmentHasPassed(ap)?`<button class="btn fixed" type="button" onclick="openReviewDialog('${escapeHtml(ap.id)}')">${escapeHtml(t(existingReview?'Изменить отзыв':'Оценить мастера'))}</button>`:'';actions=`<div class="schedule-actions"><button class="btn fixed" type="button" onclick="editClientBooking('${escapeHtml(ap.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="deleteClientBooking('${escapeHtml(ap.id)}')">${escapeHtml(t('Удалить'))}</button>${reviewAction}</div>`}
  const unlock=blockId&&!clientView?`<div class="schedule-actions"><button class="btn fixed" type="button" onclick="unblockSlot('${escapeHtml(blockId)}')">${escapeHtml(t('Разблокировать'))}</button></div>`:'';
  const slotAttrs=date?` data-slot-date="${escapeHtml(date)}" data-slot-start="${start}" data-slot-end="${end}"`:'';const serviceAttrs=clientView&&kind==='free'&&slotServiceId?` data-slot-service-id="${escapeHtml(slotServiceId)}"`:'';
  const blockAttrs=blockId&&!clientView?` data-block-id="${escapeHtml(blockId)}"`:'';
  const clientAttrs=clientView&&kind==='free'?' role="button" tabindex="0" aria-label="Забронировать свободное время"':'';
- const classes=`schedule-row ${kind}${clientView&&kind==='free'?' client-bookable':''}${!clientView&&kind==='free'?' master-slot':''}`;
+ const classes=`schedule-row ${kind}${clientView&&kind==='free'?' client-bookable':''}${!clientView&&kind==='free'?' master-slot':''}${ap&&normalizeAppointmentStatus(ap.status)==='completed'?' completed':''}`;
  const canSeeAppointment=!!ap&&(!clientView||clientOwnsAppointment(ap));
+ const appointmentStateHtml=ap&&!clientView?`<small class="schedule-note">${ap.status==='completed'?'✓ '+escapeHtml(t('Приём состоялся'))+' · ':''}${escapeHtml(t(ap.paid?'Оплачено':'Не оплачено'))}</small>`:'';
  const noteHtml=canSeeAppointment&&ap.notes?`<small class="schedule-note">${escapeHtml(t('Комментарий:'))} ${escapeHtml(ap.notes)}</small>`:'';
  const photos=canSeeAppointment&&Array.isArray(ap.photos)?ap.photos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS):[];
  const photosHtml=photos.length?`<div class="schedule-photos">${photos.map((src,i)=>`<a href="${escapeHtml(src)}" target="_blank" rel="noopener" aria-label="${escapeHtml(t('Открыть фото'))} ${i+1}"><img src="${escapeHtml(src)}" alt="${escapeHtml(t('Прикреплённое фото'))}" loading="lazy"></a>`).join('')}</div>`:'';
- return `<div class="${classes}"${slotAttrs}${serviceAttrs}${blockAttrs}${clientAttrs}><div class="schedule-time">${escapeHtml(minutesToTime(start))}–${escapeHtml(minutesToTime(end))}</div><div class="schedule-info"><strong>${escapeHtml(label)}</strong>${detail?`<small>${escapeHtml(detail)}</small>`:''}${noteHtml}${photosHtml}</div>${actions||unlock}</div>`;
+ return `<div class="${classes}"${slotAttrs}${serviceAttrs}${blockAttrs}${clientAttrs}><div class="schedule-time">${escapeHtml(minutesToTime(start))}–${escapeHtml(minutesToTime(end))}</div><div class="schedule-info"><strong>${escapeHtml(label)}</strong>${detail?`<small>${escapeHtml(detail)}</small>`:''}${appointmentStateHtml}${noteHtml}${photosHtml}</div>${actions||unlock}</div>`;
 }
 function bindMasterSlotGestures(container){if(!container)return;container.querySelectorAll('.schedule-row.master-slot[data-slot-date],.schedule-row.blocked[data-block-id]').forEach(row=>{let timer=null,moved=false,longPressed=false,startX=0,startY=0;const clear=()=>{if(timer){clearTimeout(timer);timer=null}};row.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;if(e.button!==undefined&&e.button!==0)return;moved=false;longPressed=false;startX=e.clientX;startY=e.clientY;timer=setTimeout(()=>{longPressed=true;if(row.dataset.blockId)unblockSlot(row.dataset.blockId);else setSlotBlocked(row.dataset.slotDate,Number(row.dataset.slotStart),Number(row.dataset.slotEnd));},700)});row.addEventListener('pointermove',e=>{if(Math.abs(e.clientX-startX)>10||Math.abs(e.clientY-startY)>10){moved=true;clear()}});['pointerup','pointerleave','pointercancel'].forEach(type=>row.addEventListener(type,clear));row.addEventListener('contextmenu',e=>e.preventDefault());row.addEventListener('click',e=>{if(longPressed||moved){e.preventDefault();e.stopPropagation();longPressed=false;return}if(row.classList.contains('free')&&row.dataset.slotDate){openAppointmentForm(null,null,{date:row.dataset.slotDate,start:Number(row.dataset.slotStart),end:Number(row.dataset.slotEnd)})}})});}
 function bindClientBookingSlots(container){if(!container)return;container.querySelectorAll('.schedule-row.client-bookable[data-slot-date]').forEach(row=>{const activate=()=>openClientBooking(row.dataset.slotDate,Number(row.dataset.slotStart),Number(row.dataset.slotEnd),null,row.dataset.slotServiceId||'');row.addEventListener('click',e=>{if(e.target.closest('button'))return;activate()});row.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate()}})});}
@@ -4358,7 +4487,22 @@ $('appointmentForm').onsubmit=e=>{
  else{data.appointments.push({id:(crypto.randomUUID&&crypto.randomUUID())||String(Date.now()),clientId:clientCard?.id||'',name,phone,service,price,date,time,paid,notes,durationMinutes,photos})}
  const savedAp=data.appointments.find(a=>String(a.id)===String(id))||data.appointments[data.appointments.length-1];selectedDate=date;cursor=new Date(date+'T12:00:00');cursor.setDate(1);$('appointmentFormPanel').classList.add('hidden');$('appointmentForm').reset();$('appointmentId').value='';masterCommentPhotos=[];$('appointmentPhotos').value='';renderPhotoPreviews('appointmentPhotoPreview',masterCommentPhotos,()=>{});save();if(cloudReady()&&savedAp)syncCloudAppointment(savedAp,'master');document.querySelector('[data-tab="calendar"]').click();
 };
-function togglePaid(id){let a=data.appointments.find(x=>x.id===id);if(!a)return;a.paid=!a.paid;save()}
+async function togglePaid(id){
+ const appointment=data.appointments.find(x=>String(x.id)===String(id));
+ if(!appointment)return;
+ appointment.paid=appointment.paid!==true;
+ save();
+ if(cloudReady())await syncCloudAppointment(appointment,'master','upsert');
+ else showAppToast(t('Оплата сохранена на этом устройстве. Для облачной синхронизации войди в аккаунт мастера.'));
+}
+async function toggleAppointmentCompleted(id){
+ const appointment=data.appointments.find(x=>String(x.id)===String(id));
+ if(!appointment)return;
+ appointment.status=normalizeAppointmentStatus(appointment.status)==='completed'?'booked':'completed';
+ save();
+ if(cloudReady())await syncCloudAppointment(appointment,'master','upsert');
+ else showAppToast(t('Статус приёма сохранён на этом устройстве. Для облачной синхронизации войди в аккаунт мастера.'));
+}
 async function cancelMasterAppointment(id){const a=data.appointments.find(x=>String(x.id)===String(id));if(!a)return;if(confirm(t('Отменить эту запись? Клиент будет удалён из расписания.'))){if(a.cloudId&&cloudReady()){const synced=await syncCloudAppointment(a,'master','cancel');if(!synced)return}data.appointments=data.appointments.filter(x=>String(x.id)!==String(id));save();showAppToast(t('Запись отменена.'))}}
 function deleteAppointment(id){if(confirm(t('Удалить эту запись?'))){data.appointments=data.appointments.filter(x=>x.id!==id);save()}}
 function editAppointment(id){let a=data.appointments.find(x=>x.id===id);if(a)openAppointmentForm(null,a)}
