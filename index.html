@@ -1,5 +1,9 @@
 <!doctype html>
 <html lang="ru">
+<!-- Nailora v8.98.3 PRIVACY POLICY UI PREVIEW: demo policy, links on welcome, registration and settings. NOT a finalized legal notice. -->
+<!-- Nailora v8.98.1 QUIET REGION PREVIEW: country at registration; verified-email server discovery designed but not deployed. -->
+<!-- Nailora v8.97 PHONE CONSENT TEST: UI + server migration required before use; master telephone defaults PRIVATE. -->
+<!-- Preliminary staging build; do not deploy as production until regional server and authentication are tested. -->
 <!-- v8.96: persist paid/completed appointment history in Supabase, restore legacy local states, and keep visits visible on days off. Based on v8.95. -->
 <!-- Nailora v8.95: update welcome-screen wording; preserve app logic and Supabase integration. Based on v8.94. -->
 <!-- Nailora v8.92: add a client-owned saved-masters list synchronized through Supabase. Based on v8.91. -->
@@ -1045,20 +1049,25 @@ html.nailora-load-timeout::before{content:"Nailora загружается дол
 })();
 </script>
 <script>
-// Cloud SDK loads asynchronously: a slow mobile connection must not block
-// parsing and displaying Nailora's local start screen.
+// v8.97: never contact the international authentication provider automatically.
+// Load its SDK only AFTER the user explicitly selects the international region.
 (function(){
-  window.__nailoraSupabaseReady = new Promise(function(resolve){
-    var settled=false;
-    function finish(ok){if(settled)return;settled=true;resolve(!!ok);}
-    var script=document.createElement('script');
-    script.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-    script.async=true;
-    script.onload=function(){finish(!!window.supabase?.createClient);if(window.__nailoraStartCloud)window.__nailoraStartCloud();};
-    script.onerror=function(){finish(false);};
-    window.setTimeout(function(){finish(false);},8000);
-    document.head.appendChild(script);
-  });
+  window.__nailoraLoadSupabase = function(){
+    if(window.__nailoraSupabaseReady) return window.__nailoraSupabaseReady;
+    window.__nailoraSupabaseReady = new Promise(function(resolve){
+      var settled=false;
+      function finish(ok){if(settled)return;settled=true;resolve(!!ok);}
+      if(window.supabase?.createClient){finish(true);return;}
+      var script=document.createElement('script');
+      script.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+      script.async=true;
+      script.onload=function(){finish(!!window.supabase?.createClient);};
+      script.onerror=function(){finish(false);};
+      window.setTimeout(function(){finish(false);},8000);
+      document.head.appendChild(script);
+    });
+    return window.__nailoraSupabaseReady;
+  };
 })();
 </script>
 <style>
@@ -1088,6 +1097,149 @@ html.nailora-load-timeout::before{content:"Nailora загружается дол
  #nailoraTetrisDialog .tetris-board-wrap{width:min(100%,calc((100dvh - 205px)/2),260px);max-height:calc(100dvh - 205px)}
  #nailoraTetrisDialog .tetris-controls button{min-height:44px;font-size:26px}
 }
+
+/* v8.97 — consent checkbox is independent of phone used for account and appointments */
+.nailora-phone-consent{margin:14px 0;padding:12px 13px;border:1px solid #d7c8e8;border-radius:12px;background:rgba(252,249,255,.88)}
+.nailora-phone-consent .check-line{display:flex;align-items:flex-start;gap:10px;line-height:1.45;font-size:13px;color:#46375b}
+.nailora-phone-consent input[type=checkbox]{width:18px;height:18px;min-width:18px;margin-top:2px;accent-color:#71529a}
+.nailora-phone-consent p{margin:8px 0 0;line-height:1.45}
+/* v8.97 — visible region selector without changing the rest of the design */
+.nailora-region-panel{margin:15px 0 9px;padding:14px;border:1px solid #cbb8df;border-radius:14px;background:rgba(248,244,253,.89)}
+.nailora-region-panel label{font-size:15px;font-weight:750;color:#54386f;margin:0 0 7px}
+.nailora-region-panel select{font-size:16px;background:#fff}
+.nailora-region-panel #nailoraRegionHint{margin:9px 0 0;line-height:1.5}
+.nailora-region-panel[data-region="ru"]{border-color:#e3c8aa;background:#fff9f2}
+.nailora-region-panel[data-region="global"]{border-color:#bcdccc;background:#f4fbf7}
+</style>
+<script>
+window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only test; no RU authentication enabled
+/* Nailora RU API v0.3 browser transport. No Supabase calls; no token persistence.
+ * Preview build: the UI only uses the read-only probe. Authentication and
+ * mutations are defined for later private tests, NOT enabled in HTML.
+ */
+(function (global) {
+  'use strict';
+  const allowed = new Set(['GET','POST','PATCH','PUT']);
+  function normalizeBase(raw) {
+    if (typeof raw !== 'string' || !raw.trim()) throw new Error('RU API address is not configured');
+    let url;
+    try { url = new URL(raw.trim()); } catch (_) { throw new Error('Invalid RU API address'); }
+    const local = ['localhost','127.0.0.1'].includes(url.hostname);
+    if (url.protocol !== 'https:' && !(local && url.protocol === 'http:')) {
+      throw new Error('RU API requires HTTPS');
+    }
+    if (url.username || url.password || url.search || url.hash || url.pathname !== '/' && url.pathname !== '') {
+      throw new Error('RU API must be an origin, not a path or URL with credentials');
+    }
+    return url.origin;
+  }
+  function createClient(config) {
+    const base = normalizeBase(config.baseUrl);
+    const fetcher = config.fetchImpl || global.fetch.bind(global);
+    const getRegion = config.getRegion;
+    if (typeof getRegion !== 'function') throw new Error('Region guard is required');
+    let bearer = null; // in memory only: never localStorage/sessionStorage
+    function assertRu() {
+      if (getRegion() !== 'ru') throw new Error('RU API is only available for the Russia region');
+    }
+    async function request(method, path, options) {
+      assertRu();
+      if (!allowed.has(method) || !path.startsWith('/') || path.startsWith('//') || /[?#]/.test(path)) {
+        throw new Error('Invalid API request');
+      }
+      const opts = options || {};
+      const headers = {'Accept':'application/json'};
+      if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+      if (opts.auth) {
+        if (!bearer) throw new Error('RU authentication required');
+        headers.Authorization = 'Bearer ' + bearer;
+      }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 9000);
+      try {
+        const resp = await fetcher(base + path + (opts.query || ''), {
+          method, headers, credentials:'omit', redirect:'error', mode:'cors', cache:'no-store',
+          signal:controller.signal,
+          ...(opts.body === undefined ? {} : {body:JSON.stringify(opts.body)})
+        });
+        let body = null;
+        if (resp.status !== 204) {
+          const ct = (resp.headers && resp.headers.get && resp.headers.get('content-type')) || '';
+          if (!ct.toLowerCase().includes('application/json')) throw new Error('RU API returned non-JSON response');
+          body = await resp.json();
+        }
+        if (!resp.ok) {
+          const e = new Error(typeof body?.detail === 'string' ? body.detail : 'RU API error (' + resp.status + ')');
+          e.status = resp.status; throw e;
+        }
+        return body;
+      } finally { clearTimeout(timer); }
+    }
+    function qs(input) {
+      const p = new URLSearchParams();
+      for (const [k,v] of Object.entries(input || {})) if (v !== undefined && v !== null && String(v).length) p.set(k,String(v));
+      const s = p.toString(); return s ? '?' + s : '';
+    }
+    function uuid(value) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value))) {
+        throw new Error('Invalid id');
+      }
+      return String(value);
+    }
+    return Object.freeze({
+      baseUrl:base,
+      isAuthenticated(){return Boolean(bearer)},
+      clearSession(){bearer=null},
+      health(){return request('GET','/healthz')},
+      ready(){return request('GET','/readyz')},
+      directory(filters){return request('GET','/v1/directory',{query:qs(filters)})},
+      availability(masterId,on){return request('GET','/v1/masters/'+uuid(masterId)+'/availability',{query:qs({on})})},
+      async login(email,password){
+        const r=await request('POST','/v1/auth/login',{body:{email,password}});
+        if (typeof r?.access_token !== 'string' || !r.access_token) throw new Error('Invalid RU session response');
+        bearer=r.access_token; return {role:r.role,expires_in:r.expires_in};
+      },
+      async logout(){try{if(bearer)await request('POST','/v1/auth/logout',{auth:true});}finally{bearer=null}},
+      me(){return request('GET','/v1/me',{auth:true})},
+      updateMe(fields){return request('PATCH','/v1/me',{body:fields,auth:true})},
+      schedule(){return request('GET','/v1/me/schedule',{auth:true})},
+      saveSchedule(scheduleData){return request('PUT','/v1/me/schedule',{body:scheduleData,auth:true})},
+      appointments(params){return request('GET','/v1/appointments',{auth:true,query:qs(params)})},
+      // By design NEVER accepts client-supplied price, paid, owner, or status.
+      book(x){return request('POST','/v1/appointments',{auth:true,body:{master_id:x.master_id,service_id:x.service_id,date:x.date,time:x.time,notes:x.notes||''}})},
+      reschedule(id,x){return request('POST','/v1/appointments/'+uuid(id)+'/reschedule',{auth:true,body:{service_id:x.service_id,date:x.date,time:x.time}})},
+      cancel(id){return request('POST','/v1/appointments/'+uuid(id)+'/cancel',{auth:true})},
+      // Master-only operation; rights enforced on server.
+      finance(id,changes){return request('PATCH','/v1/appointments/'+uuid(id)+'/finance',{auth:true,body:changes})}
+    });
+  }
+  global.NailoraRuSDK = Object.freeze({normalizeBase,createClient});
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<style id="nailoraPrivacyStyle">
+/* Страница политики. Цвета наследуются от выбранной темы Nailora. */
+.nailora-policy-link{color:#71529a;background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:3px;font:inherit;font-weight:700}
+.nailora-policy-link:hover{opacity:.78}
+.policy-welcome-footer{margin-top:20px;padding-top:14px;border-top:1px solid var(--border-color,#ece6f0);text-align:center;font-size:13px}
+.policy-register-box{margin-top:16px;padding:13px 15px;background:var(--soft-bg,#f6f3f9);border:1px solid var(--border-color,#e9e2ee);border-radius:14px}
+.policy-register-box .check-line{margin:0;display:flex;align-items:flex-start;gap:9px}
+.policy-register-box .check-line input{margin-top:4px;flex-shrink:0;width:18px;height:18px}
+.policy-register-box .nailora-policy-link{margin-top:7px;margin-left:27px;text-align:left}
+#nailoraPrivacyDialog{width:min(740px,calc(100vw - 24px));max-width:740px;max-height:92vh;max-height:92dvh;padding:0;overflow:auto;overscroll-behavior:contain;border:1px solid var(--border-color,#e5dceb);border-radius:20px;background:var(--panel-bg,#fff);color:var(--text-color,#292433);box-shadow:0 24px 80px #1f142b55}
+#nailoraPrivacyDialog::backdrop{background:#1b142bcc;backdrop-filter:blur(4px)}
+#nailoraPrivacyDialog .policy-topbar{position:sticky;top:0;z-index:2;background:var(--panel-bg,#fff);border-bottom:1px solid var(--border-color,#e9e2ee);padding:14px 19px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+#nailoraPrivacyDialog .policy-close{flex-shrink:0}
+#nailoraPrivacyDialog .policy-content{padding:20px 26px 10px;line-height:1.7;font-size:14px}
+#nailoraPrivacyDialog .policy-hero{border-radius:15px;padding:18px 20px;background:var(--soft-bg,#f6f3f9);margin-bottom:18px}
+#nailoraPrivacyDialog .policy-hero h2{font-size:22px;line-height:1.25;margin:5px 0 10px}
+#nailoraPrivacyDialog .policy-draft-label{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.02em;border-radius:99px;padding:4px 10px;background:#fef3db;color:#815b10}
+#nailoraPrivacyDialog .policy-hero p{margin:0;color:var(--muted-color,#655b70)}
+#nailoraPrivacyDialog .policy-content h3{font-size:15px;margin:22px 0 5px}
+#nailoraPrivacyDialog .policy-content p{margin:5px 0 9px}
+#nailoraPrivacyDialog .policy-content ul{margin:5px 0 12px;padding-left:23px}
+#nailoraPrivacyDialog .policy-bottom{position:sticky;bottom:0;padding:12px 18px;display:flex;justify-content:flex-end;border-top:1px solid var(--border-color,#e9e2ee);background:var(--panel-bg,#fff)}
+@media(max-width:500px){#nailoraPrivacyDialog{width:100vw;max-width:none;max-height:100dvh;height:100dvh;margin:0;border-radius:0;border:0}#nailoraPrivacyDialog .policy-content{padding:16px 18px 12px}#nailoraPrivacyDialog .policy-topbar{padding:11px 14px}#nailoraPrivacyDialog .policy-hero{padding:14px 16px}}
 </style>
 </head>
 <body class="auth-pending">
@@ -1101,20 +1253,46 @@ html.nailora-load-timeout::before{content:"Nailora загружается дол
   <p class="muted" style="margin:20px 0 0;text-align:center">Выбери свой тип аккаунта</p>
   <div class="row" style="margin-top:12px"><button class="btn primary" id="chooseMaster" type="button">Я мастер</button><button class="btn primary" id="chooseClient" type="button">Я клиент</button></div>
   <div id="roleAccessPanel" class="panel hidden" style="margin-top:14px;padding:16px"><h3 id="roleAccessTitle" style="margin:0 0 6px">Аккаунт мастера</h3><p id="roleAccessMessage" class="muted small" aria-live="polite" style="margin:0 0 12px">Выбери регистрацию или вход.</p><div class="row"><button class="btn primary" id="roleRegisterButton" type="button">Создать профиль мастера</button><button class="btn" id="roleLoginButton" type="button">Войти</button><button class="btn" id="roleAccessBack" type="button">Назад</button></div></div>
-  <div class="row" style="margin-top:12px"><span id="cloudStatus" class="muted small">Проверка подключения…</span></div><p class="muted small" style="margin-top:18px">Профили и общие записи синхронизируются через Supabase после входа. Выбери «Я мастер» или «Я клиент», чтобы зарегистрироваться или войти. Локальные черновики остаются в этом браузере.</p>
+  <div class="panel" style="margin-top:14px;padding:14px" aria-label="Тест российского каталога">
+    <strong>🇷🇺 Российский каталог — тест подключения</strong>
+    <p class="muted small">Проверка только чтения опубликованных анкет. Регистрация и запись на российском сервере пока отключены.</p>
+    <button class="btn" type="button" id="ruCatalogProbe">Проверить российский каталог</button>
+    <p class="muted small" id="ruCatalogProbeStatus" role="status" aria-live="polite">Нажми кнопку для проверки соединения.</p>
+  </div>
+  <div class="row" style="margin-top:12px"><span id="cloudStatus" class="muted small">Проверка подключения…</span></div><p class="muted small" id="nailoraCloudInfo" style="margin-top:18px">Регион хранения определяется при регистрации и сохраняется для следующих входов.</p>
+  <div class="policy-welcome-footer"><button type="button" class="nailora-policy-link" data-nailora-privacy>Политика конфиденциальности</button></div>
  </div>
 </section>
 <section id="register" class="wrap hidden" style="max-width:650px;padding-top:5vh"><div class="panel">
  <h2 id="registerTitle">Регистрация</h2>
  <form id="registerForm"><label for="regEmail">Email для входа *</label><input id="regEmail" type="email" required maxlength="254" autocomplete="email" placeholder="name@example.com"><label for="regPassword">Пароль (не менее 8 символов) *</label><div class="password-field"><input id="regPassword" type="password" minlength="8" maxlength="128" required autocomplete="new-password" placeholder="Придумай пароль"><button class="password-toggle" type="button" data-password-target="regPassword" aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 7-.4 1.1-1.2 2.3-2.4 3.4"/><path d="M6.6 6.6C4.5 8 3.1 10.1 2.5 12c.5 1.4 1.5 2.8 3 4 1.7 1.4 3.9 2.3 6.5 2.3 1.1 0 2.1-.2 3-.5"/></svg></button></div><label for="regName">Имя *</label><input id="regName" required maxlength="80" placeholder="Как к вам обращаться">
  <label for="regPhone">Номер телефона *</label><input id="regPhone" type="tel" maxlength="30" placeholder="Например, +49 151 12345678" autocomplete="tel" required>
- <label for="regCountry">Страна *</label><input id="regCountry" maxlength="100" placeholder="Например, Германия" required>
+ <label for="regCountry">Страна проживания *</label><select id="regCountry" autocomplete="country-name" required><option value="">Выберите страну</option><option value="Россия">Россия</option><option value="Австралия">Австралия</option><option value="Австрия">Австрия</option><option value="Азербайджан">Азербайджан</option><option value="Аландские о-ва">Аландские о-ва</option><option value="Албания">Албания</option><option value="Алжир">Алжир</option><option value="Американское Самоа">Американское Самоа</option><option value="Ангилья">Ангилья</option><option value="Ангола">Ангола</option><option value="Андорра">Андорра</option><option value="Антарктида">Антарктида</option><option value="Антигуа и Барбуда">Антигуа и Барбуда</option><option value="Аргентина">Аргентина</option><option value="Армения">Армения</option><option value="Аруба">Аруба</option><option value="Афганистан">Афганистан</option><option value="Багамы">Багамы</option><option value="Бангладеш">Бангладеш</option><option value="Барбадос">Барбадос</option><option value="Бахрейн">Бахрейн</option><option value="Беларусь">Беларусь</option><option value="Белиз">Белиз</option><option value="Бельгия">Бельгия</option><option value="Бенин">Бенин</option><option value="Бермудские о-ва">Бермудские о-ва</option><option value="Болгария">Болгария</option><option value="Боливия">Боливия</option><option value="Бонэйр, Синт-Эстатиус и Саба">Бонэйр, Синт-Эстатиус и Саба</option><option value="Босния и Герцеговина">Босния и Герцеговина</option><option value="Ботсвана">Ботсвана</option><option value="Бразилия">Бразилия</option><option value="Британская территория в Индийском океане">Британская территория в Индийском океане</option><option value="Бруней">Бруней</option><option value="Буркина-Фасо">Буркина-Фасо</option><option value="Бурунди">Бурунди</option><option value="Бутан">Бутан</option><option value="Вануату">Вануату</option><option value="Ватикан">Ватикан</option><option value="Великобритания">Великобритания</option><option value="Венгрия">Венгрия</option><option value="Венесуэла">Венесуэла</option><option value="Виргинские о-ва (Великобритания)">Виргинские о-ва (Великобритания)</option><option value="Виргинские о-ва (США)">Виргинские о-ва (США)</option><option value="Внешние малые о-ва (США)">Внешние малые о-ва (США)</option><option value="Восточный Тимор">Восточный Тимор</option><option value="Вьетнам">Вьетнам</option><option value="Габон">Габон</option><option value="Гаити">Гаити</option><option value="Гайана">Гайана</option><option value="Гамбия">Гамбия</option><option value="Гана">Гана</option><option value="Гваделупа">Гваделупа</option><option value="Гватемала">Гватемала</option><option value="Гвинея">Гвинея</option><option value="Гвинея-Бисау">Гвинея-Бисау</option><option value="Германия">Германия</option><option value="Гернси">Гернси</option><option value="Гибралтар">Гибралтар</option><option value="Гондурас">Гондурас</option><option value="Гонконг (САР)">Гонконг (САР)</option><option value="Гренада">Гренада</option><option value="Гренландия">Гренландия</option><option value="Греция">Греция</option><option value="Грузия">Грузия</option><option value="Гуам">Гуам</option><option value="Дания">Дания</option><option value="Джерси">Джерси</option><option value="Джибути">Джибути</option><option value="Доминика">Доминика</option><option value="Доминиканская Республика">Доминиканская Республика</option><option value="Египет">Египет</option><option value="Замбия">Замбия</option><option value="Западная Сахара">Западная Сахара</option><option value="Зимбабве">Зимбабве</option><option value="Израиль">Израиль</option><option value="Индия">Индия</option><option value="Индонезия">Индонезия</option><option value="Иордания">Иордания</option><option value="Ирак">Ирак</option><option value="Иран">Иран</option><option value="Ирландия">Ирландия</option><option value="Исландия">Исландия</option><option value="Испания">Испания</option><option value="Италия">Италия</option><option value="Йемен">Йемен</option><option value="Кабо-Верде">Кабо-Верде</option><option value="Казахстан">Казахстан</option><option value="Камбоджа">Камбоджа</option><option value="Камерун">Камерун</option><option value="Канада">Канада</option><option value="Катар">Катар</option><option value="Кения">Кения</option><option value="Кипр">Кипр</option><option value="Киргизия">Киргизия</option><option value="Кирибати">Кирибати</option><option value="Китай">Китай</option><option value="КНДР">КНДР</option><option value="Кокосовые о-ва">Кокосовые о-ва</option><option value="Колумбия">Колумбия</option><option value="Коморы">Коморы</option><option value="Конго - Браззавиль">Конго - Браззавиль</option><option value="Конго - Киншаса">Конго - Киншаса</option><option value="Косово">Косово</option><option value="Коста-Рика">Коста-Рика</option><option value="Кот-д’Ивуар">Кот-д’Ивуар</option><option value="Куба">Куба</option><option value="Кувейт">Кувейт</option><option value="Кюрасао">Кюрасао</option><option value="Лаос">Лаос</option><option value="Латвия">Латвия</option><option value="Лесото">Лесото</option><option value="Либерия">Либерия</option><option value="Ливан">Ливан</option><option value="Ливия">Ливия</option><option value="Литва">Литва</option><option value="Лихтенштейн">Лихтенштейн</option><option value="Люксембург">Люксембург</option><option value="Маврикий">Маврикий</option><option value="Мавритания">Мавритания</option><option value="Мадагаскар">Мадагаскар</option><option value="Майотта">Майотта</option><option value="Макао (САР)">Макао (САР)</option><option value="Малави">Малави</option><option value="Малайзия">Малайзия</option><option value="Мали">Мали</option><option value="Мальдивы">Мальдивы</option><option value="Мальта">Мальта</option><option value="Марокко">Марокко</option><option value="Мартиника">Мартиника</option><option value="Маршалловы о-ва">Маршалловы о-ва</option><option value="Мексика">Мексика</option><option value="Мозамбик">Мозамбик</option><option value="Молдова">Молдова</option><option value="Монако">Монако</option><option value="Монголия">Монголия</option><option value="Монтсеррат">Монтсеррат</option><option value="Мьянма (Бирма)">Мьянма (Бирма)</option><option value="Намибия">Намибия</option><option value="Науру">Науру</option><option value="Непал">Непал</option><option value="Нигер">Нигер</option><option value="Нигерия">Нигерия</option><option value="Нидерланды">Нидерланды</option><option value="Никарагуа">Никарагуа</option><option value="Ниуэ">Ниуэ</option><option value="Новая Зеландия">Новая Зеландия</option><option value="Новая Каледония">Новая Каледония</option><option value="Норвегия">Норвегия</option><option value="о-в Буве">о-в Буве</option><option value="о-в Мэн">о-в Мэн</option><option value="о-в Норфолк">о-в Норфолк</option><option value="о-в Рождества">о-в Рождества</option><option value="о-в Св. Елены">о-в Св. Елены</option><option value="о-ва Кайман">о-ва Кайман</option><option value="о-ва Кука">о-ва Кука</option><option value="о-ва Питкэрн">о-ва Питкэрн</option><option value="о-ва Херд и Макдональд">о-ва Херд и Макдональд</option><option value="ОАЭ">ОАЭ</option><option value="Оман">Оман</option><option value="Пакистан">Пакистан</option><option value="Палау">Палау</option><option value="Палестинские территории">Палестинские территории</option><option value="Панама">Панама</option><option value="Папуа — Новая Гвинея">Папуа — Новая Гвинея</option><option value="Парагвай">Парагвай</option><option value="Перу">Перу</option><option value="Польша">Польша</option><option value="Португалия">Португалия</option><option value="Пуэрто-Рико">Пуэрто-Рико</option><option value="Республика Корея">Республика Корея</option><option value="Реюньон">Реюньон</option><option value="Руанда">Руанда</option><option value="Румыния">Румыния</option><option value="Сальвадор">Сальвадор</option><option value="Самоа">Самоа</option><option value="Сан-Марино">Сан-Марино</option><option value="Сан-Томе и Принсипи">Сан-Томе и Принсипи</option><option value="Саудовская Аравия">Саудовская Аравия</option><option value="Северная Македония">Северная Македония</option><option value="Северные Марианские о-ва">Северные Марианские о-ва</option><option value="Сейшельские о-ва">Сейшельские о-ва</option><option value="Сен-Бартелеми">Сен-Бартелеми</option><option value="Сен-Мартен">Сен-Мартен</option><option value="Сен-Пьер и Микелон">Сен-Пьер и Микелон</option><option value="Сенегал">Сенегал</option><option value="Сент-Винсент и Гренадины">Сент-Винсент и Гренадины</option><option value="Сент-Китс и Невис">Сент-Китс и Невис</option><option value="Сент-Люсия">Сент-Люсия</option><option value="Сербия">Сербия</option><option value="Сингапур">Сингапур</option><option value="Синт-Мартен">Синт-Мартен</option><option value="Сирия">Сирия</option><option value="Словакия">Словакия</option><option value="Словения">Словения</option><option value="Соломоновы о-ва">Соломоновы о-ва</option><option value="Сомали">Сомали</option><option value="Судан">Судан</option><option value="Суринам">Суринам</option><option value="США">США</option><option value="Сьерра-Леоне">Сьерра-Леоне</option><option value="Таджикистан">Таджикистан</option><option value="Таиланд">Таиланд</option><option value="Тайвань">Тайвань</option><option value="Танзания">Танзания</option><option value="Того">Того</option><option value="Токелау">Токелау</option><option value="Тонга">Тонга</option><option value="Тринидад и Тобаго">Тринидад и Тобаго</option><option value="Тувалу">Тувалу</option><option value="Тунис">Тунис</option><option value="Туркменистан">Туркменистан</option><option value="Турция">Турция</option><option value="Тёркс и Кайкос">Тёркс и Кайкос</option><option value="Уганда">Уганда</option><option value="Узбекистан">Узбекистан</option><option value="Украина">Украина</option><option value="Уоллис и Футуна">Уоллис и Футуна</option><option value="Уругвай">Уругвай</option><option value="Фарерские о-ва">Фарерские о-ва</option><option value="Федеративные Штаты Микронезии">Федеративные Штаты Микронезии</option><option value="Фиджи">Фиджи</option><option value="Филиппины">Филиппины</option><option value="Финляндия">Финляндия</option><option value="Фолклендские о-ва">Фолклендские о-ва</option><option value="Франция">Франция</option><option value="Французская Гвиана">Французская Гвиана</option><option value="Французская Полинезия">Французская Полинезия</option><option value="Французские Южные территории">Французские Южные территории</option><option value="Хорватия">Хорватия</option><option value="Центрально-Африканская Республика">Центрально-Африканская Республика</option><option value="Чад">Чад</option><option value="Черногория">Черногория</option><option value="Чехия">Чехия</option><option value="Чили">Чили</option><option value="Швейцария">Швейцария</option><option value="Швеция">Швеция</option><option value="Шпицберген и Ян-Майен">Шпицберген и Ян-Майен</option><option value="Шри-Ланка">Шри-Ланка</option><option value="Эквадор">Эквадор</option><option value="Экваториальная Гвинея">Экваториальная Гвинея</option><option value="Эритрея">Эритрея</option><option value="Эсватини">Эсватини</option><option value="Эстония">Эстония</option><option value="Эфиопия">Эфиопия</option><option value="Южная Георгия и Южные Сандвичевы о-ва">Южная Георгия и Южные Сандвичевы о-ва</option><option value="Южно-Африканская Республика">Южно-Африканская Республика</option><option value="Южный Судан">Южный Судан</option><option value="Ямайка">Ямайка</option><option value="Япония">Япония</option></select><p class="muted small" id="nailoraRegistrationRegionNote" aria-live="polite">Страну выбирают один раз при регистрации. По ней определяется сервер аккаунта.</p>
  <label for="regCity">Город / населённый пункт *</label><input id="regCity" maxlength="120" placeholder="Например, Франкфурт-на-Майне" required>
- <div id="masterExtra" class="hidden"><label for="regArea">Район / ориентир (необязательно)</label><input id="regArea" maxlength="100" placeholder="Например, центр города"><label for="regAddress">Адрес оказания услуг *</label><input id="regAddress" maxlength="180" placeholder="Улица, дом, помещение"><p class="muted small">Этот адрес будет показан клиентам в каталоге мастеров вашего города.</p><label for="regActivityDirection">Направление деятельности *</label><select id="regActivityDirection" required><option value="Маникюр и педикюр">Маникюр и педикюр</option><option value="Парикмахерские услуги">Парикмахерские услуги</option><option value="Брови и ресницы">Брови и ресницы</option><option value="Массаж">Массаж</option><option value="Косметология">Косметология</option><option value="Визаж">Визаж</option><option value="Эпиляция">Эпиляция</option><option value="Другое">Другое</option></select><p class="muted small">Выбери основное направление. Услуги внутри направления укажешь отдельно.</p><label for="regSpecialty">Услуги и специализация</label><input id="regSpecialty" maxlength="120" placeholder="Например, покрытие, стрижки, окрашивание"></div>
+ <div id="masterExtra" class="hidden"><div class="nailora-phone-consent">
+  <label class="check-line" for="regPublicPhoneConsent"><input type="checkbox" id="regPublicPhoneConsent"> <strong>Разрешаю показывать мой мобильный номер клиентам в каталоге мастеров</strong></label>
+  <p class="muted small">Необязательно. Если не разрешить, номер остаётся в закрытом профиле для связи по записи, но не появляется в публичном каталоге. Разрешение можно отозвать в настройках.</p>
+ </div><label for="regArea">Район / ориентир (необязательно)</label><input id="regArea" maxlength="100" placeholder="Например, центр города"><label for="regAddress">Адрес оказания услуг *</label><input id="regAddress" maxlength="180" placeholder="Улица, дом, помещение"><p class="muted small">Этот адрес будет показан клиентам в каталоге мастеров вашего города.</p><label for="regActivityDirection">Направление деятельности *</label><select id="regActivityDirection" required><option value="Маникюр и педикюр">Маникюр и педикюр</option><option value="Парикмахерские услуги">Парикмахерские услуги</option><option value="Брови и ресницы">Брови и ресницы</option><option value="Массаж">Массаж</option><option value="Косметология">Косметология</option><option value="Визаж">Визаж</option><option value="Эпиляция">Эпиляция</option><option value="Другое">Другое</option></select><p class="muted small">Выбери основное направление. Услуги внутри направления укажешь отдельно.</p><label for="regSpecialty">Услуги и специализация</label><input id="regSpecialty" maxlength="120" placeholder="Например, покрытие, стрижки, окрашивание"></div>
+ <div class="policy-register-box" aria-label="Политика конфиденциальности">
+  <label class="check-line" for="nailoraPrivacyAcknowledged"><input id="nailoraPrivacyAcknowledged" type="checkbox" required><span>Я ознакомился(лась) с Политикой конфиденциальности.</span></label>
+  <button type="button" class="nailora-policy-link" data-nailora-privacy>Прочитать политику конфиденциальности</button>
+  <p class="muted small" style="margin:9px 0 0">Разрешение на публикацию номера мастера оформляется отдельно и не зависит от этой отметки.</p>
+ </div>
  <div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn primary" type="submit" id="createProfileButton">Создать профиль</button><button class="btn hidden" id="registerOpenLogin" type="button" tabindex="-1" aria-hidden="true">Войти</button><button class="btn" id="backWelcome" type="button">Назад</button></div><p id="registerStatus" class="muted small" aria-live="polite" style="margin-top:10px"></p></form>
  </div></section>
 <section id="verifyEmail" class="wrap hidden" style="max-width:720px;padding-top:6vh"><div class="panel verify-panel"><div class="verify-mark" aria-hidden="true">✉</div><h2 class="verify-title">Подтверди электронную почту</h2><p class="verify-subtitle">Остался всего один небольшой шаг, и можно будет пользоваться Nailora.</p><p id="verifyEmailMessage" class="verify-intro" aria-live="polite">Мы отправили письмо со ссылкой для подтверждения. Открой его, чтобы подтвердить адрес.</p><ol class="verify-steps"><li><strong>Зайди в свою электронную почту</strong><span>Открой почтовый ящик, который указал при регистрации.</span></li><li><strong>Найди письмо от Nailora</strong><span>Если его не видно во входящих, загляни в папку «Спам».</span></li><li><strong>Открой письмо и перейди по ссылке</strong><span>Это подтвердит адрес электронной почты.</span></li></ol><p class="verify-note">После подтверждения вернись в Nailora. Если сессия восстановится успешно, приложение откроет твой профиль автоматически.</p><div class="verify-help small" style="margin-top:16px"><button type="button" id="verifyNoEmailToggle" class="link-button" aria-expanded="false" aria-controls="verifyNoEmailDetails">Письмо не пришло?</button><div id="verifyNoEmailDetails" class="hidden" style="margin-top:10px;padding:14px;border:1px solid #e9dff3;background:#faf7fc;border-radius:12px;text-align:left"><p style="margin:0 0 10px;color:#62566e">Проверь папку «Спам». Если письма там нет, можно отправить ссылку ещё раз здесь. Если аккаунт уже создан, не создавай его повторно.</p><div class="row" style="flex-wrap:wrap"><button type="button" id="resendVerifyEmail" class="btn primary">Отправить письмо ещё раз</button><button type="button" id="verifyBackToRegister" class="btn">Вернуться к регистрации</button></div><p id="verifyHelpStatus" class="muted small" aria-live="polite" style="margin:10px 0 0"></p></div></div></div></section>
-<section id="login" class="wrap hidden" style="max-width:650px;padding-top:5vh"><div class="panel"><h2>Вход в Nailora</h2><form id="loginForm"><div id="loginRoleRow" class="hidden"><label for="loginRole">Тип аккаунта</label><select id="loginRole"><option value="master">Мастер</option><option value="client">Клиент</option></select></div><label for="loginEmail">Email *</label><input id="loginEmail" type="email" required autocomplete="username" maxlength="254"><label for="loginPassword">Пароль *</label><div class="password-field"><input id="loginPassword" type="password" required autocomplete="current-password" maxlength="128"><button class="password-toggle" type="button" data-password-target="loginPassword" aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 7-.4 1.1-1.2 2.3-2.4 3.4"/><path d="M6.6 6.6C4.5 8 3.1 10.1 2.5 12c.5 1.4 1.5 2.8 3 4 1.7 1.4 3.9 2.3 6.5 2.3 1.1 0 2.1-.2 3-.5"/></svg></button></div><div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn primary fixed" type="submit">Войти</button><button class="btn fixed" id="loginOpenRegister" type="button">Зарегистрироваться</button><button class="btn fixed" id="backLogin" type="button">Назад</button></div><p style="margin:12px 0 0"><button class="link-button" id="forgotPasswordButton" type="button">Забыли пароль?</button></p><p id="loginStatus" class="muted small" aria-live="polite"></p></form></div></section>
+<section id="login" class="wrap hidden" style="max-width:650px;padding-top:5vh"><div class="panel"><h2>Вход в Nailora</h2><form id="loginForm">
+ <div id="nailoraDiscoverCodePanel" class="hidden" style="border:1px solid var(--border, #ddd);padding:12px;border-radius:12px;margin-bottom:14px">
+  <label for="nailoraDiscoverCode">Код подтверждения из письма</label>
+  <input id="nailoraDiscoverCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Код из письма">
+  <p class="muted small">На новом устройстве сначала подтверждаем email и автоматически находим сервер аккаунта. Пароль в сервис поиска не передаётся.</p>
+  <button type="button" id="nailoraDiscoverFinish" class="btn fixed">Подтвердить email</button>
+  <button type="button" id="nailoraDiscoverCancel" class="btn fixed">Отмена</button>
+ </div>
+ <div id="nailoraLegacyLogin" class="hidden" style="margin-bottom:12px">
+  <p class="muted small">Сервис автоматического поиска аккаунтов пока не запущен. Если профиль уже был создан в старой версии Nailora на Supabase, можно войти в него напрямую один раз.</p>
+  <button type="button" id="nailoraLoginLegacyGlobal" class="btn fixed">Войти в ранее созданный аккаунт Supabase</button>
+ </div><div id="loginRoleRow" class="hidden"><label for="loginRole">Тип аккаунта</label><select id="loginRole"><option value="master">Мастер</option><option value="client">Клиент</option></select></div><label for="loginEmail">Email *</label><input id="loginEmail" type="email" required autocomplete="username" maxlength="254"><label for="loginPassword">Пароль *</label><div class="password-field"><input id="loginPassword" type="password" required autocomplete="current-password" maxlength="128"><button class="password-toggle" type="button" data-password-target="loginPassword" aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 7-.4 1.1-1.2 2.3-2.4 3.4"/><path d="M6.6 6.6C4.5 8 3.1 10.1 2.5 12c.5 1.4 1.5 2.8 3 4 1.7 1.4 3.9 2.3 6.5 2.3 1.1 0 2.1-.2 3-.5"/></svg></button></div><div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn primary fixed" type="submit">Войти</button><button class="btn fixed" id="loginOpenRegister" type="button">Зарегистрироваться</button><button class="btn fixed" id="backLogin" type="button">Назад</button></div><p style="margin:12px 0 0"><button class="link-button" id="forgotPasswordButton" type="button">Забыли пароль?</button></p><p id="loginStatus" class="muted small" aria-live="polite"></p></form></div></section>
 <section id="resetPassword" class="wrap hidden" style="max-width:650px;padding-top:5vh"><div class="panel"><h2 id="resetPasswordTitle">Восстановление пароля</h2><div id="requestPasswordReset"><p class="muted">Укажи email аккаунта. Мы отправим письмо со ссылкой для восстановления пароля.</p><form id="requestPasswordResetForm"><label for="resetEmail">Email *</label><input id="resetEmail" type="email" required maxlength="254" autocomplete="email" placeholder="name@example.com"><div class="row" style="margin-top:14px"><button class="btn primary" type="submit" id="sendPasswordResetButton">Отправить ссылку</button><button class="btn" id="backResetRequest" type="button">Назад</button></div><p id="resetRequestStatus" class="muted small" aria-live="polite"></p></form></div><div id="setNewPassword" class="hidden"><p class="muted">Придумай новый пароль для своего аккаунта.</p><form id="setNewPasswordForm"><label for="newPassword">Новый пароль (не менее 8 символов) *</label><input id="newPassword" type="password" minlength="8" maxlength="128" required autocomplete="new-password"><label for="confirmNewPassword">Повтори новый пароль *</label><input id="confirmNewPassword" type="password" minlength="8" maxlength="128" required autocomplete="new-password"><div class="row" style="margin-top:14px"><button class="btn primary" type="submit">Сохранить новый пароль</button></div><p id="newPasswordStatus" class="muted small" aria-live="polite"></p></form></div></div></section>
 <section id="clientApp" class="wrap hidden" style="max-width:850px"><div class="panel"><div class="row profile-header-row"><div class="profile-identity"><img id="clientAvatar" class="profile-avatar-hero hidden" alt="Аватар профиля клиента"><div id="clientAvatarPlaceholder" class="profile-avatar-placeholder" aria-hidden="true">👤</div><div class="profile-nickname" id="clientNickname"></div><p class="profile-greeting" id="clientGreeting"></p></div><div class="header-actions"><button class="btn fixed" id="clientAccount" type="button">Аккаунт и настройки</button></div></div></div>
  <nav class="tabs client-master-tabs" aria-label="Разделы мастеров" style="margin:14px 0 16px"><button class="active" id="clientSearchTab" type="button">Найти мастера</button><button id="clientFavoritesTab" type="button">Мои мастера</button></nav>
@@ -1152,10 +1330,37 @@ html.nailora-load-timeout::before{content:"Nailora загружается дол
 <section id="backup" class="tab hidden"><div class="panel"><h2>Резервная копия</h2><p>Данные хранятся в этом браузере на этом компьютере. Сохраняй копию регулярно, особенно перед обновлением файла.</p><button class="btn primary" id="exportData">Скачать резервную копию</button><label style="margin-top:18px">Восстановить из копии JSON</label><input type="file" id="importFile" accept=".json,application/json"><p class="muted">Импорт заменит текущие данные. Сначала экспортируй копию на всякий случай.</p><button class="btn danger" id="clearData">Удалить все данные</button></div></section>
 </main>
 </div>
+<dialog id="nailoraPrivacyDialog" aria-labelledby="nailoraPrivacyTitle" aria-describedby="nailoraPrivacySubtitle">
+ <div class="policy-topbar"><strong>Найди своего бьюти-мастера</strong><button class="btn fixed policy-close" type="button" data-nailora-privacy-close aria-label="Закрыть политику">✕</button></div>
+ <div class="policy-content">
+  <div class="policy-hero"><span class="policy-draft-label">ПРОЕКТ ДЛЯ СОГЛАСОВАНИЯ</span><h2 id="nailoraPrivacyTitle">Политика конфиденциальности</h2><p id="nailoraPrivacySubtitle">О том, как Нейлора использует данные мастеров и клиентов. Текст ниже — предварительный образец, ещё не утверждённый юридический документ.</p></div>
+  <h3>1. Какие данные используются</h3>
+  <p>При регистрации могут использоваться имя, email, телефон, страна и город. Мастера также указывают специализацию, адрес оказания услуг, расписание, стоимость услуг и при желании фото профиля. Для записи на услугу могут сохраняться сведения о времени посещения, услуге и комментарии, включая прикреплённые фото.</p>
+  <h3>2. Для чего они нужны</h3>
+  <p>Чтобы создать аккаунт, показать доступных мастеров, записать клиента на услугу, управлять расписанием, сообщать об изменениях и обеспечивать работу приложения.</p>
+  <h3>3. Кто видит информацию</h3>
+  <ul><li>В каталоге отображаются публичные сведения о мастере, если его профиль опубликован.</li><li><strong>Мобильный номер мастера показывается в каталоге только при его отдельном разрешении.</strong></li><li>Детали клиентских записей должны быть доступны только участникам записи и уполномоченным лицам, которым доступ необходим для работы сервиса.</li></ul>
+  <h3>4. Где хранятся данные</h3>
+  <p>Нейлора разрабатывается с отдельной инфраструктурой для российских пользователей и для пользователей других стран. Российская серверная часть пока готовится к запуску. Сведения о конкретных поставщиках и возможных трансграничных передачах будут уточнены в окончательной редакции.</p>
+  <h3>5. Настройки и удаление данных</h3>
+  <p>Мастер может отозвать разрешение на публикацию телефона в настройках. В приложении предусмотрено удаление аккаунта. Порядок обработки обращений о доступе, исправлении и удалении данных будет описан в окончательной версии.</p>
+  <h3>6. Работа приложения на устройстве</h3>
+  <p>Для сохранения настроек и сеанса входа приложение может использовать локальное хранилище браузера. Используемые сторонние сервисы и сроки хранения данных будут перечислены перед публикацией окончательной политики.</p>
+  <h3>7. Кто отвечает за данные</h3>
+  <p><strong>Оператор, контакт для обращений, дата вступления политики в силу и сроки хранения:</strong> будут указаны до публичного запуска этой редакции.</p>
+  <p class="muted small" style="margin:24px 0 10px"><strong>Важно:</strong> эта демонстрационная страница нужна для согласования оформления. Она не заменяет окончательную политику конфиденциальности и не подтверждает соответствие законодательству.</p>
+ </div>
+ <div class="policy-bottom"><button class="btn primary" type="button" data-nailora-privacy-close>Закрыть</button></div>
+</dialog>
 <dialog id="settingsDialog" aria-labelledby="settingsTitle">
  <div class="dialog-head"><div><h2 id="settingsTitle" style="margin:0">Аккаунт и настройки</h2><p class="muted small" style="margin:5px 0 0">Профиль и внешний вид приложения</p></div><button type="button" class="btn fixed" id="closeSettings" aria-label="Закрыть настройки">✕</button></div>
  <div class="dialog-body">
-  <section class="settings-section"><h3>Мой аккаунт</h3><p class="muted small" id="settingsRoleLabel">Тип аккаунта</p><div class="avatar-editor"><img id="settingsAvatarPreview" class="avatar-preview hidden" alt="Аватар профиля"><div id="settingsAvatarPlaceholder" class="avatar-placeholder" aria-hidden="true">👤</div><div style="flex:1"><label for="profileAvatarInput">Аватар профиля</label><input id="profileAvatarInput" type="file" accept="image/*"><p class="photo-picker-help">Выбери фото из галереи. Изображение будет уменьшено для экономии места.</p><button type="button" class="btn danger" id="removeProfileAvatar">Удалить аватар</button></div></div><form id="accountEditForm"><label>Имя</label><input id="settingsName" required maxlength="80"><label>Телефон</label><input id="settingsPhone" type="tel" maxlength="30"><label>Страна *</label><input id="settingsCountry" maxlength="100" required><label>Город / населённый пункт *</label><input id="settingsCity" maxlength="120" required><div id="settingsMasterFields" class="hidden"><label>Район / ориентир</label><input id="settingsArea" maxlength="100"><label>Адрес оказания услуг *</label><input id="settingsAddress" maxlength="180" placeholder="Улица, дом, помещение"><p class="muted small">Этот адрес будет показан клиентам в каталоге мастеров вашего города.</p><label for="settingsActivityDirection">Направление деятельности</label><select id="settingsActivityDirection"><option value="Маникюр и педикюр">Маникюр и педикюр</option><option value="Парикмахерские услуги">Парикмахерские услуги</option><option value="Брови и ресницы">Брови и ресницы</option><option value="Массаж">Массаж</option><option value="Косметология">Косметология</option><option value="Визаж">Визаж</option><option value="Эпиляция">Эпиляция</option><option value="Другое">Другое</option></select><label for="settingsSpecialty">Услуги и специализация</label><input id="settingsSpecialty" maxlength="120"></div><div class="account-actions"><button class="btn primary" type="submit">Сохранить профиль</button></div></form></section>
+  <section class="settings-section"><h3>Мой аккаунт</h3><p class="muted small" id="settingsRoleLabel">Тип аккаунта</p><div class="avatar-editor"><img id="settingsAvatarPreview" class="avatar-preview hidden" alt="Аватар профиля"><div id="settingsAvatarPlaceholder" class="avatar-placeholder" aria-hidden="true">👤</div><div style="flex:1"><label for="profileAvatarInput">Аватар профиля</label><input id="profileAvatarInput" type="file" accept="image/*"><p class="photo-picker-help">Выбери фото из галереи. Изображение будет уменьшено для экономии места.</p><button type="button" class="btn danger" id="removeProfileAvatar">Удалить аватар</button></div></div><form id="accountEditForm"><label>Имя</label><input id="settingsName" required maxlength="80"><label>Телефон</label><input id="settingsPhone" type="tel" maxlength="30"><label>Страна *</label><input id="settingsCountry" maxlength="100" required><label>Город / населённый пункт *</label><input id="settingsCity" maxlength="120" required><div id="settingsMasterFields" class="hidden"><label>Район / ориентир</label><input id="settingsArea" maxlength="100"><label>Адрес оказания услуг *</label><input id="settingsAddress" maxlength="180" placeholder="Улица, дом, помещение"><p class="muted small">Этот адрес будет показан клиентам в каталоге мастеров вашего города.</p><label for="settingsActivityDirection">Направление деятельности</label><select id="settingsActivityDirection"><option value="Маникюр и педикюр">Маникюр и педикюр</option><option value="Парикмахерские услуги">Парикмахерские услуги</option><option value="Брови и ресницы">Брови и ресницы</option><option value="Массаж">Массаж</option><option value="Косметология">Косметология</option><option value="Визаж">Визаж</option><option value="Эпиляция">Эпиляция</option><option value="Другое">Другое</option></select><label for="settingsSpecialty">Услуги и специализация</label><input id="settingsSpecialty" maxlength="120">
+   <div class="nailora-phone-consent">
+     <label class="check-line" for="settingsPublicPhoneConsent"><input type="checkbox" id="settingsPublicPhoneConsent"> <strong>Разрешаю публиковать мой мобильный номер для связи с клиентами</strong></label>
+     <p class="muted small">При включении номер из поля «Телефон» будет доступен вошедшим пользователям в каталоге мастеров. При выключении он будет скрыт. Разрешение необязательное и может быть отозвано в любой момент. Нажми «Сохранить профиль», чтобы применить изменение.</p>
+     <p id="settingsPhoneConsentStatus" class="muted small" role="status" aria-live="polite">Номер скрыт от каталога</p>
+   </div></div><div class="account-actions"><button class="btn primary" type="submit">Сохранить профиль</button></div></form></section>
   <section class="settings-section hidden" id="masterReminderSettings"><h3>Напоминания о записях</h3><p class="muted small">Настраиваются мастером. Напоминания работают, пока Nailora открыт в этом браузере; при закрытом приложении для автоматических уведомлений потребуется серверный сервис.</p><label class="check-line"><input type="checkbox" id="masterRemindersEnabled"> Включить напоминания мастеру</label><label for="masterReminderLeadTime">За сколько времени до записи напоминать</label><select id="masterReminderLeadTime"><option value="15">За 15 минут</option><option value="30">За 30 минут</option><option value="60">За 1 час</option><option value="120">За 2 часа</option><option value="1440">За 24 часа</option></select><button type="button" class="btn" id="allowBrowserNotifications" style="margin-top:10px">Разрешить уведомления браузера</button><p class="muted small" id="notificationPermissionStatus" role="status" style="margin-bottom:0">Без системного разрешения напоминание появится внутри открытого приложения.</p></section>
   <section class="settings-section hidden" id="masterCurrencySettings"><h3>Валюта цен услуг</h3><p class="muted small">Выбери валюту для цен услуг, записей и финансов. Изменение валюты меняет только отображение, а не пересчитывает суммы.</p><label for="masterCurrencyChoice">Валюта</label><select id="masterCurrencyChoice"><option value="RUB">RUB — ₽</option><option value="EUR">EUR — €</option><option value="USD">USD — $</option><option value="GBP">GBP — £</option><option value="PLN">PLN — zł</option><option value="UAH">UAH — ₴</option><option value="TRY">TRY — ₺</option><option value="KZT">KZT — ₸</option><option value="CZK">CZK — Kč</option><option value="CHF">CHF</option></select><p class="muted small">Валюта применяется ко всем денежным суммам в этом демопрототипе. При смене валюты числовые суммы автоматически не конвертируются.</p></section>
   <section class="settings-section" id="pushNotificationSettings">
@@ -1173,7 +1378,8 @@ html.nailora-load-timeout::before{content:"Nailora загружается дол
   <section class="settings-section"><h3>🎮 Мини-игры</h3><p class="muted small">Немного развлечения, пока ждёшь свою запись.</p><button type="button" class="btn primary" id="openNailoraTetris">Играть в тетрис</button></section>
   <section class="settings-section"><h3>Язык интерфейса</h3><label for="settingsLanguageChoice">Язык этого аккаунта</label><select id="settingsLanguageChoice" aria-label="Язык этого аккаунта"></select></section>
   <section class="settings-section"><h3>Оформление Nailora</h3><div class="theme-picker" id="settingsThemePicker" style="margin-top:10px"><p class="muted small">Выбери одну из пяти тем. Она сразу применится и сохранится в этом браузере.</p><div class="theme-options" role="group" aria-label="Тема приложения"><button class="theme-choice" type="button" data-theme-choice="flower" aria-pressed="false"><span class="theme-swatch flower"></span>Цветочный шёлк</button><button class="theme-choice" type="button" data-theme-choice="lavender" aria-pressed="false"><span class="theme-swatch lavender"></span>Лавандовый туман</button><button class="theme-choice" type="button" data-theme-choice="mist" aria-pressed="false"><span class="theme-swatch mist"></span>Цветная дымка</button><button class="theme-choice" type="button" data-theme-choice="mint" aria-pressed="false"><span class="theme-swatch mint"></span>Мятный сад</button><button class="theme-choice" type="button" data-theme-choice="nude" aria-pressed="false"><span class="theme-swatch nude"></span>Нюдовый люкс</button></div></div><label for="backgroundChoice" style="margin-top:14px">Дополнительный фон</label><select id="backgroundChoice"><option value="solid">Однотонный</option><option value="gradient">Мягкий градиент</option><option value="paper">Точечный узор</option></select><p class="muted small">Выбранная тема сохраняется при повторном входе и используется в аккаунтах мастера и клиента на этом устройстве.</p></section>
-  <div class="account-actions"><button type="button" class="btn danger" id="settingsDeleteAccount">Удалить аккаунт</button><button type="button" class="btn danger" id="settingsLogout">Выйти из аккаунта</button><button type="button" class="btn" id="settingsDone">Готово</button></div>
+   <section class="settings-section" id="nailoraPrivacySettings"><h3>Конфиденциальность и данные</h3><p class="muted small">Здесь можно посмотреть, как используются данные профиля и записей.</p><button type="button" class="btn" data-nailora-privacy>Открыть Политику конфиденциальности</button></section>
+   <div class="account-actions"><button type="button" class="btn danger" id="settingsDeleteAccount">Удалить аккаунт</button><button type="button" class="btn danger" id="settingsLogout">Выйти из аккаунта</button><button type="button" class="btn" id="settingsDone">Готово</button></div>
   <p class="muted small">Удаление аккаунта безвозвратно удалит ваш профиль и связанные с ним данные Nailora на сервере. После удаления войти в этот аккаунт будет невозможно.</p>
  </div>
 </dialog>
@@ -3157,8 +3363,86 @@ function refreshRoleGreetings(){if(!activeRole)return;const p=profiles[activeRol
 function setLanguage(language,save=true){currentLanguage=LANGUAGESAFE(language)?language:'ru';if(save)localStorage.setItem(LANGUAGE_KEY,currentLanguage);if(appDataReady){refreshRoleGreetings();renderAll();if(activeRole==='client'){renderMasterSearch();renderFavoriteMasters()}}updateNotificationEntryButtons();translatePage();}
 
 const $=id=>document.getElementById(id);
-document.querySelectorAll('[data-password-target]').forEach(button=>{button.addEventListener('click',()=>{const input=$(button.dataset.passwordTarget);if(!input)return;const show=input.type==='password';input.type=show?'text':'password';button.innerHTML=show?"<svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/></svg>":"<svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 3l18 18\"/><path d=\"M10.6 10.6a2 2 0 0 0 2.8 2.8\"/><path d=\"M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 7-.4 1.1-1.2 2.3-2.4 3.4\"/><path d=\"M6.6 6.6C4.5 8 3.1 10.1 2.5 12c.5 1.4 1.5 2.8 3 4 1.7 1.4 3.9 2.3 6.5 2.3 1.1 0 2.1-.2 3-.5\"/></svg>";button.setAttribute('aria-label',show?'Скрыть пароль':'Показать пароль');button.title=show?'Скрыть пароль':'Показать пароль';button.setAttribute('aria-pressed',String(show));input.focus({preventScroll:true});});});
-const ROLE_KEY='manicureRoleProfiles_v1', REQUEST_KEY='manicureClientRequests_v1', SETTINGS_KEY='manicureUiSettings_v1', REMINDER_SENT_KEY='nailoraReminderSent_v1', ACTIVE_ROLE_KEY='nailoraActiveRole_v1';
+// v8.97 regional architecture: explicit, durable selection; never infer it from IP.
+const NAILORA_REGION_KEY='nailora_region_v897';
+const NAILORA_REGION_GLOBAL='global', NAILORA_REGION_RU='ru';
+function nailoraNormalizeCountry(value){return String(value||'').normalize('NFKC').trim().toLocaleLowerCase('ru').replace(/\s+/g,' ')}
+function nailoraIsRussianCountry(value){return ['россия','россии','рф','российская федерация','russia','russian federation','ru','rus'].includes(nailoraNormalizeCountry(value))}
+function nailoraStoredRegion(){
+ try{const value=localStorage.getItem(NAILORA_REGION_KEY);return value===NAILORA_REGION_RU||value===NAILORA_REGION_GLOBAL?value:''}catch(_){return ''}
+}
+let nailoraActiveRegion=nailoraStoredRegion();
+const NAILORA_REGION_RESOLVER_BASE=''; // Set to the HTTPS domain AFTER secure email OTP service is deployed.
+const NAILORA_EMAIL_REGION_CACHE='nailora_verified_region_by_email_v899';
+function nailoraEmailKey(email){return String(email||'').trim().toLowerCase()}
+// This is a convenience cache, NOT proof of account ownership. Never route from IP address.
+function nailoraRememberEmailRegion(email,region){
+ const key=nailoraEmailKey(email);
+ if(!key||![NAILORA_REGION_RU,NAILORA_REGION_GLOBAL].includes(region))return;
+ try{const v=JSON.parse(localStorage.getItem(NAILORA_EMAIL_REGION_CACHE)||'{}');v[key]=region;const keys=Object.keys(v);if(keys.length>20)delete v[keys[0]];localStorage.setItem(NAILORA_EMAIL_REGION_CACHE,JSON.stringify(v))}catch(_){}
+}
+function nailoraKnownEmailRegion(email,role){
+ const key=nailoraEmailKey(email);if(!key)return '';
+ try{const v=JSON.parse(localStorage.getItem(NAILORA_EMAIL_REGION_CACHE)||'{}');if([NAILORA_REGION_RU,NAILORA_REGION_GLOBAL].includes(v[key]))return v[key]}catch(_){}
+ if(profiles?.[role] && nailoraEmailKey(profiles[role].email)===key)return nailoraActiveRegion;
+ return '';
+}
+function nailoraChangeRegion(region){
+ if(![NAILORA_REGION_RU,NAILORA_REGION_GLOBAL].includes(region))throw new Error('Неизвестный регион');
+ if(nailoraActiveRegion&&nailoraActiveRegion!==region){
+  // Avoid reusing already loaded caches, sessions and SDK clients across regions.
+  try{sessionStorage.setItem('nailora_after_region_switch_v899',JSON.stringify({region,role:chosenRole||selectedEntryRole||'client',email:$('loginEmail')?.value||$('regEmail')?.value||''}))}catch(_){}
+  try{localStorage.setItem(NAILORA_REGION_KEY,region)}catch(_){}
+  window.location.reload();return false;
+ }
+ nailoraActiveRegion=region;
+ try{localStorage.setItem(NAILORA_REGION_KEY,region)}catch(_){}
+ return true;
+}
+async function nailoraEnsureGlobalCloud(){
+ if(nailoraActiveRegion!==NAILORA_REGION_GLOBAL)throw new Error('Неверный сервер входа');
+ if(cloud)return true;
+ const sdk=await window.__nailoraLoadSupabase();
+ if(!sdk||!startNailoraCloud(true))throw new Error('Не удалось загрузить зарубежную базу. Проверь интернет.');
+ return true;
+}
+function nailoraRegionAllowed(action){
+ if(nailoraActiveRegion===NAILORA_REGION_RU){
+  const notice='Российский сервер ещё проходит настройку. '+(action||'Вход')+' временно недоступен; данные в Supabase не передаются.';
+  const target=(action==='Регистрация'?$ ('registerStatus'): $('loginStatus'))||$('cloudStatus');
+  if(target)target.textContent=notice;
+  return false;
+ }
+ return nailoraActiveRegion===NAILORA_REGION_GLOBAL;
+}
+function nailoraRefreshRegionUi(){
+ const note=$('nailoraRegistrationRegionNote');
+ const country=$('regCountry')?.value||'';
+ if(note)note.textContent=!country.trim()
+  ?'Страну указывают один раз при регистрации. По ней выбирается сервер аккаунта.'
+  :nailoraIsRussianCountry(country)
+    ?'Для России предусмотрен российский сервер. Регистрация здесь пока закрыта до проверки безопасности.'
+    :'Вы выбрали страну: '+country+'. Пожалуйста, проверьте правильность выбора.';
+ const info=$('nailoraCloudInfo');
+ if(info)info.textContent='При регистрации выбирается страна. При следующих входах приложение запоминает нужный сервер.';
+}
+nailoraRefreshRegionUi();
+$('regCountry')?.addEventListener('input',nailoraRefreshRegionUi);
+
+// Email discovery requires a server-side verified one-time code. An unauthenticated
+// email->region lookup would reveal whether someone is registered. Passwords NEVER
+// travel to this service. Endpoints remain unavailable until VPS & email sender setup.
+async function nailoraDiscoveryRequest(path,payload){
+ const base=String(NAILORA_REGION_RESOLVER_BASE||'').trim();
+ if(!base)throw new Error('Сервис поиска аккаунта ещё не подключён');
+ const url=new URL(base);
+ if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/')throw new Error('Неверный HTTPS адрес сервиса');
+ const response=await fetch(url.origin+path,{method:'POST',credentials:'omit',cache:'no-store',redirect:'error',mode:'cors',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)});
+ if(!response.ok)throw new Error(response.status===429?'Слишком много запросов. Попробуй позже.':'Не удалось подтвердить email. Попробуй позже.');
+ return response.json();
+}
+const nailoraRuCacheSuffix=nailoraActiveRegion===NAILORA_REGION_RU?'_ru_v898':'';
+const ROLE_KEY='manicureRoleProfiles_v1'+nailoraRuCacheSuffix, REQUEST_KEY='manicureClientRequests_v1'+nailoraRuCacheSuffix, SETTINGS_KEY='manicureUiSettings_v1'+nailoraRuCacheSuffix, REMINDER_SENT_KEY='nailoraReminderSent_v1'+nailoraRuCacheSuffix, ACTIVE_ROLE_KEY='nailoraActiveRole_v1'+nailoraRuCacheSuffix;
 const CURRENCY_SYMBOLS={RUB:'₽',EUR:'€',USD:'$',GBP:'£',PLN:'zł',UAH:'₴',TRY:'₺',KZT:'₸',CZK:'Kč',CHF:'CHF'};
 const CURRENCY_CODES=Object.keys(CURRENCY_SYMBOLS);
 setupLanguageSelect($('languageChoice'));setupLanguageSelect($('settingsLanguageChoice'));$('languageChoice').value=LANGUAGESAFE(currentLanguage)?currentLanguage:'ru';$('languageChoice').onchange=()=>setLanguage($('languageChoice').value);$('settingsLanguageChoice').onchange=()=>{setLanguage($('settingsLanguageChoice').value);if(activeRole){profiles[activeRole]={...(profiles[activeRole]||{}),language:currentLanguage};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));}};
@@ -3198,6 +3482,7 @@ function saveRegistrationDraft(role){
  const draft={...(registrationDrafts[role]||{})};
  ids.forEach(id=>{const el=$(id);if(el)draft[id.replace(/^reg/,'').replace(/^./,c=>c.toLowerCase())]=el.value;});
  const direction=$('regActivityDirection');if(direction)draft.activityDirection=direction.value;
+ if(role==='master')draft.publicPhoneConsent=$('regPublicPhoneConsent').checked===true;
  // Never retain the registration password in a draft.
  delete draft.password;
  registrationDrafts[role]=draft;
@@ -3209,7 +3494,8 @@ function beginRegistration(role){
  $('registerTitle').textContent=t(role==='master'?'Регистрация мастера':'Регистрация клиента');
  $('masterExtra').classList.toggle('hidden',role!=='master');$('regAddress').required=role==='master';
  $('regName').value=draft.name??profile.name??'';$('regPhone').value=draft.phone??profile.phone??'';$('regCountry').value=draft.country??profile.country??'';$('regCity').value=draft.city??profile.city??profile.area??'';$('regArea').value=draft.area??profile.area??'';$('regAddress').value=draft.address??profile.address??'';$('regSpecialty').value=draft.specialty??profile.specialty??'';$('regActivityDirection').value=draft.activityDirection??profile.activityDirection??'Маникюр и педикюр';$('regEmail').value=draft.email??profile.email??'';
- $('regPassword').value='';$('registerStatus').textContent='';showOnly('register');
+ $('regPublicPhoneConsent').checked=role==='master'&&draft.publicPhoneConsent===true;
+ $('regPassword').value='';$('registerStatus').textContent='';nailoraRefreshRegionUi();showOnly('register');
 }
 function openRegistrationFromLogin(){
  const role=selectedEntryRole||$('loginRole').value||'master';
@@ -3237,7 +3523,7 @@ const NAILORA_SUPABASE_URL='https://frtdsqzgepcasojzcynd.supabase.co';
 const NAILORA_SUPABASE_KEY='sb_publishable_-1TkkaMKrUdXmKfApv_8ew_Ao4e2GVk';
 let cloud=null,cloudUser=null,cloudMasterDirectory=[],cloudFavoriteMasters=[],selectedCloudMasterId='',cloudScheduleData=null,cloudBookedSlots=[],cloudNotifications=[],cloudPollTimer=null,cloudScheduleLoading=false,cloudScheduleLoadError='',cloudScheduleWarning='';
 let editingAvailabilityDate='';
-const KEY='manicureAppData_v1';
+const KEY='manicureAppData_v1'+nailoraRuCacheSuffix;
 let data={clients:[],appointments:[],expenses:[],daysOff:[],monthlyHours:{},blockedSlots:[],services:[{id:'nailora-service-default',name:'Маникюр с покрытием',durationMinutes:90,price:0}]};
 try{const saved=localStorage.getItem(KEY);if(saved)data={...data,...JSON.parse(saved)}}catch(e){}
 if(!Array.isArray(data.clients))data.clients=[];
@@ -3255,8 +3541,8 @@ function getAuthLinkErrorCode(){try{const query=new URLSearchParams(window.locat
 function isPasswordRecoveryCallback(){try{const query=new URLSearchParams(window.location.search||'');const hash=new URLSearchParams(String(window.location.hash||'').replace(/^#/,'') );return query.get('type')==='recovery'||hash.get('type')==='recovery'}catch(_){return false}}
 function cloudReady(){return !!(cloud&&cloudUser&&profiles[activeRole]?.cloudId)}
 function setCloudStatus(message){const el=$('cloudStatus');if(el)el.textContent=t(message)}
-function profileFromCloudRow(role,row){return {name:row.name||'',phone:row.phone||'',country:row.country||'',city:row.city||'',area:row.area||'',address:row.address||'',specialty:row.specialty||'',activityDirection:row.activity_direction||(role==='master'&&String(row.id||'')===String(profiles.master?.cloudId||'')?profiles.master?.activityDirection:'')||'',avatar:row.avatar_url||profiles[role]?.avatar||'',avatarUrl:row.avatar_url||profiles[role]?.avatarUrl||'',email:row.email||cloudUser?.email||'',cloudId:row.id,profileId:row.id,authUserId:row.auth_user_id,language:currentLanguage,...(role==='master'?{currency:profiles.master?.currency||'RUB'}:{favoriteMasterIds:Array.isArray(row.favorite_masters)?row.favorite_masters.map(x=>String(x)).filter(Boolean):(Array.isArray(profiles.client?.favoriteMasterIds)?profiles.client.favoriteMasterIds:[])})}}
-async function ensureCloudProfile(role, profile, user=cloudUser){if(!cloud||!user)throw new Error('Сначала войди в аккаунт Supabase.');const table=role==='master'?'masters':'clients';const row={auth_user_id:user.id,email:user.email||profile.email||null,name:profile.name||'',phone:profile.phone||'',country:profile.country||'',city:profile.city||'',area:role==='master'?(profile.area||''):null,address:role==='master'?(profile.address||''):null,specialty:role==='master'?(profile.specialty||''):null,...(role==='master'?{activity_direction:profile.activityDirection||''}:{}),timezone_name:(Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'),avatar_url:(typeof profile.avatar==='string'&&/^https:\/\//i.test(profile.avatar)?profile.avatar.split('?')[0]:(profile.avatarUrl||null)),...(role==='client'?{favorite_masters:Array.isArray(profile.favoriteMasterIds)?profile.favoriteMasterIds.map(x=>String(x)).filter(Boolean):[]} : {}),updated_at:new Date().toISOString()};const {data:rows,error}=await cloud.from(table).upsert(row,{onConflict:'auth_user_id'}).select('*');if(error)throw error;const saved=Array.isArray(rows)?rows[0]:rows;if(!saved?.id)throw new Error('Supabase не вернул ID профиля.');profiles[role]={...profile,...profileFromCloudRow(role,saved),email:user.email||profile.email};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));return profiles[role]}
+function profileFromCloudRow(role,row){return {name:row.name||'',phone:row.phone||'',country:row.country||'',city:row.city||'',area:row.area||'',address:row.address||'',specialty:row.specialty||'',activityDirection:row.activity_direction||(role==='master'&&String(row.id||'')===String(profiles.master?.cloudId||'')?profiles.master?.activityDirection:'')||'',avatar:row.avatar_url||profiles[role]?.avatar||'',avatarUrl:row.avatar_url||profiles[role]?.avatarUrl||'',email:row.email||cloudUser?.email||'',cloudId:row.id,profileId:row.id,authUserId:row.auth_user_id,language:currentLanguage,...(role==='master'?{currency:profiles.master?.currency||'RUB',publicPhoneConsent:row.phone_publication_consent===true}:{favoriteMasterIds:Array.isArray(row.favorite_masters)?row.favorite_masters.map(x=>String(x)).filter(Boolean):(Array.isArray(profiles.client?.favoriteMasterIds)?profiles.client.favoriteMasterIds:[])})}}
+async function ensureCloudProfile(role, profile, user=cloudUser){if(!cloud||!user)throw new Error('Сначала войди в аккаунт Supabase.');const table=role==='master'?'masters':'clients';const row={auth_user_id:user.id,email:user.email||profile.email||null,name:profile.name||'',phone:profile.phone||'',country:profile.country||'',city:profile.city||'',area:role==='master'?(profile.area||''):null,address:role==='master'?(profile.address||''):null,specialty:role==='master'?(profile.specialty||''):null,...(role==='master'?{activity_direction:profile.activityDirection||'',phone_publication_consent:profile.publicPhoneConsent===true}:{}),timezone_name:(Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'),avatar_url:(typeof profile.avatar==='string'&&/^https:\/\//i.test(profile.avatar)?profile.avatar.split('?')[0]:(profile.avatarUrl||null)),...(role==='client'?{favorite_masters:Array.isArray(profile.favoriteMasterIds)?profile.favoriteMasterIds.map(x=>String(x)).filter(Boolean):[]} : {}),updated_at:new Date().toISOString()};const {data:rows,error}=await cloud.from(table).upsert(row,{onConflict:'auth_user_id'}).select('*');if(error)throw error;const saved=Array.isArray(rows)?rows[0]:rows;if(!saved?.id)throw new Error('Supabase не вернул ID профиля.');profiles[role]={...profile,...profileFromCloudRow(role,saved),email:user.email||profile.email};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));return profiles[role]}
 async function syncCurrentProfile(){if(!cloud||!cloudUser||!activeRole||!profiles[activeRole])return;try{await ensureCloudProfile(activeRole,profiles[activeRole]);setCloudStatus('Подключено · '+(cloudUser.email||'аккаунт'));}catch(err){console.error(err);showAppToast('Профиль сохранён в браузере, но не синхронизирован: '+(err.message||'ошибка Supabase'));}}
 // Store each account's IANA time zone on the server when that role is opened.
 // Appointment notifications use the master's zone for master alerts and the client's zone for client alerts.
@@ -3275,6 +3561,7 @@ async function syncRoleTimezoneToCloud(role=activeRole){
 async function syncMasterTimezoneToCloud(){return syncRoleTimezoneToCloud('master')}
 async function syncClientTimezoneToCloud(){return syncRoleTimezoneToCloud('client')}
 async function loginWithSupabase(email,password,role){
+ if(!nailoraRegionAllowed('Вход'))throw new Error('Зарубежная авторизация недоступна для выбранного региона.');
  if(!cloud)throw new Error('Библиотека Supabase не загрузилась. Проверь интернет и перезагрузи страницу.');
  try{
   // Close any lingering prior session before using the explicitly selected login.
@@ -3286,9 +3573,10 @@ async function loginWithSupabase(email,password,role){
   const table=role==='master'?'masters':'clients';
   let {data:row,error:rowError}=await cloud.from(table).select('*').eq('auth_user_id',cloudUser.id).maybeSingle();
   if(rowError)throw rowError;
+  if(nailoraIsRussianCountry(row?.country||cloudUser.user_metadata?.country))throw new Error('Этот аккаунт относится к России. Для него потребуется перенос в российскую базу. Используй прежнюю v8.96, пока перенос не закончен.');
   if(!row){
    const meta=cloudUser.user_metadata||{};
-   const candidate={...profiles[role],name:meta.name||profiles[role]?.name||'',phone:meta.phone||profiles[role]?.phone||'',country:meta.country||profiles[role]?.country||'',city:meta.city||profiles[role]?.city||'',area:meta.area||profiles[role]?.area||'',address:meta.address||profiles[role]?.address||'',specialty:meta.specialty||profiles[role]?.specialty||'',email:cloudUser.email};
+   const candidate={...profiles[role],publicPhoneConsent:role==='master'&&meta.phone_publication_consent===true,name:meta.name||profiles[role]?.name||'',phone:meta.phone||profiles[role]?.phone||'',country:meta.country||profiles[role]?.country||'',city:meta.city||profiles[role]?.city||'',area:meta.area||profiles[role]?.area||'',address:meta.address||profiles[role]?.address||'',specialty:meta.specialty||profiles[role]?.specialty||'',email:cloudUser.email};
    if(!candidate.name||!candidate.city||!candidate.country)throw new Error('Профиль для выбранной роли не найден. Проверь тип аккаунта и email.');
    await ensureCloudProfile(role,candidate,cloudUser);
   }else{
@@ -3308,7 +3596,64 @@ async function loginWithSupabase(email,password,role){
   throw err;
  }
 }
-$('loginForm').onsubmit=async e=>{e.preventDefault();const status=$('loginStatus');status.textContent='Выполняю вход…';const role=$('loginRole').value;chosenRole=role;try{await loginWithSupabase($('loginEmail').value.trim(),$('loginPassword').value,role);status.textContent='Вход выполнен.';}catch(err){console.error(err);const message=String(err?.message||'');status.textContent=(err?.code==='email_not_confirmed'||/email not confirmed|email_not_confirmed/i.test(message))?'Email ещё не подтверждён. Открой экран подтверждения и воспользуйся ссылкой «Письмо не пришло?».':'Не удалось войти: '+(message||'проверь email и пароль');}};
+let nailoraPendingEmailDiscovery='';
+async function nailoraGlobalLogin(email,password,role,status){
+ if(!nailoraChangeRegion(NAILORA_REGION_GLOBAL))return;
+ await nailoraEnsureGlobalCloud();
+ await loginWithSupabase(email,password,role);
+ nailoraRememberEmailRegion(email,NAILORA_REGION_GLOBAL);
+ status.textContent='Вход выполнен.';
+}
+$('loginForm').onsubmit=async e=>{
+ e.preventDefault();
+ const status=$('loginStatus'),role=$('loginRole').value,email=$('loginEmail').value.trim().toLowerCase(),password=$('loginPassword').value;
+ chosenRole=role;
+ $('nailoraLegacyLogin').classList.add('hidden');
+ if(!email||!password){status.textContent='Введи email и пароль.';return;}
+ const known=nailoraKnownEmailRegion(email,role);
+ if(known===NAILORA_REGION_RU){
+  if(nailoraChangeRegion(NAILORA_REGION_RU))nailoraRegionAllowed('Вход');
+  return;
+ }
+ if(known===NAILORA_REGION_GLOBAL){
+  status.textContent='Выполняю вход…';
+  try{await nailoraGlobalLogin(email,password,role,status)}catch(err){status.textContent='Не удалось войти: '+(err?.message||'проверь email и пароль')}
+  return;
+ }
+ if(!NAILORA_REGION_RESOLVER_BASE){
+  status.textContent='Для этого email регион пока не определён. На новом устройстве потребуется проверка через сервер, который ещё не активирован.';
+  $('nailoraLegacyLogin').classList.remove('hidden');return;
+ }
+ status.textContent='Для первого входа на этом устройстве отправляем код подтверждения на email…';
+ try{
+  await nailoraDiscoveryRequest('/v1/account-region/start',{email});
+  nailoraPendingEmailDiscovery=email;
+  $('nailoraDiscoverCodePanel').classList.remove('hidden');
+  status.textContent='Если адрес зарегистрирован в сервисе поиска, код отправлен на почту. Введи его ниже.';
+  $('nailoraLegacyLogin').classList.remove('hidden');
+ }catch(err){status.textContent=err.message||'Ошибка определения сервера';$('nailoraLegacyLogin').classList.remove('hidden')}
+};
+$('nailoraDiscoverFinish').onclick=async function(){
+ const status=$('loginStatus'),email=nailoraPendingEmailDiscovery,code=$('nailoraDiscoverCode').value.trim();
+ if(!email||!/^\d{6,8}$/.test(code)){status.textContent='Введи код из письма.';return}
+ this.disabled=true;
+ try{
+  const answer=await nailoraDiscoveryRequest('/v1/account-region/finish',{email,code});
+  if(![NAILORA_REGION_RU,NAILORA_REGION_GLOBAL].includes(answer?.region))throw new Error('Профиль не найден или код недействителен.');
+  nailoraRememberEmailRegion(email,answer.region);
+  $('nailoraDiscoverCodePanel').classList.add('hidden');
+  if(answer.region===NAILORA_REGION_RU){if(nailoraChangeRegion(NAILORA_REGION_RU))nailoraRegionAllowed('Вход');return}
+  await nailoraGlobalLogin(email,$('loginPassword').value,$('loginRole').value,status);
+ }catch(err){status.textContent=err.message||'Не удалось подтвердить email'}
+ finally{this.disabled=false}
+};
+$('nailoraDiscoverCancel').onclick=()=>{nailoraPendingEmailDiscovery='';$('nailoraDiscoverCode').value='';$('nailoraDiscoverCodePanel').classList.add('hidden');$('nailoraLegacyLogin').classList.remove('hidden');$('loginStatus').textContent='Можно повторить поиск или использовать старый аккаунт Supabase.'};
+$('nailoraLoginLegacyGlobal').onclick=async function(){
+ const status=$('loginStatus');this.disabled=true;status.textContent='Проверяю существующий аккаунт Supabase…';
+ try{await nailoraGlobalLogin($('loginEmail').value.trim().toLowerCase(),$('loginPassword').value,$('loginRole').value,status)}
+ catch(err){status.textContent='Не удалось войти в прежний аккаунт: '+(err.message||'ошибка входа')}
+ finally{this.disabled=false}
+};
 function confirmationEmailRedirectOptions(){const emailRedirectTo=getEmailRedirectUrl();return emailRedirectTo?{emailRedirectTo}:{}};
 const PENDING_VERIFICATION_KEY='nailora_pending_verification_v837';
 let pendingVerificationEmail='',pendingVerificationRole='client';
@@ -3324,18 +3669,21 @@ $('registerForm').onsubmit=async e=>{
  const phone=String($('regPhone').value||'').trim();
  const registrationRole=chosenRole||selectedEntryRole||'client';
  const previous=profiles[registrationRole]||{};
- const profile={...previous,name:$('regName').value.trim(),phone,country:$('regCountry').value.trim(),city:$('regCity').value.trim(),area:registrationRole==='master'? $('regArea').value.trim():(previous.area||''),address:registrationRole==='master'? $('regAddress').value.trim():(previous.address||''),specialty:registrationRole==='master'? $('regSpecialty').value.trim():(previous.specialty||''),activityDirection:registrationRole==='master'? $('regActivityDirection').value:(previous.activityDirection||''),email,language:currentLanguage};
+ const profile={...previous,name:$('regName').value.trim(),phone,country:$('regCountry').value.trim(),city:$('regCity').value.trim(),area:registrationRole==='master'? $('regArea').value.trim():(previous.area||''),address:registrationRole==='master'? $('regAddress').value.trim():(previous.address||''),specialty:registrationRole==='master'? $('regSpecialty').value.trim():(previous.specialty||''),activityDirection:registrationRole==='master'? $('regActivityDirection').value:(previous.activityDirection||''),publicPhoneConsent:registrationRole==='master'&&$('regPublicPhoneConsent').checked===true,email,language:currentLanguage};
+ if(nailoraIsRussianCountry(profile.country)){status.textContent='Российский сервер пока не активирован. Регистрацию временно не проводим; данные в зарубежную базу не отправляются.';return;}
  if(!profile.name||!profile.country||!profile.city||!profile.phone){status.textContent='Заполни имя, телефон, страну и город.';return}
  if(registrationRole==='master'&&!profile.address){status.textContent='Укажи адрес оказания услуг.';return}
- if(!cloud){status.textContent='Supabase не загрузился. Проверь интернет и повтори попытку.';return}
  const submit=$('createProfileButton');submit.disabled=true;
  try{
-  const signupOptions={data:{role:registrationRole,name:profile.name,phone:profile.phone,country:profile.country,city:profile.city,area:profile.area||'',address:profile.address||'',specialty:profile.specialty||'',activity_direction:profile.activityDirection||''},...confirmationEmailRedirectOptions()};
+  if(!nailoraChangeRegion(NAILORA_REGION_GLOBAL))return;
+  await nailoraEnsureGlobalCloud();
+  const signupOptions={data:{role:registrationRole,name:profile.name,phone:profile.phone,country:profile.country,city:profile.city,area:profile.area||'',address:profile.address||'',specialty:profile.specialty||'',activity_direction:profile.activityDirection||'',phone_publication_consent:registrationRole==='master'&&profile.publicPhoneConsent===true},...confirmationEmailRedirectOptions()};
   const {data:result,error}=await cloud.auth.signUp({email,password,options:signupOptions});
   if(error)throw error;
   if(!result.user)throw new Error('Supabase не создал пользователя.');
   if(Array.isArray(result.user.identities)&&result.user.identities.length===0){status.textContent='Этот email уже зарегистрирован. Не создавай аккаунт повторно. Нажми «Войти» или воспользуйся ссылкой «Забыли пароль?», если не помнишь пароль.';return}
   profiles[registrationRole]={...(profiles[registrationRole]||{}),...profile};
+  nailoraRememberEmailRegion(email,NAILORA_REGION_GLOBAL);
   localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));
   if(!result.session){
    cloudUser=null;activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);
@@ -3570,7 +3918,7 @@ async function bootCloudAuth(){
     const cachedBelongsToSession=!!cachedProfile&&(
       cachedProfile.authUserId===uid || (!!cachedEmail&&!!sessionEmail&&cachedEmail===sessionEmail)
     );
-    if(cachedBelongsToSession){
+    if(cachedBelongsToSession&&!nailoraIsRussianCountry(cachedProfile?.country)){
       nailoraRestoredFromCache=true;
       activeRole=cachedRole;
       chosenRole=cachedRole;
@@ -3588,11 +3936,17 @@ async function bootCloudAuth(){
     let role=savedRole==='master'&&(mres.data||meta.role==='master')?'master':savedRole==='client'&&(cres.data||meta.role==='client')?'client':meta.role==='master'?'master':meta.role==='client'?'client':profiles.master?.authUserId===uid&&mres.data?'master':profiles.client?.authUserId===uid&&cres.data?'client':mres.data?'master':cres.data?'client':null;
     if(!role){setCloudStatus('Сессия активна, но роль профиля не определена. Выбери тип аккаунта и войди.');showOnly('welcome');return;}
     let row=role==='master'?mres.data:cres.data;
+    if(nailoraIsRussianCountry(row?.country||meta.country)){
+      await cloud.auth.signOut({scope:'local'});
+      cloudUser=null;activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);
+      setCloudStatus('Российский профиль обнаружен в старой базе. Для него нужен перенос. До переноса используй v8.96.');
+      showOnly('welcome');return;
+    }
     if(!row){
-      const candidate={...(profiles[role]||{}),name:meta.name||profiles[role]?.name||'',phone:meta.phone||profiles[role]?.phone||'',country:meta.country||profiles[role]?.country||'',city:meta.city||profiles[role]?.city||'',area:meta.area||profiles[role]?.area||'',address:meta.address||profiles[role]?.address||'',specialty:meta.specialty||profiles[role]?.specialty||'',email:cloudUser.email,language:currentLanguage};
+      const candidate={...(profiles[role]||{}),publicPhoneConsent:role==='master'&&meta.phone_publication_consent===true,name:meta.name||profiles[role]?.name||'',phone:meta.phone||profiles[role]?.phone||'',country:meta.country||profiles[role]?.country||'',city:meta.city||profiles[role]?.city||'',area:meta.area||profiles[role]?.area||'',address:meta.address||profiles[role]?.address||'',specialty:meta.specialty||profiles[role]?.specialty||'',email:cloudUser.email,language:currentLanguage};
       if(!candidate.name||!candidate.phone||!candidate.country||!candidate.city||(role==='master'&&!candidate.address)){setCloudStatus('Email подтверждён, но данные профиля неполные. Войди в аккаунт и проверь профиль.');showOnly('welcome');return;}
       const savedProfile=await ensureCloudProfile(role,candidate,cloudUser);
-      row={id:savedProfile.cloudId,auth_user_id:uid,name:savedProfile.name,phone:savedProfile.phone,country:savedProfile.country,city:savedProfile.city,area:savedProfile.area,address:savedProfile.address,specialty:savedProfile.specialty,email:cloudUser.email,avatar_url:savedProfile.avatarUrl||savedProfile.avatar||null};
+      row={id:savedProfile.cloudId,auth_user_id:uid,name:savedProfile.name,phone:savedProfile.phone,country:savedProfile.country,city:savedProfile.city,area:savedProfile.area,address:savedProfile.address,specialty:savedProfile.specialty,email:cloudUser.email,phone_publication_consent:savedProfile.publicPhoneConsent===true,avatar_url:savedProfile.avatarUrl||savedProfile.avatar||null};
     }
     profiles[role]={...profiles[role],...profileFromCloudRow(role,row),email:cloudUser.email};
     {const timezoneName=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';const timezoneTable=role==='master'?'masters':'clients';const {error:timezoneError}=await cloud.from(timezoneTable).update({timezone_name:timezoneName}).eq('auth_user_id',uid);if(timezoneError)console.warn('Account timezone sync failed:',timezoneError.message);}
@@ -3616,7 +3970,8 @@ async function bootCloudAuth(){
   }
 }
 
-function startNailoraCloud(){
+function startNailoraCloud(skipRestore=false){
+  if(nailoraActiveRegion!==NAILORA_REGION_GLOBAL)return false;
   if(window.__nailoraCloudStarted)return true;
   if(!window.supabase?.createClient){
     setCloudStatus('Облачная синхронизация пока недоступна. Проверь интернет.');
@@ -3636,28 +3991,36 @@ function startNailoraCloud(){
     return false;
   }
   cloud.auth.onAuthStateChange((event,session)=>{cloudUser=session?.user||null;if(event==='PASSWORD_RECOVERY'){sessionStorage.setItem('nailoraPasswordRecoveryActive','1');chosenRole=selectedEntryRole||'client';$('resetEmail').value=cloudUser?.email||$('loginEmail').value||'';$('requestPasswordReset').classList.add('hidden');$('setNewPassword').classList.remove('hidden');$('newPasswordStatus').textContent='Ссылка действительна. Задай новый пароль.';showOnly('resetPassword');return}if(!cloudUser){setCloudStatus('Не выполнен вход в Supabase');if(cloudPollTimer)clearInterval(cloudPollTimer)}else setCloudStatus('Сессия Supabase активна · '+(cloudUser.email||''))});
-  bootCloudAuth();
+  if(!skipRestore)bootCloudAuth();
   return true;
 }
 // Fast path: render the last locally saved profile before the remote Auth SDK finishes loading.
 // bootCloudAuth validates the persisted Supabase session and switches to welcome only if needed.
 try{
  const lastRole=localStorage.getItem(ACTIVE_ROLE_KEY);
- if((lastRole==='master'||lastRole==='client')&&profiles[lastRole]){
+ if(nailoraActiveRegion===NAILORA_REGION_GLOBAL&&(lastRole==='master'||lastRole==='client')&&profiles[lastRole]&&!nailoraIsRussianCountry(profiles[lastRole].country)){
   activeRole=lastRole;chosenRole=lastRole;
-  openRole(lastRole);
+   queueMicrotask(() => openRole(lastRole).catch(err => console.warn('Cached profile restore failed:', err)));
   setCloudStatus('Восстанавливаю сохранённый профиль…');
  }
 }catch(cacheRestoreError){console.warn('Local profile fast restore failed:',cacheRestoreError)}
-window.__nailoraStartCloud=startNailoraCloud;
-window.__nailoraSupabaseReady.then(ok=>{
+// v8.97: no Supabase requests while Russia (or no region) is selected.
+if(nailoraActiveRegion===NAILORA_REGION_GLOBAL){
+ window.__nailoraLoadSupabase().then(ok=>{
   if(ok)startNailoraCloud();
-  else{setCloudStatus('Supabase загружается медленно или недоступен. Можно продолжить с экрана входа.');showOnly('welcome');document.body.classList.remove('auth-pending');}
-}).catch(err=>{
+  else{setCloudStatus('Зарубежная база временно недоступна. Проверь интернет.');showOnly('welcome');document.body.classList.remove('auth-pending');}
+ }).catch(err=>{
   console.warn('Supabase loader failed',err);
-  setCloudStatus('Не удалось загрузить облачную библиотеку. Проверь интернет.');
+  setCloudStatus('Не удалось загрузить зарубежную библиотеку. Проверь интернет.');
   showOnly('welcome');document.body.classList.remove('auth-pending');
-});
+ });
+}else{
+  showOnly('welcome');
+  document.body.classList.remove('auth-pending');
+  setCloudStatus(nailoraActiveRegion===NAILORA_REGION_RU
+    ?'Российский сервер готовится к запуску.'
+    :'Выбери «Я мастер» или «Я клиент», затем войди или создай профиль.');
+}
 async function openRole(role){
  activeRole=role;chosenRole=role;
  try{localStorage.setItem(ACTIVE_ROLE_KEY,role)}catch(_){}
@@ -3703,7 +4066,13 @@ async function logout(){
  }
 }
 
-function openSettings(){if(!activeRole)return;const p=profiles[activeRole]||{};renderProfileAvatar(activeRole);$('settingsLanguageChoice').value=p.language||currentLanguage;$('settingsRoleLabel').textContent=t(activeRole==='master'?'Тип аккаунта: Мастер':'Тип аккаунта: Клиент');$('settingsName').value=p.name||'';$('settingsPhone').value=p.phone||'';$('settingsCountry').value=p.country||'';$('settingsCity').value=p.city||p.area||'';$('settingsMasterFields').classList.toggle('hidden',activeRole!=='master');$('masterReminderSettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencySettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencyChoice').value=CURRENCY_CODES.includes(String((profiles.master||{}).currency||'RUB').toUpperCase())?String((profiles.master||{}).currency||'RUB').toUpperCase():'RUB';$('settingsAddress').required=activeRole==='master';$('settingsArea').value=p.area||'';$('settingsAddress').value=p.address||'';$('settingsSpecialty').value=p.specialty||'';$('settingsActivityDirection').value=p.activityDirection||'Маникюр и педикюр';const reminderPrefs=getMasterReminderPrefs();$('masterRemindersEnabled').checked=!!reminderPrefs.enabled;$('masterReminderLeadTime').value=String(reminderPrefs.minutes||60);$('masterReminderLeadTime').disabled=!reminderPrefs.enabled;refreshNotificationPermissionStatus();applyUiSettings();if(typeof $('settingsDialog').showModal==='function')$('settingsDialog').showModal();else $('settingsDialog').setAttribute('open','');refreshPushSettingsStatus()}
+function openSettings(){if(!activeRole)return;const p=profiles[activeRole]||{};renderProfileAvatar(activeRole);$('settingsLanguageChoice').value=p.language||currentLanguage;$('settingsRoleLabel').textContent=t(activeRole==='master'?'Тип аккаунта: Мастер':'Тип аккаунта: Клиент');$('settingsName').value=p.name||'';$('settingsPhone').value=p.phone||'';$('settingsPublicPhoneConsent').checked=activeRole==='master'&&p.publicPhoneConsent===true;updateNailoraPhoneConsentStatus();$('settingsCountry').value=p.country||'';$('settingsCity').value=p.city||p.area||'';$('settingsMasterFields').classList.toggle('hidden',activeRole!=='master');$('masterReminderSettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencySettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencyChoice').value=CURRENCY_CODES.includes(String((profiles.master||{}).currency||'RUB').toUpperCase())?String((profiles.master||{}).currency||'RUB').toUpperCase():'RUB';$('settingsAddress').required=activeRole==='master';$('settingsArea').value=p.area||'';$('settingsAddress').value=p.address||'';$('settingsSpecialty').value=p.specialty||'';$('settingsActivityDirection').value=p.activityDirection||'Маникюр и педикюр';const reminderPrefs=getMasterReminderPrefs();$('masterRemindersEnabled').checked=!!reminderPrefs.enabled;$('masterReminderLeadTime').value=String(reminderPrefs.minutes||60);$('masterReminderLeadTime').disabled=!reminderPrefs.enabled;refreshNotificationPermissionStatus();applyUiSettings();if(typeof $('settingsDialog').showModal==='function')$('settingsDialog').showModal();else $('settingsDialog').setAttribute('open','');refreshPushSettingsStatus()}
+function updateNailoraPhoneConsentStatus(){
+ const el=$('settingsPhoneConsentStatus');if(!el)return;
+ const allowed=$('settingsPublicPhoneConsent').checked;
+ el.textContent=allowed?'После сохранения номер будет виден клиентам в каталоге.':'После сохранения номер будет скрыт из публичного каталога.';
+}
+$('settingsPublicPhoneConsent').addEventListener('change',updateNailoraPhoneConsentStatus);
 $('masterAccount').onclick=openSettings;$('clientAccount').onclick=openSettings;
 $('closeSettings').onclick=()=>$('settingsDialog').close();$('settingsDone').onclick=()=>$('settingsDialog').close();$('settingsLogout').onclick=logout;
 
@@ -3713,7 +4082,7 @@ function makeNailoraSupportMessage(){
  const message=String($('nailoraSupportMessage').value||'').trim();
  const role=activeRole==='master'?'Мастер':'Клиент';
  const lang=currentLanguage||'ru';
- return `Nailora v8.71\nРоль: ${role}\nЯзык приложения: ${lang}\nТема: ${topic}\n\n${message}`;
+ return `Nailora v8.97-test\nРоль: ${role}\nЯзык приложения: ${lang}\nТема: ${topic}\n\n${message}`;
 }
 function openNailoraSupport(){
  const settings=$('settingsDialog');
@@ -3999,7 +4368,29 @@ window.addEventListener('load',()=>{registerNailoraServiceWorker().catch(err=>co
 // Theme buttons use data-theme-choice; the old themeChoice select no longer exists.
 const backgroundChoice=$('backgroundChoice');if(backgroundChoice)backgroundChoice.onchange=()=>{uiSettings.background=backgroundChoice.value;persistUiSettings()};
 $('masterCurrencyChoice').onchange=async()=>{if(activeRole!=='master')return;const currency=String($('masterCurrencyChoice').value||'RUB').toUpperCase();if(!CURRENCY_CODES.includes(currency))return;const nextProfiles={...profiles,master:{...(profiles.master||{}),currency}};if(persistProfilesSafely(nextProfiles)){refreshCurrencyLabels();renderAll();if(cloudReady()){if(!profiles.master?.cloudId){showAppToast('Валюта сохранена на этом устройстве, но не удалось найти облачный профиль мастера.');return}const synced=await syncMasterScheduleToCloud();if(!synced){showAppToast('Валюта сохранена на этом устройстве, но не удалось передать её клиентам.');return}}showAppToast(t('Валюта цен сохранена.'))}};
-$('accountEditForm').onsubmit=e=>{e.preventDefault();if(!activeRole)return;const old=profiles[activeRole]||{};profiles[activeRole]={...old,name:$('settingsName').value.trim(),phone:$('settingsPhone').value.trim(),country:$('settingsCountry').value.trim(),city:$('settingsCity').value.trim(),area:activeRole==='master'? $('settingsArea').value.trim():(old.area||''),address:activeRole==='master'? $('settingsAddress').value.trim():(old.address||''),specialty:activeRole==='master'? $('settingsSpecialty').value.trim():(old.specialty||''),activityDirection:activeRole==='master'? $('settingsActivityDirection').value:(old.activityDirection||'')};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));refreshRoleGreetings();renderProfileAvatar(activeRole);if(activeRole==='master')renderMasterReviews();if(activeRole==='client'){$('searchCountry').value=profiles.client.country;$('searchCity').value=profiles.client.city;renderMasterSearch()}syncCurrentProfile();alert(t('Данные аккаунта сохранены.'))};
+$('accountEditForm').onsubmit=async e=>{
+ e.preventDefault();if(!activeRole)return;
+ if(nailoraIsRussianCountry($('settingsCountry').value)){alert('Для России предназначен отдельный сервер. Изменение региона аккаунта будет возможно после миграции.');return;}
+ const role=activeRole,old=profiles[role]||{};
+ const updated={...old,name:$('settingsName').value.trim(),phone:$('settingsPhone').value.trim(),country:$('settingsCountry').value.trim(),city:$('settingsCity').value.trim(),area:role==='master' ? $('settingsArea').value.trim():(old.area||''),address:role==='master'? $('settingsAddress').value.trim():(old.address||''),specialty:role==='master'? $('settingsSpecialty').value.trim():(old.specialty||''),activityDirection:role==='master'? $('settingsActivityDirection').value:(old.activityDirection||''),publicPhoneConsent:role==='master'?$('settingsPublicPhoneConsent').checked===true:false};
+ const btn=$('accountEditForm').querySelector('[type=submit]');if(btn)btn.disabled=true;
+ try{
+  if(!cloud||!cloudUser)throw new Error('Нет соединения с сервером. Разрешение не сохранено.');
+  const saved=await ensureCloudProfile(role,updated,cloudUser);
+  profiles[role]={...updated,...saved};
+  localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));
+  refreshRoleGreetings();renderProfileAvatar(role);
+  if(role==='master')renderMasterReviews();
+  if(role==='client'){$('searchCountry').value=profiles.client.country;$('searchCity').value=profiles.client.city;renderMasterSearch()}
+  updateNailoraPhoneConsentStatus();
+  alert('Профиль и разрешение на публикацию номера сохранены на сервере.');
+ }catch(err){
+  console.error('Profile save failed',err);
+  $('settingsPublicPhoneConsent').checked=old.publicPhoneConsent===true;
+  updateNailoraPhoneConsentStatus();
+  alert('Не удалось сохранить профиль. Проверь SQL-обновление v8.97 и подключение: '+(err?.message||'ошибка сервера'));
+ }finally{if(btn)btn.disabled=false}
+};
 applyUiSettings();setLanguage(currentLanguage,false);
 function moveClientMonth(delta){if($('clientCalendarView')?.value==='week'){const d=new Date((clientSelectedDate||iso(new Date()))+'T12:00:00');d.setDate(d.getDate()+delta*7);clientSelectedDate=iso(d);clientCursor=new Date(d.getFullYear(),d.getMonth(),1)}else{clientCursor.setMonth(clientCursor.getMonth()+delta);clientSelectedDate=iso(new Date(clientCursor.getFullYear(),clientCursor.getMonth(),1))}renderClientCalendar()}
 $('clientCalendarView').onchange=()=>{if($('clientCalendarView').value==='week'){const d=new Date((clientSelectedDate||iso(new Date()))+'T12:00:00');clientCursor=new Date(d.getFullYear(),d.getMonth(),1)}renderClientCalendar()};
@@ -4174,6 +4565,7 @@ $('closeReviewDialog').onclick=closeReviewDialog;$('cancelReviewDialog').onclick
 $('reviewForm').onsubmit=e=>{e.preventDefault();const appointmentId=String($('reviewAppointmentId').value||''),appointment=data.appointments.find(a=>String(a.id)===appointmentId);if(activeRole!=='client'||!appointment||!clientOwnsAppointment(appointment)||!appointmentHasPassed(appointment)){alert(t('Эту запись нельзя оценить.'));return}if(!profiles.master){alert(t('Профиль мастера не найден.'));return}const pid=getClientProfileId(true),reviews=getMasterReviews().slice(),oldIndex=reviews.findIndex(r=>String(r.appointmentId)===appointmentId&&String(r.clientProfileId||'')===String(pid));const review={id:oldIndex>=0?reviews[oldIndex].id:((crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random())),appointmentId,clientProfileId:pid,clientNickname:profileNickname('client'),rating:Math.max(1,Math.min(5,Number($('reviewRating').value)||5)),comment:String($('reviewComment').value||'').trim(),createdAt:oldIndex>=0&&reviews[oldIndex].createdAt?reviews[oldIndex].createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};if(oldIndex>=0)reviews[oldIndex]=review;else reviews.push(review);profiles.master={...profiles.master,reviews};if(!persistProfilesSafely(profiles))return;closeReviewDialog();renderMasterReviews();renderMasterSearch();renderClientCalendar();showAppToast(t(oldIndex>=0?'Отзыв обновлён.':'Спасибо за отзыв!'))};
 async function renderMasterSearch(){
  const country=String($('searchCountry')?.value||'').trim(),city=String($('searchCity')?.value||'').trim(),box=$('masterSearchResults');if(!box)return;
+ if(nailoraIsRussianCountry(country)){box.innerHTML='<p class="muted">🇷🇺 Мастера России будут доступны через российскую базу после её подключения.</p>';cloudMasterDirectory=[];return;}
  if(!country||!city){box.innerHTML=`<p class="muted">${escapeHtml(t('Введи страну и город для поиска.'))}</p>`;if(selectedClientMasterKey){selectedClientMasterKey='';selectedCloudMasterId='';renderClientCalendar()}translatePage();return}
  let found=[];
  if(cloud&&cloudUser){try{const {data:rows,error}=await cloud.from('nailora_master_public_directory').select('*').eq('is_active',true).ilike('country',country).ilike('city',city).limit(100);if(error)throw error;found=(rows||[]).map(r=>({...profileFromCloudRow('master',r),cloudId:r.id,profileId:r.id,masterId:r.id,phone:r.phone||'',avatar:r.avatar_url||'',avatarUrl:r.avatar_url||'',reviews:[]}));cloudMasterDirectory=found;}catch(err){console.error(err);box.innerHTML=`<p class="muted">Не удалось загрузить мастеров из Supabase: ${escapeHtml(err.message||'ошибка')}</p>`;translatePage();return}}
@@ -4236,7 +4628,7 @@ async function loadFavoriteMasters(){
   const {data:rows,error}=await cloud.from('nailora_master_public_directory').select('*').in('id',ids).eq('is_active',true).limit(100);
   if(error)throw error;
   const byId=new Map((rows||[]).map(r=>{const m=mapMasterDirectoryRow(r);return [String(m.cloudId),m]}));
-  cloudFavoriteMasters=ids.map(id=>byId.get(id)).filter(Boolean);
+  cloudFavoriteMasters=ids.map(id=>byId.get(id)).filter(m=>m&&!nailoraIsRussianCountry(m.country));
   profiles.client={...(profiles.client||{}),favoriteMasterProfiles:cloudFavoriteMasters.map(favoriteMasterSnapshot)};
   try{localStorage.setItem(ROLE_KEY,JSON.stringify(profiles))}catch(_){}
   renderFavoriteMasters();
@@ -4682,4 +5074,44 @@ setInterval(checkMasterReminders,30000);
 })();
 </script>
 
+
+<script id="nailoraPrivacyScript">
+(function(){
+ const dlg=document.getElementById('nailoraPrivacyDialog');
+ if(!dlg)return;
+ document.addEventListener('click',function(event){
+  const opener=event.target.closest('[data-nailora-privacy]');
+  if(opener){event.preventDefault();if(!dlg.open){if(typeof dlg.showModal==='function')dlg.showModal();else dlg.setAttribute('open','');}return;}
+  const closer=event.target.closest('[data-nailora-privacy-close]');
+  if(closer){event.preventDefault();if(typeof dlg.close==='function')dlg.close();else dlg.removeAttribute('open');}
+ });
+ dlg.addEventListener('click',function(event){if(event.target===dlg){if(typeof dlg.close==='function')dlg.close();else dlg.removeAttribute('open');}});
+})();
+</script>
+<script>
+/* Standalone, opt-in RU catalog smoke test — does not authenticate or modify data. */
+(function () {
+  'use strict';
+  const button = document.getElementById('ruCatalogProbe');
+  const status = document.getElementById('ruCatalogProbeStatus');
+  if (!button || !status) return;
+  button.addEventListener('click', async function () {
+    button.disabled = true;
+    status.textContent = 'Проверяю подключение…';
+    try {
+      const client = window.NailoraRuSDK.createClient({
+        baseUrl: window.NAILORA_RU_API_BASE,
+        getRegion: () => 'ru' // Explicit read-only probe, not the user's account region.
+      });
+      const catalog = await client.directory({ limit: 50 });
+      if (!catalog || !Array.isArray(catalog.items)) throw new Error('Неверный формат ответа');
+      status.textContent = '✅ Каталог доступен. Получено опубликованных анкет: ' + catalog.items.length + (catalog.items.length === 50 ? ' (первые 50)' : '') + '.';
+    } catch (err) {
+      status.textContent = '⚠️ Не удалось загрузить каталог: ' + String(err && err.message || 'ошибка соединения');
+    } finally {
+      button.disabled = false;
+    }
+  });
+})();
+</script>
 </body></html>
