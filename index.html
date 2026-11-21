@@ -1332,7 +1332,12 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
  <div class="panel" id="masterSearchPanel"><h2>Найти мастера</h2><p class="muted">Выбери направление деятельности, страну и город, чтобы найти подходящего мастера.</p><label for="searchActivityDirection">Направление деятельности</label><select id="searchActivityDirection"><option value="">Все направления</option><option value="Маникюр и педикюр">Маникюр и педикюр</option><option value="Парикмахерские услуги">Парикмахерские услуги</option><option value="Брови и ресницы">Брови и ресницы</option><option value="Массаж">Массаж</option><option value="Косметология">Косметология</option><option value="Визаж">Визаж</option><option value="Эпиляция">Эпиляция</option><option value="Другое">Другое</option></select><div class="row" style="margin-top:10px"><div><label for="searchCountry">Страна</label><input id="searchCountry" maxlength="100" placeholder="Страна"/></div><div><label for="searchCity">Город / населённый пункт</label><input id="searchCity" maxlength="120" placeholder="Город или населённый пункт"/></div></div><div class="row" style="margin-top:10px"><button class="btn primary fixed" id="searchMastersButton" type="button">Найти мастеров</button><button class="btn fixed" id="resetMasterSearch" type="button">Мой город</button></div><div id="masterSearchResults" style="margin-top:14px"><p class="muted">Введи страну и город для поиска.</p></div></div>
  <div class="panel hidden" id="clientFavoriteMastersPanel"><h2>Мои мастера</h2><p class="muted">Сохранённые мастера всегда под рукой. Выбери мастера, чтобы открыть его расписание.</p><div id="clientFavoriteMastersList"><p class="muted">Загрузка…</p></div></div>
 <div class="panel"><div class="row"><button class="btn fixed" id="clientPrev" type="button">←</button><h2 id="clientMonthTitle" style="text-align:center;margin:0;flex:2"></h2><button class="btn fixed" id="clientNext" type="button">→</button></div><div class="row" style="margin-top:10px"><label style="flex:0 0 150px">Вид календаря<select id="clientCalendarView"><option value="month">Месяц</option><option value="week">Неделя</option></select></label><div class="muted small" style="align-self:end">В ячейках показаны только начало и конец рабочего дня. Занятые дни отмечены цветом, личные данные клиентов скрыты.</div></div><div class="grid" id="clientCalendarGrid" style="margin-top:10px"></div></div>
- <div class="panel"><h2>Расписание выбранного дня</h2><p class="muted small">Показаны только начала записи, для которых хватает времени на услугу. Перерывы и занятое время других клиентов скрыты.</p><div id="clientDaySchedule" class="schedule-list"></div></div></section>
+ <div class="panel"><h2>Расписание выбранного дня</h2><p class="muted small">Показаны только начала записи, для которых хватает времени на услугу. Перерывы и занятое время других клиентов скрыты.</p><div id="clientDaySchedule" class="schedule-list"></div></div>
+ <div class="panel hidden" id="ruMyBookingsPanel" aria-label="Мои записи">
+  <div class="row" style="align-items:center;justify-content:space-between"><h2 style="margin:0">Мои записи</h2><button type="button" class="btn fixed" id="ruMyBookingsRefresh">Обновить</button></div>
+  <p class="muted small">Записи сохраняются на сервере. Время отображается по часовому поясу твоего устройства.</p>
+  <div id="ruMyBookingsList" aria-live="polite"><p class="muted">Загрузка…</p></div>
+ </div></section>
 <div id="masterApp" class="hidden">
 <header><div class="wrap"><div class="row profile-header-row"><div class="profile-identity"><img id="masterAvatar" class="profile-avatar-hero hidden" alt="Аватар профиля мастера"><div id="masterAvatarPlaceholder" class="profile-avatar-placeholder" aria-hidden="true">👤</div><div class="profile-nickname" id="masterNickname"></div><p id="masterGreeting" class="profile-greeting">Календарь · постоянные клиенты · доходы и расходы</p></div><div class="header-actions"><button class="btn fixed" id="masterAccount" type="button">Аккаунт и настройки</button></div></div></div></header>
 <main class="wrap">
@@ -3558,7 +3563,7 @@ const NAILORA_SUPABASE_KEY='sb_publishable_-1TkkaMKrUdXmKfApv_8ew_Ao4e2GVk';
 let cloud=null,cloudUser=null,cloudMasterDirectory=[],cloudFavoriteMasters=[],selectedCloudMasterId='',cloudScheduleData=null,cloudBookedSlots=[],cloudNotifications=[],cloudPollTimer=null,cloudScheduleLoading=false,cloudScheduleLoadError='',cloudScheduleWarning='';
 
 // RU client integration (staging). The account server stays separate from the service-location server.
-const RU_STAGE_LIVE_BOOKINGS=true; // Preview safety: mock-tested booking only until explicit live acceptance.
+const RU_STAGE_LIVE_BOOKINGS=true; // Live RU appointments use authenticated POST /v1/appointments; server confirms every booking.
 const RU_CLIENT_PROFILE_CACHE='manicureRoleProfiles_v1_ru_v898';
 let ruApiClient=null,ruSelectedMasterId='',ruServices=[],ruSelectedServiceId='',ruDaySequence=0,ruAvailableStarts=[],ruAvailableContext='',ruBookingRequest=null;
 function ruSdk(){
@@ -3600,8 +3605,55 @@ async function ruOpenClientAccount(email){
   chosenRole='client';activeRole='client';
   nailoraRememberEmailRegion(email,NAILORA_REGION_RU);
   await openRole('client');
+  void ruLoadMyBookings();
   setCloudStatus('Профиль клиента открыт');
 }
+// Lists are fetched from the authenticated Russian API, never cached as
+// locally "confirmed" bookings. Only this signed-in client's items are shown.
+let ruBookingsLoadSequence=0;
+function ruDisplayAppointmentTime(value,onlyTime=false){
+  const d=new Date(value);
+  if(!Number.isFinite(d.getTime()))return '—';
+  return new Intl.DateTimeFormat('ru-RU',onlyTime?
+    {hour:'2-digit',minute:'2-digit'}:
+    {day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(d);
+}
+async function ruLoadMyBookings(){
+  const panel=$('ruMyBookingsPanel'),box=$('ruMyBookingsList');
+  if(!panel||!box)return;
+  if(!ruIsAccount()||activeRole!=='client'||!ruSdk().isAuthenticated()){
+    panel.classList.add('hidden');return;
+  }
+  panel.classList.remove('hidden');
+  const seq=++ruBookingsLoadSequence;
+  box.innerHTML='<p class="muted">Загрузка записей…</p>';
+  try{
+    const result=await ruSdk().appointments({role:'client'});
+    if(seq!==ruBookingsLoadSequence)return;
+    if(result?.success!==true||!Array.isArray(result.items)||result.role!=='client')throw new Error('Неверный ответ сервера');
+    if(!result.items.length){box.innerHTML='<p class="muted">Пока нет записей на услуги.</p>';return;}
+    const labels={booked:'Забронировано',confirmed:'Подтверждено',completed:'Завершено',cancelled:'Отменено',canceled:'Отменено'};
+    box.innerHTML=result.items.map(a=>{
+      const label=labels[String(a.status||'').toLowerCase()]||String(a.status||'Неизвестно');
+      const price=Number(a.price);
+      return '<div class="card">'
+        +'<strong>'+escapeHtml(String(a.master_name||'Мастер'))+'</strong>'
+        +'<div>'+escapeHtml(String(a.service_name||'Услуга не указана'))+'</div>'
+        +'<div class="muted">'+escapeHtml(ruDisplayAppointmentTime(a.start_time))
+        +' – '+escapeHtml(ruDisplayAppointmentTime(a.end_time,true))+'</div>'
+        +'<div class="muted small">'+escapeHtml(label)
+        +(Number.isFinite(price)&&price>0?' · '+escapeHtml(startingPrice(price)):'')+'</div>'
+        +(a.notes?'<p class="muted small">'+escapeHtml(String(a.notes))+'</p>':'')
+        +'</div>';
+    }).join('');
+  }catch(err){
+    if(seq!==ruBookingsLoadSequence)return;
+    box.innerHTML='<p class="muted" role="status">Не удалось загрузить записи: '
+      +escapeHtml(err?.message||'ошибка соединения')+'. Нажми «Обновить».</p>';
+  }
+}
+$('ruMyBookingsRefresh').addEventListener('click',()=>{void ruLoadMyBookings();});
+
 async function ruLogin(email,password,role,status){
   if(role!=='client')throw new Error('Вход мастера ещё не подключён к серверному календарю. Данные мастера не изменены.');
   await ruSdk().login(email,password);
@@ -4188,6 +4240,9 @@ async function openRole(role){
   $('searchCountry').value=profiles.client?.country||'';
   $('searchCity').value=profiles.client?.city||profiles.client?.area||'';
   renderMasterSearch();renderClientCalendar();
+  const ruList=$('ruMyBookingsList');if(ruList)ruList.textContent='';
+  ++ruBookingsLoadSequence;
+  $('ruMyBookingsPanel')?.classList.toggle('hidden',!ruIsAccount());
   getClientProfileId(true);
   loadFavoriteMasters().catch(err=>{console.warn('Favorite artists load failed:',err);renderFavoriteMastersError();});
  }
@@ -4199,7 +4254,7 @@ async function openRole(role){
  }
 }
 async function logout(){
- if(ruIsAccount()){if($('settingsDialog').open)$('settingsDialog').close();try{await ruSdk().logout()}catch(_){}activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);showOnly('welcome');setCloudStatus('Выход выполнен');return;}
+ if(ruIsAccount()){++ruBookingsLoadSequence;const list=$('ruMyBookingsList');if(list)list.textContent='';if($('settingsDialog').open)$('settingsDialog').close();try{await ruSdk().logout()}catch(_){}activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);showOnly('welcome');setCloudStatus('Выход выполнен');return;}
  if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=null;
  if($('settingsDialog').open)$('settingsDialog').close();
  setCloudStatus('Выхожу из аккаунта…');
@@ -5012,6 +5067,7 @@ async function ruSubmitBooking(){
     ruBookingRequest=null;closeClientBooking();
     showAppToast('Запись подтверждена российским сервером.');
     await ruRenderDay();
+    void ruLoadMyBookings();
   }catch(err){showAppToast('Запись не подтверждена: '+(err?.message||'ошибка соединения')+'. При повторе используем тот же запрос.');ruUpdateBookingDuration();}
 }
 
