@@ -1313,7 +1313,7 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
  </div>
  <div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn primary" type="submit" id="createProfileButton">Создать профиль</button><button class="btn hidden" id="registerOpenLogin" type="button" tabindex="-1" aria-hidden="true">Войти</button><button class="btn" id="backWelcome" type="button">Назад</button></div><p id="registerStatus" class="muted small" aria-live="polite" style="margin-top:10px"></p></form>
  </div></section>
-<section id="verifyEmail" class="wrap hidden" style="max-width:720px;padding-top:6vh"><div class="panel verify-panel"><div class="verify-mark" aria-hidden="true">✉</div><h2 class="verify-title">Подтверди электронную почту</h2><p class="verify-subtitle">Остался всего один небольшой шаг, и можно будет пользоваться Nailora.</p><p id="verifyEmailMessage" class="verify-intro" aria-live="polite">Мы отправили письмо со ссылкой для подтверждения. Открой его, чтобы подтвердить адрес.</p><div id="ruVerifyCodeArea" class="hidden"><label for="ruVerifyCode">Восьмизначный код из письма</label><input id="ruVerifyCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{8}" placeholder="00000000"><button id="ruVerifyConfirm" type="button" class="btn primary" style="margin:12px 0">Подтвердить email</button><button id="ruVerifyBackLogin" type="button" class="btn" style="margin:12px 0 12px 8px">← Назад ко входу</button><p id="ruVerifyStatus" class="muted small" aria-live="polite"></p></div><ol class="verify-steps" id="verifyEmailSteps"><li><strong>Зайди в свою электронную почту</strong><span>Открой почтовый ящик, который указал при регистрации.</span></li><li><strong>Найди письмо от Nailora</strong><span>Если его не видно во входящих, загляни в папку «Спам».</span></li><li><strong>Открой письмо и перейди по ссылке</strong><span>Это подтвердит адрес электронной почты.</span></li></ol><p class="verify-note" id="verifyEmailNote">После подтверждения вернись в Nailora. Если сессия восстановится успешно, приложение откроет твой профиль автоматически.</p><div class="verify-help small" style="margin-top:16px"><button type="button" id="verifyNoEmailToggle" class="link-button" aria-expanded="false" aria-controls="verifyNoEmailDetails">Письмо не пришло?</button><div id="verifyNoEmailDetails" class="hidden" style="margin-top:10px;padding:14px;border:1px solid #e9dff3;background:#faf7fc;border-radius:12px;text-align:left"><p style="margin:0 0 10px;color:#62566e">Проверь папку «Спам». Если письма там нет, можно отправить ссылку ещё раз здесь. Если аккаунт уже создан, не создавай его повторно.</p><div class="row" style="flex-wrap:wrap"><button type="button" id="resendVerifyEmail" class="btn primary">Отправить письмо ещё раз</button><button type="button" id="verifyBackToRegister" class="btn">Вернуться к регистрации</button></div><p id="verifyHelpStatus" class="muted small" aria-live="polite" style="margin:10px 0 0"></p></div></div></div></section>
+<section id="verifyEmail" class="wrap hidden" style="max-width:720px;padding-top:6vh"><div class="panel verify-panel"><div class="verify-mark" aria-hidden="true">✉</div><h2 class="verify-title">Подтверди электронную почту</h2><p class="verify-subtitle">Остался всего один небольшой шаг, и можно будет пользоваться приложением.</p><p id="verifyEmailMessage" class="verify-intro" aria-live="polite">Мы отправили письмо со ссылкой для подтверждения. Открой его, чтобы подтвердить адрес.</p><div id="ruVerifyCodeArea" class="hidden"><label for="ruVerifyCode">Восьмизначный код из письма</label><input id="ruVerifyCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{8}" placeholder="00000000"><button id="ruVerifyConfirm" type="button" class="btn primary" style="margin:12px 0">Подтвердить email</button><button id="ruVerifyBackLogin" type="button" class="btn" style="margin:12px 0 12px 8px">← Назад ко входу</button><p id="ruVerifyStatus" class="muted small" aria-live="polite"></p></div><ol class="verify-steps" id="verifyEmailSteps"><li><strong>Зайди в свою электронную почту</strong><span>Открой почтовый ящик, который указал при регистрации.</span></li><li><strong>Найди письмо с кодом подтверждения</strong><span>Если его не видно во входящих, загляни в папку «Спам».</span></li><li><strong>Открой письмо и перейди по ссылке</strong><span>Это подтвердит адрес электронной почты.</span></li></ol><p class="verify-note" id="verifyEmailNote">После подтверждения вернись в приложение. Если сессия восстановится успешно, приложение откроет твой профиль автоматически.</p><div class="verify-help small" style="margin-top:16px"><button type="button" id="verifyNoEmailToggle" class="link-button" aria-expanded="false" aria-controls="verifyNoEmailDetails">Письмо не пришло?</button><div id="verifyNoEmailDetails" class="hidden" style="margin-top:10px;padding:14px;border:1px solid #e9dff3;background:#faf7fc;border-radius:12px;text-align:left"><p style="margin:0 0 10px;color:#62566e">Проверь папку «Спам». Если письма там нет, можно отправить ссылку ещё раз здесь. Если аккаунт уже создан, не создавай его повторно.</p><div class="row" style="flex-wrap:wrap"><button type="button" id="resendVerifyEmail" class="btn primary">Отправить письмо ещё раз</button><button type="button" id="verifyBackToRegister" class="btn">Вернуться к регистрации</button></div><p id="verifyHelpStatus" class="muted small" aria-live="polite" style="margin:10px 0 0"></p></div></div></div></section>
 <section id="login" class="wrap hidden" style="max-width:650px;padding-top:5vh"><div class="panel"><h2>Вход в профиль</h2><form id="loginForm">
  <div id="nailoraDiscoverCodePanel" class="hidden" style="border:1px solid var(--border, #ddd);padding:12px;border-radius:12px;margin-bottom:14px">
   <label for="nailoraDiscoverCode">Код подтверждения из письма</label>
@@ -3581,8 +3581,8 @@ function ruNewRequestId(){
 }
 function ruNormalizeServices(result){
   const arr=Array.isArray(result)?result:Array.isArray(result?.items)?result.items:Array.isArray(result?.services)?result.services:[];
-  return arr.filter(x=>x&&typeof x.id==='string'&&typeof x.name==='string'&&Number(x.durationMinutes??x.duration_minutes)>0).map(x=>({
-    id:String(x.id),name:String(x.name),durationMinutes:Number(x.durationMinutes??x.duration_minutes),price:Math.max(0,Number(x.price)||0)
+  return arr.filter(x=>x&&typeof (x.id??x.service_id)==='string'&&typeof (x.name??x.service_name)==='string'&&Number(x.durationMinutes??x.duration_minutes??x.duration)>0).map(x=>({
+    id:String(x.id??x.service_id),name:String(x.name??x.service_name),durationMinutes:Number(x.durationMinutes??x.duration_minutes??x.duration),price:Math.max(0,Number(x.price)||0)
   }));
 }
 function ruProfileData(me,role){return Array.isArray(me?.profiles)?me.profiles.find(x=>x.role===role):null}
@@ -3641,7 +3641,7 @@ function ruSetVerifyVisibility(){
   const note=$('verifyEmailNote');
   if(note)note.textContent=isRu
     ?'Введи код из письма и нажми «Подтвердить email». После этого откроется твой профиль.'
-    :'После подтверждения вернись в Nailora. Если сессия восстановится успешно, приложение откроет твой профиль автоматически.';
+    :'После подтверждения вернись в приложение. Если сессия восстановится успешно, приложение откроет твой профиль автоматически.';
 }
 
 let editingAvailabilityDate='';
@@ -4447,6 +4447,8 @@ async function refreshPushSettingsStatus(){
  const status=$('pushNotificationsStatus'),enable=$('enablePushNotifications'),test=$('testPushNotifications'),disable=$('disablePushNotifications');
  if(!status||!enable)return;
  test.classList.add('hidden');disable.classList.add('hidden');
+ if(ruIsAccount()){enable.disabled=true;status.textContent='Push-уведомления для российских аккаунтов пока не подключены.';return}
+ enable.disabled=false;
  if(!cloudReady()){status.textContent=t('Сначала войди в аккаунт Nailora.');return}
  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)){
   status.textContent=t('Это устройство не поддерживает Web Push. Открой Nailora в актуальном браузере.');return;
@@ -4468,6 +4470,7 @@ async function refreshPushSettingsStatus(){
  }catch(err){status.textContent=t('Не удалось включить push-уведомления.')+' '+(err?.message||'');console.warn('Push status check failed:',err)}
 }
 $('enablePushNotifications').onclick=async()=>{
+ if(ruIsAccount()){$('pushNotificationsStatus').textContent='Push-уведомления для российских аккаунтов пока не подключены.';return}
  const button=$('enablePushNotifications'),status=$('pushNotificationsStatus');button.disabled=true;status.textContent='';
  try{
   if(!cloudReady())throw new Error(t('Сначала войди в аккаунт Nailora.'));
@@ -4836,19 +4839,42 @@ function showClientMasterView(view='search'){
 }
 $('clientSearchTab').onclick=()=>showClientMasterView('search');
 $('clientFavoritesTab').onclick=()=>showClientMasterView('favorites');
-async function chooseMasterForBooking(cloudId=''){const master=[...cloudMasterDirectory,...cloudFavoriteMasters].find(m=>String(m.cloudId||m.profileId||m.masterId||'')===String(cloudId))||profiles.master;if(!master)return;if(nailoraIsRussianCountry(master.country)){
+async function chooseMasterForBooking(cloudId=''){
+ const master=[...cloudMasterDirectory,...cloudFavoriteMasters].find(m=>String(m.cloudId||m.profileId||m.masterId||'')===String(cloudId))||profiles.master;
+ if(!master)return;
+ if(nailoraIsRussianCountry(master.country)){
   const masterId=String(master.masterId||master.profileId||master.cloudId||'');
-  if(ruSelectedMasterId===masterId){ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';selectedClientMasterKey='';renderMasterSearch();renderClientCalendar();return;}
+  if(ruSelectedMasterId===masterId){
+   ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';ruAvailableContext='';ruDaySequence++;selectedClientMasterKey='';
+   renderMasterSearch();renderClientCalendar();return;
+  }
+  const scheduleBox=$('clientDaySchedule');
+  if(scheduleBox)scheduleBox.innerHTML='<div class="schedule-empty">Загружаю услуги и расписание мастера…</div>';
   try{
-    const fetched=ruNormalizeServices(await ruSdk().services(masterId));
-    if(!fetched.length)throw new Error('У мастера пока нет доступных услуг');
-    ruSelectedMasterId=masterId;ruServices=fetched;ruSelectedServiceId=fetched[0].id;
-    selectedClientMasterKey=masterSelectionKey(master);selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;
-    clientSelectedDate=iso(new Date());clientCursor=new Date(clientSelectedDate+'T12:00:00');clientCursor.setDate(1);
-    renderClientCalendar();$('clientDaySchedule')?.scrollIntoView({behavior:'smooth',block:'center'});
-  }catch(err){showAppToast('Не удалось открыть расписание: '+(err?.message||'ошибка сервера'));}
+   const fetched=ruNormalizeServices(await ruSdk().services(masterId));
+   if(!fetched.length)throw new Error('У мастера пока нет доступных услуг');
+   ruSelectedMasterId=masterId;ruServices=fetched;ruSelectedServiceId=fetched[0].id;
+   ruAvailableContext='';ruDaySequence++;
+   selectedClientMasterKey=masterSelectionKey(master);selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;
+   clientSelectedDate=iso(new Date());clientCursor=new Date(clientSelectedDate+'T12:00:00');clientCursor.setDate(1);
+   // The existing calendar is directly below the search panel. Start from the calendar, not the isolated day slots.
+   renderClientCalendar();
+   const calendar=$('clientCalendarGrid')?.closest('.panel');
+   calendar?.scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(err){
+   const message='Не удалось открыть расписание: '+(err?.message||'ошибка соединения');
+   if(scheduleBox)scheduleBox.innerHTML='<div class="schedule-empty" role="status">'+escapeHtml(message)+'</div>';
+   showAppToast(message);
+  }
   return;
-}ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';const key=masterSelectionKey(master);if(selectedClientMasterKey===key){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';renderMasterSearch();renderClientCalendar();showAppToast(t('Выбор мастера снят. Выбери мастера, чтобы открыть расписание.'));return}selectedClientMasterKey=key;selectedCloudMasterId=cloudUser?String(master.cloudId||master.profileId||master.masterId||''):'';cloudScheduleData=null;cloudBookedSlots=[];cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';const today=iso(new Date());let ds=clientSelectedDate>=today&&!isDayOff(clientSelectedDate)?clientSelectedDate:nextAvailableDate(today);if(!ds)ds=today;clientSelectedDate=ds;clientCursor=new Date(ds+'T12:00:00');clientCursor.setDate(1);renderMasterSearch();if(cloudUser&&selectedCloudMasterId){await loadCloudScheduleForMaster(master)}renderClientCalendar();$('clientDaySchedule').scrollIntoView({behavior:'smooth',block:'center'});showAppToast(t('Мастер выбран. Нажми на свободный интервал, чтобы забронировать время.'));}
+ }
+ ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';
+ const key=masterSelectionKey(master);
+ if(selectedClientMasterKey===key){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';renderMasterSearch();renderClientCalendar();showAppToast(t('Выбор мастера снят. Выбери мастера, чтобы открыть расписание.'));return}
+ selectedClientMasterKey=key;selectedCloudMasterId=cloudUser?String(master.cloudId||master.profileId||master.masterId||''):'';cloudScheduleData=null;cloudBookedSlots=[];cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';
+ const today=iso(new Date());let ds=clientSelectedDate>=today&&!isDayOff(clientSelectedDate)?clientSelectedDate:nextAvailableDate(today);if(!ds)ds=today;clientSelectedDate=ds;clientCursor=new Date(ds+'T12:00:00');clientCursor.setDate(1);renderMasterSearch();
+ if(cloudUser&&selectedCloudMasterId){await loadCloudScheduleForMaster(master)}renderClientCalendar();$('clientDaySchedule').scrollIntoView({behavior:'smooth',block:'center'});showAppToast(t('Мастер выбран. Нажми на свободный интервал, чтобы забронировать время.'));
+}
 $('searchMastersButton').onclick=renderMasterSearch;
 $('searchActivityDirection').onchange=renderMasterSearch;
 $('searchCountry').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();renderMasterSearch()}});
@@ -4883,16 +4909,29 @@ function renderClientCalendar(){
 // RU calendar uses dates already available in the existing interface; daily slots come from the VPS.
 function ruRenderClientCalendar(){
   const grid=$('clientCalendarGrid');if(!grid)return;grid.innerHTML='';
-  const date=new Date(clientCursor.getFullYear(),clientCursor.getMonth(),1),year=date.getFullYear(),month=date.getMonth();
-  $('clientMonthTitle').textContent=formatMonth(date)+' '+year;
+  const weekView=$('clientCalendarView')?.value==='week';
+  let start,first,total;
+  if(weekView){
+    start=new Date((clientSelectedDate||iso(new Date()))+'T12:00:00');
+    start.setDate(start.getDate()-((start.getDay()+6)%7));
+    const end=new Date(start);end.setDate(end.getDate()+6);
+    const left=new Intl.DateTimeFormat(LOCALES[currentLanguage]||currentLanguage,{day:'numeric',month:'short'}).format(start);
+    const right=new Intl.DateTimeFormat(LOCALES[currentLanguage]||currentLanguage,{day:'numeric',month:'short',year:'numeric'}).format(end);
+    $('clientMonthTitle').textContent=left+'–'+right;
+    first=0;total=7;
+  }else{
+    start=new Date(clientCursor.getFullYear(),clientCursor.getMonth(),1);
+    $('clientMonthTitle').textContent=formatMonth(start)+' '+start.getFullYear();
+    first=(start.getDay()+6)%7;
+    total=new Date(start.getFullYear(),start.getMonth()+1,0).getDate();
+  }
   localizedWeekdays().forEach(x=>{const d=document.createElement('div');d.className='dayname muted';d.textContent=x;grid.append(d)});
-  for(let i=0;i<(date.getDay()+6)%7;i++)grid.append(document.createElement('div'));
-  const days=new Date(year,month+1,0).getDate();
-  for(let day=1;day<=days;day++){
-    const ds=iso(new Date(year,month,day));const b=document.createElement('button');
+  for(let i=0;i<first;i++)grid.append(document.createElement('div'));
+  for(let i=0;i<total;i++){
+    const d=new Date(start.getFullYear(),start.getMonth(),start.getDate()+i),ds=iso(d),b=document.createElement('button');
     b.type='button';b.className='day'+(ds===clientSelectedDate?' selected':'')+(ds===iso(new Date())?' today':'');
-    b.innerHTML=`<span class="num">${day}</span>`;b.title=ds;
-    b.onclick=()=>{clientSelectedDate=ds;ruRenderClientCalendar();};grid.append(b);
+    b.innerHTML='<span class="num">'+d.getDate()+'</span>';b.title=ds;
+    b.onclick=()=>{clientSelectedDate=ds;ruRenderClientCalendar()};grid.append(b);
   }
   ruRenderDay();translatePage();
 }
