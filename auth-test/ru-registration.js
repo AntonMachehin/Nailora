@@ -159,6 +159,8 @@
       specialty: server.specialty || fallback.specialty || cached.specialty || '',
       activityDirection: server.activity_direction || server.activityDirection || fallback.activityDirection || cached.activityDirection || '',
       publicPhoneConsent: server.phone_publication_consent === true || (fallback.publicPhoneConsent === true && server.phone_publication_consent === undefined),
+      avatarUrl: typeof server.avatar_url === 'string' && /^https:\/\//i.test(server.avatar_url) ? server.avatar_url :
+        (typeof server.avatar_url === 'string' && server.avatar_url.startsWith('/avatars/') ? API_ORIGIN + server.avatar_url : (cached.avatarUrl || '')),
       email: me.email, authUserId: id,
       profileId: server.profile_id || server.id || '',
       language: currentLanguage
@@ -170,13 +172,69 @@
     nailoraRememberEmailRegion(me.email, NAILORA_REGION_RU);
     return saved;
   }
+  function restoreMasterData(snapshot) {
+    const payload = snapshot?.master_data;
+    if (!payload || !payload.profile || !Array.isArray(payload.appointments))
+      throw new Error('Российская база не вернула данные мастера. Пустой календарь не открываем.');
+    const profile = payload.profile;
+    const link = snapshot.profiles.find(p => p.role === 'master');
+    if (String(profile.id) !== String(link?.profile_id))
+      throw new Error('Профиль в ответе сервера не соответствует авторизованному аккаунту.');
+    const schedule = payload.schedule_data && typeof payload.schedule_data === 'object'
+      ? payload.schedule_data : {};
+    const savedServices = Array.isArray(schedule.services) && schedule.services.length
+      ? schedule.services : payload.services;
+    // Read-only reconstruction. Nothing is sent back to the database here.
+    data = {
+      clients: [], expenses: [],
+      appointments: payload.appointments.map(a => ({
+        id: String(a.id), localId: a.local_id || '',
+        clientId: a.client_id || '', name: a.client_name || '',
+        phone: a.client_phone || '', service: a.service_name || '',
+        price: Number(a.price) || 0, date: a.local_date || '',
+        time: a.local_time || '', durationMinutes: Number(a.duration_minutes) || 60,
+        notes: a.notes || '', paid: a.paid === true,
+        photos: Array.isArray(a.photos) ? a.photos : [], status: a.status || ''
+      })),
+      daysOff: Array.isArray(schedule.daysOff) ? schedule.daysOff : [],
+      monthlyHours: schedule.monthlyHours && typeof schedule.monthlyHours === 'object' && !Array.isArray(schedule.monthlyHours) ? schedule.monthlyHours : {},
+      availabilityByDate: schedule.availabilityByDate && typeof schedule.availabilityByDate === 'object' && !Array.isArray(schedule.availabilityByDate) ? schedule.availabilityByDate : {},
+      blockedSlots: Array.isArray(schedule.blockedSlots) ? schedule.blockedSlots : [],
+      services: Array.isArray(savedServices) ? savedServices.map(s => ({
+        id: String(s.id || ''), name: String(s.name || ''),
+        durationMinutes: Number(s.durationMinutes ?? s.duration_minutes) || 60,
+        price: Number(s.price) || 0
+      })).filter(s => s.id && s.name) : []
+    };
+    const clients = new Map();
+    for (const a of data.appointments) {
+      const key = a.clientId ? 'id:' + a.clientId
+        : a.phone ? 'phone:' + a.phone.replace(/\D/g, '')
+        : a.name ? 'name:' + a.name.toLocaleLowerCase() : '';
+      if (!key || clients.has(key)) continue;
+      clients.set(key, {id: a.clientId || 'from-appointment:' + a.id,
+        name: a.name || 'Клиент', phone: a.phone || '',
+        service: a.service || '', price: a.price || 0, notes: ''});
+    }
+    data.clients = [...clients.values()];
+    // Keep browser state isolated to the logged in Russian user. It is NOT cloud sync.
+    localStorage.setItem(DATA_CACHE_KEY, JSON.stringify(data));
+  }
   async function openExisting(role, me, fallback = {}) {
-    applyServerProfile(me, role, fallback);
+    let actual = me;
+    if (role === 'master' && !inPreview) {
+      actual = await api('me?include_master=1', 'GET');
+      if (actual.user_id !== me.user_id)
+        throw new Error('Не удалось проверить владельца профиля.');
+    }
+    applyServerProfile(actual, role, fallback);
+    if (role === 'master' && !inPreview) restoreMasterData(actual);
     sessionStorage.removeItem(KEY);
     resetRegistrationView();
     $('regPassword').value = '';
     $('loginPassword').value = '';
     await openRole(role);
+    if (role === 'master' && !inPreview) renderAll();
     setCloudStatus('Профиль открыт · ' + (me.email || 'аккаунт'));
   }
   async function finishRegistration(p) {
