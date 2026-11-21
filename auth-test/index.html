@@ -1123,7 +1123,7 @@ html.nailora-load-timeout::before{content:"Nailora загружается дол
 .nailora-region-panel[data-region="global"]{border-color:#bcdccc;background:#f4fbf7}
 </style>
 <script>
-window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only test; no RU authentication enabled
+window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // RU services; staged UI integration
 /* Nailora RU API v0.3 browser transport. No Supabase calls; no token persistence.
  * Preview build: the UI only uses the read-only probe. Authentication and
  * mutations are defined for later private tests, NOT enabled in HTML.
@@ -1204,7 +1204,8 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
       health(){return request('GET','/healthz')},
       ready(){return request('GET','/readyz')},
       directory(filters){return request('GET','/v1/directory',{query:qs(filters)})},
-      availability(masterId,on){return request('GET','/v1/masters/'+uuid(masterId)+'/availability',{query:qs({on})})},
+      services(masterId){return request('GET','/v1/masters/'+uuid(masterId)+'/services')},
+      availability(masterId,date,serviceId){return request('GET','/v1/masters/'+uuid(masterId)+'/availability',{query:qs({date,service_id:serviceId})})},
       async login(email,password){
         const r=await request('POST','/v1/auth/login',{body:{email,password}});
         if (typeof r?.access_token !== 'string' || !r.access_token) throw new Error('Invalid RU session response');
@@ -1217,7 +1218,7 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
       saveSchedule(scheduleData){return request('PUT','/v1/me/schedule',{body:scheduleData,auth:true})},
       appointments(params){return request('GET','/v1/appointments',{auth:true,query:qs(params)})},
       // By design NEVER accepts client-supplied price, paid, owner, or status.
-      book(x){return request('POST','/v1/appointments',{auth:true,body:{master_id:x.master_id,service_id:x.service_id,date:x.date,time:x.time,notes:x.notes||''}})},
+      book(x){return request('POST','/v1/appointments',{auth:true,body:{master_id:x.master_id,service_id:x.service_id,date:x.date,start_time:x.start_time,request_id:uuid(x.request_id)}})},
       reschedule(id,x){return request('POST','/v1/appointments/'+uuid(id)+'/reschedule',{auth:true,body:{service_id:x.service_id,date:x.date,time:x.time}})},
       cancel(id){return request('POST','/v1/appointments/'+uuid(id)+'/cancel',{auth:true})},
       // Master-only operation; rights enforced on server.
@@ -3380,6 +3381,57 @@ function nailoraStoredRegion(){
  try{const value=localStorage.getItem(NAILORA_REGION_KEY);return value===NAILORA_REGION_RU||value===NAILORA_REGION_GLOBAL?value:''}catch(_){return ''}
 }
 let nailoraActiveRegion=nailoraStoredRegion();
+// Deliberately created once per page; the SDK keeps its bearer only in memory.
+const nailoraRuClient=window.NailoraRuSDK.createClient({
+ baseUrl:window.NAILORA_RU_API_BASE,
+ getRegion:()=>NAILORA_REGION_RU
+});
+let nailoraRuSelectedMasterId='',nailoraRuServices=[],nailoraRuDayInfo=null,nailoraRuDaySerial=0;
+function nailoraRuMasterRow(r){
+ return {cloudId:String(r.id),profileId:String(r.id),masterId:String(r.id),
+  name:String(r.name||''),city:String(r.city||''),country:String(r.country||'Россия'),
+  area:String(r.area||''),specialty:String(r.specialty||''),
+  activityDirection:String(r.activity_direction||''),avatar:String(r.avatar_url||''),
+  avatarUrl:String(r.avatar_url||''),phone:'',address:'',reviews:[],ruSource:true};
+}
+function nailoraRuServicesFromResponse(result){
+ const arr=Array.isArray(result?.items)?result.items:Array.isArray(result?.services)?result.services:[];
+ return arr.filter(x=>x&&typeof x==='object'&&String(x.id||x.service_id||'').trim()).map(x=>({
+   id:String(x.id||x.service_id), name:String(x.name||x.service_name||''),
+   price:Number(x.price)||0,
+   durationMinutes:Number(x.durationMinutes??x.duration_minutes??x.duration)||60
+ })).filter(x=>x.name&&x.durationMinutes>0);
+}
+async function nailoraRuLoadDay(date){
+ if(!nailoraRuSelectedMasterId)return;
+ const serial=++nailoraRuDaySerial,master=nailoraRuSelectedMasterId;
+ nailoraRuDayInfo=null;
+ renderClientDaySchedule();
+ try{
+  if(!nailoraRuServices.length)throw new Error('Мастер пока не указал услуги');
+  const svc=nailoraRuServices[0];
+  const result=await nailoraRuClient.availability(master,date,svc.id);
+  if(serial!==nailoraRuDaySerial||master!==nailoraRuSelectedMasterId||date!==clientSelectedDate)return;
+  if(!Array.isArray(result?.available_starts))throw new Error('Сервер не вернул список свободного времени');
+  nailoraRuDayInfo={date,service:svc,slots:result.available_starts.filter(x=>typeof x==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(x))};
+ }catch(err){
+  if(serial!==nailoraRuDaySerial)return;
+  nailoraRuDayInfo={date,error:String(err?.message||'Не удалось получить расписание')};
+ }
+ renderClientDaySchedule();
+}
+function nailoraRuRenderDay(box,date){
+ const dateLabel=escapeHtml(formatDate(new Date(date+'T12:00:00')));
+ const head=`<div class="schedule-header"><strong>${dateLabel}</strong></div>`;
+ if(!nailoraRuDayInfo||nailoraRuDayInfo.date!==date){box.innerHTML=head+'<div class="schedule-empty">Загружаю свободное время…</div>';return;}
+ if(nailoraRuDayInfo.error){box.innerHTML=head+`<div class="schedule-empty">${escapeHtml(nailoraRuDayInfo.error)}</div>`;return;}
+ const {service,slots}=nailoraRuDayInfo;
+ const title=escapeHtml(service.name+' · '+service.durationMinutes+' мин.');
+ box.innerHTML=head+`<p class="muted small">${title}</p>`+(slots.length
+ ? `<div class="schedule-list">${slots.map(time=>`<div class="schedule-row free"><div class="schedule-time">${escapeHtml(time)}</div><div class="schedule-info"><strong>Свободно</strong></div></div>`).join('')}</div>`
+ : '<div class="schedule-empty">На выбранный день свободного времени нет.</div>');
+}
+
 const NAILORA_REGION_RESOLVER_BASE=''; // Set to the HTTPS domain AFTER secure email OTP service is deployed.
 const NAILORA_EMAIL_REGION_CACHE='nailora_verified_region_by_email_v899';
 function nailoraEmailKey(email){return String(email||'').trim().toLowerCase()}
@@ -4066,6 +4118,7 @@ async function openRole(role){
  activeRole=role;chosenRole=role;
  try{localStorage.setItem(ACTIVE_ROLE_KEY,role)}catch(_){}
  if(role==='client'){
+  nailoraRuSelectedMasterId='';nailoraRuServices=[];nailoraRuDayInfo=null;++nailoraRuDaySerial;
   selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;
   cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';
  }
@@ -4613,11 +4666,23 @@ document.querySelectorAll('#reviewStarControl [data-rating]').forEach(button=>bu
 $('closeReviewDialog').onclick=closeReviewDialog;$('cancelReviewDialog').onclick=closeReviewDialog;$('reviewDialog').addEventListener('click',e=>{if(e.target===$('reviewDialog'))closeReviewDialog()});
 $('reviewForm').onsubmit=e=>{e.preventDefault();const appointmentId=String($('reviewAppointmentId').value||''),appointment=data.appointments.find(a=>String(a.id)===appointmentId);if(activeRole!=='client'||!appointment||!clientOwnsAppointment(appointment)||!appointmentHasPassed(appointment)){alert(t('Эту запись нельзя оценить.'));return}if(!profiles.master){alert(t('Профиль мастера не найден.'));return}const pid=getClientProfileId(true),reviews=getMasterReviews().slice(),oldIndex=reviews.findIndex(r=>String(r.appointmentId)===appointmentId&&String(r.clientProfileId||'')===String(pid));const review={id:oldIndex>=0?reviews[oldIndex].id:((crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random())),appointmentId,clientProfileId:pid,clientNickname:profileNickname('client'),rating:Math.max(1,Math.min(5,Number($('reviewRating').value)||5)),comment:String($('reviewComment').value||'').trim(),createdAt:oldIndex>=0&&reviews[oldIndex].createdAt?reviews[oldIndex].createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};if(oldIndex>=0)reviews[oldIndex]=review;else reviews.push(review);profiles.master={...profiles.master,reviews};if(!persistProfilesSafely(profiles))return;closeReviewDialog();renderMasterReviews();renderMasterSearch();renderClientCalendar();showAppToast(t(oldIndex>=0?'Отзыв обновлён.':'Спасибо за отзыв!'))};
 async function renderMasterSearch(){
- const country=String($('searchCountry')?.value||'').trim(),city=String($('searchCity')?.value||'').trim(),box=$('masterSearchResults');if(!box)return;
- if(nailoraIsRussianCountry(country)){box.innerHTML='<p class="muted">🇷🇺 Мастера России будут доступны через российскую базу после её подключения.</p>';cloudMasterDirectory=[];return;}
+ const country=String($('searchCountry')?.value||'').trim(),city=String($('searchCity')?.value||'').trim(),box=$('masterSearchResults');if(!box)return;if(!nailoraIsRussianCountry(country)&&nailoraRuSelectedMasterId){++nailoraRuDaySerial;nailoraRuSelectedMasterId='';nailoraRuServices=[];nailoraRuDayInfo=null;selectedCloudMasterId='';selectedClientMasterKey='';cloudScheduleData=null;cloudBookedSlots=[];renderClientCalendar();}
  if(!country||!city){box.innerHTML=`<p class="muted">${escapeHtml(t('Введи страну и город для поиска.'))}</p>`;if(selectedClientMasterKey){selectedClientMasterKey='';selectedCloudMasterId='';renderClientCalendar()}translatePage();return}
  let found=[];
- if(cloud&&cloudUser){try{const {data:rows,error}=await cloud.from('nailora_master_public_directory').select('*').eq('is_active',true).ilike('country',country).ilike('city',city).limit(100);if(error)throw error;found=(rows||[]).map(r=>({...profileFromCloudRow('master',r),cloudId:r.id,profileId:r.id,masterId:r.id,phone:r.phone||'',avatar:r.avatar_url||'',avatarUrl:r.avatar_url||'',reviews:[]}));cloudMasterDirectory=found;}catch(err){console.error(err);box.innerHTML=`<p class="muted">Не удалось загрузить мастеров из Supabase: ${escapeHtml(err.message||'ошибка')}</p>`;translatePage();return}}
+  if(nailoraIsRussianCountry(country)){
+   try{
+    const result=await nailoraRuClient.directory({limit:50});
+    if(!Array.isArray(result?.items))throw new Error('Некорректный ответ каталога');
+    found=result.items.map(nailoraRuMasterRow)
+     .filter(m=>nailoraIsRussianCountry(m.country)&&cityMatches(m.city,city));
+    cloudMasterDirectory=found;
+   }catch(err){
+    cloudMasterDirectory=[];
+    box.innerHTML=`<p class="muted">Не удалось получить список мастеров: ${escapeHtml(err.message||'ошибка')}</p>`;
+    return;
+   }
+  }
+  else if(cloud&&cloudUser){try{const {data:rows,error}=await cloud.from('nailora_master_public_directory').select('*').eq('is_active',true).ilike('country',country).ilike('city',city).limit(100);if(error)throw error;found=(rows||[]).map(r=>({...profileFromCloudRow('master',r),cloudId:r.id,profileId:r.id,masterId:r.id,phone:r.phone||'',avatar:r.avatar_url||'',avatarUrl:r.avatar_url||'',reviews:[]}));cloudMasterDirectory=found;}catch(err){console.error(err);box.innerHTML=`<p class="muted">Не удалось загрузить мастеров из Supabase: ${escapeHtml(err.message||'ошибка')}</p>`;translatePage();return}}
  else {const master=profiles.master||null;const masterCity=master?.city||master?.area||'',masterCountry=master?.country||'';found=master&&cityMatches(masterCity,city)&&countryKey(masterCountry)===countryKey(country)?[master]:[];cloudMasterDirectory=found;}
  const selectedDirection=String($('searchActivityDirection')?.value||'').trim();
  const directoryFound=found;
@@ -4625,7 +4690,7 @@ async function renderMasterSearch(){
  cloudMasterDirectory=found;
  if(selectedClientMasterKey&&!found.some(m=>masterSelectionKey(m)===selectedClientMasterKey)&&!cloudFavoriteMasters.some(m=>masterSelectionKey(m)===selectedClientMasterKey)){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;renderClientCalendar()}
  if(!found.length){const msg=directoryFound.length&&selectedDirection?'В этом городе пока нет мастеров с выбранным направлением.':'Мастеров в выбранном городе пока нет.';box.innerHTML=`<p class="muted">${escapeHtml(t(msg))}</p><p class="muted small">${cloudUser?'В этом городе пока нет опубликованных профилей мастеров с таким направлением.':'Для общего каталога между устройствами войди в аккаунт Nailora.'}</p>`;translatePage();return}
- box.innerHTML=found.map(m=>{const avatar=isAvatarImage(m.avatar)?`<img class="master-card-avatar" src="${escapeHtml(m.avatar)}" alt="Аватар мастера">`:`<div class="master-card-avatar-placeholder" aria-hidden="true">👤</div>`;const chosen=selectedClientMasterKey===masterSelectionKey(m),favorite=isFavoriteMaster(m),masterId=String(m.cloudId||m.profileId||'');return `<article class="card"><div class="master-card-head">${avatar}<div style="flex:1;min-width:0"><h3>${escapeHtml(profileNicknameFor(m,'master'))}</h3><div class="muted small">${escapeHtml(m.activityDirection||'Направление не указано')}</div><div>${escapeHtml(m.specialty||t('Специализация не указана'))}</div><div class="muted" style="margin-top:6px">📍 ${escapeHtml([m.city||m.area,m.country].filter(Boolean).join(', '))}</div><div style="margin-top:5px"><strong>${escapeHtml(t('Адрес оказания услуг'))}:</strong> ${escapeHtml(m.address||t('Адрес не указан'))}</div>${m.area?`<div class="muted small">${escapeHtml(t('Район / ориентир'))}: ${escapeHtml(m.area)}</div>`:''}</div></div><div class="rating-summary">${ratingSummaryHtml(m)}</div><div class="review-list master-card-reviews">${renderReviewCards(m,2)}</div><div class="row" style="margin-top:10px"><button class="btn primary fixed" type="button" onclick="chooseMasterForBooking('${escapeHtml(masterId)}')">${escapeHtml(t(chosen?'Снять выбор':'Выбрать мастера'))}</button><button class="btn fixed" type="button" onclick="toggleFavoriteMaster('${escapeHtml(masterId)}')">${escapeHtml(t(favorite?'Убрать из моих мастеров':'Добавить мастера'))}</button>${String(m.phone||'').trim()?`<a class="btn fixed" href="tel:${escapeHtml(String(m.phone).replace(/[^0-9+*#,;]/g,''))}">${escapeHtml(t('Позвонить'))}</a>`:`<button class="btn fixed" type="button" disabled>${escapeHtml(t('Позвонить'))}</button>`}</div></article>`}).join('');translatePage();
+ box.innerHTML=found.map(m=>{const avatar=isAvatarImage(m.avatar)?`<img class="master-card-avatar" src="${escapeHtml(m.avatar)}" alt="Аватар мастера">`:`<div class="master-card-avatar-placeholder" aria-hidden="true">👤</div>`;const chosen=selectedClientMasterKey===masterSelectionKey(m),favorite=isFavoriteMaster(m),masterId=String(m.cloudId||m.profileId||'');return `<article class="card"><div class="master-card-head">${avatar}<div style="flex:1;min-width:0"><h3>${escapeHtml(profileNicknameFor(m,'master'))}</h3><div class="muted small">${escapeHtml(m.activityDirection||'Направление не указано')}</div><div>${escapeHtml(m.specialty||t('Специализация не указана'))}</div><div class="muted" style="margin-top:6px">📍 ${escapeHtml([m.city||m.area,m.country].filter(Boolean).join(', '))}</div><div style="margin-top:5px"><strong>${escapeHtml(t('Адрес оказания услуг'))}:</strong> ${escapeHtml(m.address||t('Адрес не указан'))}</div>${m.area?`<div class="muted small">${escapeHtml(t('Район / ориентир'))}: ${escapeHtml(m.area)}</div>`:''}</div></div><div class="rating-summary">${ratingSummaryHtml(m)}</div><div class="review-list master-card-reviews">${renderReviewCards(m,2)}</div><div class="row" style="margin-top:10px"><button class="btn primary fixed" type="button" onclick="chooseMasterForBooking('${escapeHtml(masterId)}')">${escapeHtml(t(chosen?'Снять выбор':'Выбрать мастера'))}</button>${m.ruSource?'':`<button class="btn fixed" type="button" onclick="toggleFavoriteMaster('${escapeHtml(masterId)}')">${escapeHtml(t(favorite?'Убрать из моих мастеров':'Добавить мастера'))}</button>`}${String(m.phone||'').trim()?`<a class="btn fixed" href="tel:${escapeHtml(String(m.phone).replace(/[^0-9+*#,;]/g,''))}">${escapeHtml(t('Позвонить'))}</a>`:`<button class="btn fixed" type="button" disabled>${escapeHtml(t('Позвонить'))}</button>`}</div></article>`}).join('');translatePage();
 }
 
 function favoriteMasterIds(){const ids=profiles.client?.favoriteMasterIds;return Array.isArray(ids)?Array.from(new Set(ids.map(x=>String(x||'').trim()).filter(Boolean))):[]}
@@ -4710,14 +4775,39 @@ function showClientMasterView(view='search'){
 }
 $('clientSearchTab').onclick=()=>showClientMasterView('search');
 $('clientFavoritesTab').onclick=()=>showClientMasterView('favorites');
-async function chooseMasterForBooking(cloudId=''){const master=[...cloudMasterDirectory,...cloudFavoriteMasters].find(m=>String(m.cloudId||m.profileId||m.masterId||'')===String(cloudId))||profiles.master;if(!master)return;const key=masterSelectionKey(master);if(selectedClientMasterKey===key){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';renderMasterSearch();renderClientCalendar();showAppToast(t('Выбор мастера снят. Выбери мастера, чтобы открыть расписание.'));return}selectedClientMasterKey=key;selectedCloudMasterId=cloudUser?String(master.cloudId||master.profileId||master.masterId||''):'';cloudScheduleData=null;cloudBookedSlots=[];cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';const today=iso(new Date());let ds=clientSelectedDate>=today&&!isDayOff(clientSelectedDate)?clientSelectedDate:nextAvailableDate(today);if(!ds)ds=today;clientSelectedDate=ds;clientCursor=new Date(ds+'T12:00:00');clientCursor.setDate(1);renderMasterSearch();if(cloudUser&&selectedCloudMasterId){await loadCloudScheduleForMaster(master)}renderClientCalendar();$('clientDaySchedule').scrollIntoView({behavior:'smooth',block:'center'});showAppToast(t('Мастер выбран. Нажми на свободный интервал, чтобы забронировать время.'));}
+async function chooseMasterForBooking(cloudId=''){const master=[...cloudMasterDirectory,...cloudFavoriteMasters].find(m=>String(m.cloudId||m.profileId||m.masterId||'')===String(cloudId))||profiles.master;if(!master)return;
+ if(master.ruSource){
+  const key=masterSelectionKey(master);
+  if(selectedClientMasterKey===key){
+   ++nailoraRuDaySerial;nailoraRuSelectedMasterId='';nailoraRuServices=[];nailoraRuDayInfo=null;
+   selectedClientMasterKey='';selectedCloudMasterId='';cloudScheduleData=null;cloudBookedSlots=[];
+   await renderMasterSearch();renderClientCalendar();return;
+  }
+  try{
+   const result=await nailoraRuClient.services(String(master.masterId));
+   const services=nailoraRuServicesFromResponse(result);
+   if(!services.length)throw new Error('У мастера пока нет доступных услуг');
+   nailoraRuServices=services;nailoraRuSelectedMasterId=String(master.masterId);
+   selectedClientMasterKey=key;selectedCloudMasterId=String(master.masterId);
+   cloudScheduleData={services,daysOff:[],monthlyHours:{},availabilityByDate:{},blockedSlots:[]};
+   cloudBookedSlots=[];
+   const today=iso(new Date());clientSelectedDate=clientSelectedDate>=today?clientSelectedDate:today;
+   clientCursor=new Date(clientSelectedDate+'T12:00:00');clientCursor.setDate(1);
+   renderClientCalendar();await nailoraRuLoadDay(clientSelectedDate);
+   await renderMasterSearch();
+   $('clientDaySchedule').scrollIntoView({behavior:'smooth',block:'center'});
+  }catch(err){showAppToast('Не удалось открыть расписание: '+(err.message||'ошибка'));}
+  return;
+ }
+ ++nailoraRuDaySerial;nailoraRuSelectedMasterId='';nailoraRuDayInfo=null;
+ const key=masterSelectionKey(master);if(selectedClientMasterKey===key){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';renderMasterSearch();renderClientCalendar();showAppToast(t('Выбор мастера снят. Выбери мастера, чтобы открыть расписание.'));return}selectedClientMasterKey=key;selectedCloudMasterId=cloudUser?String(master.cloudId||master.profileId||master.masterId||''):'';cloudScheduleData=null;cloudBookedSlots=[];cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';const today=iso(new Date());let ds=clientSelectedDate>=today&&!isDayOff(clientSelectedDate)?clientSelectedDate:nextAvailableDate(today);if(!ds)ds=today;clientSelectedDate=ds;clientCursor=new Date(ds+'T12:00:00');clientCursor.setDate(1);renderMasterSearch();if(cloudUser&&selectedCloudMasterId){await loadCloudScheduleForMaster(master)}renderClientCalendar();$('clientDaySchedule').scrollIntoView({behavior:'smooth',block:'center'});showAppToast(t('Мастер выбран. Нажми на свободный интервал, чтобы забронировать время.'));}
 $('searchMastersButton').onclick=renderMasterSearch;
 $('searchActivityDirection').onchange=renderMasterSearch;
 $('searchCountry').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();renderMasterSearch()}});
 $('searchCity').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();renderMasterSearch()}});
 $('resetMasterSearch').onclick=()=>{$('searchCountry').value=profiles.client?.country||'';$('searchCity').value=profiles.client?.city||profiles.client?.area||'';$('searchActivityDirection').value='';renderMasterSearch()};
 
-function selectClientScheduleDay(ds){if(!ds)return;clientSelectedDate=ds;clientCursor=new Date(ds+'T12:00:00');clientCursor.setDate(1);renderClientCalendar();const target=$('clientDaySchedule');if(target)target.scrollIntoView({behavior:'smooth',block:'start'})}
+function selectClientScheduleDay(ds){if(!ds)return;clientSelectedDate=ds;clientCursor=new Date(ds+'T12:00:00');clientCursor.setDate(1);renderClientCalendar();if(nailoraRuSelectedMasterId)nailoraRuLoadDay(ds);const target=$('clientDaySchedule');if(target)target.scrollIntoView({behavior:'smooth',block:'start'})}
 function clientDayLabel(ds){const d=new Date(ds+'T12:00:00');return new Intl.DateTimeFormat(LOCALES[currentLanguage]||currentLanguage,{weekday:'short',day:'numeric',month:'short'}).format(d)}
 function renderClientCalendar(){
  const grid=$('clientCalendarGrid');if(!grid)return;grid.innerHTML='';
@@ -4733,14 +4823,14 @@ function renderClientCalendar(){
  for(let i=0;i<total;i++){
   const d=weekView?new Date(start.getFullYear(),start.getMonth(),start.getDate()+i):new Date(clientCursor.getFullYear(),clientCursor.getMonth(),i+1),day=d.getDate(),ds=iso(d),off=isDayOff(ds),today=ds===iso(new Date()),count=getAppointmentsOn(ds).length,hours=getMonthHours(ds);
   const b=document.createElement('button');b.type='button';b.className='day'+(today?' today':'')+(count?' has':'')+(off?' off':'')+(ds===clientSelectedDate?' selected':'');
-  const clientWindows=clientAvailabilityIntervals(ds),clientWindowLabel=formatAvailabilityIntervals(clientWindows,true)||t('График не задан');
+  const clientWindows=clientAvailabilityIntervals(ds),clientWindowLabel=nailoraRuSelectedMasterId?'Выбери день':(formatAvailabilityIntervals(clientWindows,true)||t('График не задан'));
   b.innerHTML=`<span class="num">${day}</span>${off?`<small>${escapeHtml(count?t('Выходной · есть запись'):'Выходной')}</small>`:`<small>${escapeHtml(clientWindowLabel)}</small>`}${!off&&count&&!clientWindows.length?`<small class="day-legend">${escapeHtml(t('Есть запись'))}</small>`:''}`;
   b.title=off?t('Выходной'):`${ds} · ${formatAvailabilityIntervals(clientWindows)||t('Мастер ещё не настроил рабочее время')}`;
   b.onclick=()=>selectClientScheduleDay(ds);grid.append(b)
  }
- renderClientDaySchedule();translatePage();if(activeRole==='client'&&selectedCloudMasterId&&cloudUser){const currentRangeKey=selectedCloudMasterId+'|'+clientCursor.getFullYear()+'-'+clientCursor.getMonth();if(window._nailoraLoadedClientRange!==currentRangeKey&&!cloudScheduleLoading){window._nailoraLoadedClientRange=currentRangeKey;loadCloudScheduleForMaster(selectedMaster)}}
+ renderClientDaySchedule();translatePage();if(activeRole==='client'&&selectedCloudMasterId&&cloudUser&&!nailoraRuSelectedMasterId){const currentRangeKey=selectedCloudMasterId+'|'+clientCursor.getFullYear()+'-'+clientCursor.getMonth();if(window._nailoraLoadedClientRange!==currentRangeKey&&!cloudScheduleLoading){window._nailoraLoadedClientRange=currentRangeKey;loadCloudScheduleForMaster(selectedMaster)}}
 }
-function renderClientDaySchedule(){const box=$('clientDaySchedule');if(!box)return;const ds=clientSelectedDate||iso(new Date());const windows=clientAvailabilityIntervals(ds);const label=isDayOff(ds)?t('Выходной'):(formatAvailabilityIntervals(windows)||t('График не задан'));box.innerHTML=`<div class="schedule-header"><strong>${escapeHtml(formatDate(new Date(ds+'T12:00:00')))}</strong><span class="schedule-badge">${escapeHtml(label)}</span></div>${dailyScheduleHtml(ds,true)}`;bindClientBookingSlots(box);}
+function renderClientDaySchedule(){const box=$('clientDaySchedule');if(!box)return;const ds=clientSelectedDate||iso(new Date());if(nailoraRuSelectedMasterId){nailoraRuRenderDay(box,ds);return;}const windows=clientAvailabilityIntervals(ds);const label=isDayOff(ds)?t('Выходной'):(formatAvailabilityIntervals(windows)||t('График не задан'));box.innerHTML=`<div class="schedule-header"><strong>${escapeHtml(formatDate(new Date(ds+'T12:00:00')))}</strong><span class="schedule-badge">${escapeHtml(label)}</span></div>${dailyScheduleHtml(ds,true)}`;bindClientBookingSlots(box);}
 
 function appendGapRows(rows,date,start,end,clientView){
  let cursor=start;const blocks=getBlockedSlotsOn(date);
@@ -4879,7 +4969,7 @@ async function deleteClientBooking(id){const a=findClientAppointment(id);if(!a||
 let currentClientBookingId='';
 function closeClientBooking(){const d=$('clientBookingDialog');if(d.open&&typeof d.close==='function')d.close();else d.removeAttribute('open');currentClientBookingId='';$('clientBookingId').value='';clientCommentPhotos=[];$('clientBookingPhotos').value='';renderPhotoPreviews('clientBookingPhotoPreview',clientCommentPhotos,()=>{})}
 $('closeClientBooking').onclick=closeClientBooking;$('cancelClientBooking').onclick=closeClientBooking;$('clientBookingDialog').addEventListener('click',e=>{if(e.target===$('clientBookingDialog'))closeClientBooking()});
-$('clientBookingForm').onsubmit=e=>{e.preventDefault();const id=$('clientBookingId').value,date=$('clientBookingDate').value,time=$('clientBookingTime').value,start=timeToMinutes(time),option=$('clientBookingService').selectedOptions[0],service=String(option?.dataset.name||'').trim(),durationMinutes=Math.max(15,Math.min(480,Number(option?.dataset.duration)||0)),end=start+durationMinutes,name=String((profiles.client||{}).name||'').trim()||String((id?findClientAppointment(id)?.name:'')||'').trim(),phone=String((profiles.client||{}).phone||'').trim()||String((id?findClientAppointment(id)?.phone:'')||'').trim(),notes=$('clientBookingNotes').value.trim(),photos=clientCommentPhotos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS),serviceId=option&&!String(option.value).startsWith('legacy:')?option.value:(option?.dataset.serviceId||''),price=Math.max(0,Number(option?.dataset.price)||0),existing=id?findClientAppointment(id):null;if(id&&(!existing||!clientOwnsAppointment(existing))){alert(t('Эта запись недоступна для изменения.'));return}if(!name||!service||!option||!durationMinutes){alert(t('Заполни имя и выбери услугу из списка мастера.'));return}if(!date||!time||!/^\d{2}:\d{2}$/.test(time)){alert(t('Выбери дату и время.'));return}if(date<iso(new Date())||(date===iso(new Date())&&start<=new Date().getHours()*60+new Date().getMinutes())){alert(t('Нельзя забронировать время в прошлом.'));return}if(isDayOff(date)){alert(t('Этот день отмечен как выходной.'));return}if(cloudReady()&&selectedCloudMasterId){if(!intervalFitsWorkWindow(date,start,end,true)){alert(t('Эта услуга не помещается целиком в один рабочий интервал мастера. Выбери другое время.'));return}}else{const hours=getMonthHours(date);if(start<timeToMinutes(hours.start)||end>timeToMinutes(hours.end)){alert(t('Выбранная длительность не помещается в рабочее время. Выбери другое время.'));return}}if(hasBlockedOverlap(date,start,end)){alert(t('Часть выбранного времени заблокирована. Выбери другой интервал.'));return}if(getAppointmentsOn(date).some(a=>String(a.id)!==String(id)&&start<appointmentInterval(a).end&&end>appointmentInterval(a).start)){alert(t('Запись пересекается с другой записью. Выбери другое время.'));return}const client=ensureClientCard({name,phone,service,price});const profileId=getClientProfileId(true);if(existing){Object.assign(existing,{clientId:client?.id||existing.clientId||'',clientProfileId:profileId,name,phone,service,serviceId,durationMinutes,price,date,time,notes,photos,source:'client-booking'})}else{data.appointments.push({id:(crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random()),clientId:client?.id||'',clientProfileId:profileId,name,phone,service,serviceId,price,date,time,notes,photos,paid:false,durationMinutes,source:'client-booking'})}profiles.client={...(profiles.client||{}),profileId,name,phone};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));clientSelectedDate=date;clientCursor=new Date(date+'T12:00:00');clientCursor.setDate(1);const cloudAp=existing||data.appointments.find(a=>String(a.id)===String(currentClientBookingId));closeClientBooking();save();if(cloudReady()&&selectedCloudMasterId){if(cloudAp){cloudAp.cloudMasterId=selectedCloudMasterId;cloudAp.cloudClientId=profiles.client.cloudId;syncCloudAppointment(cloudAp,'client','upsert').then(ok=>{if(ok){loadCloudScheduleForMaster(cloudMasterDirectory.find(m=>String(m.cloudId)===selectedCloudMasterId)||{cloudId:selectedCloudMasterId});showAppToast(t(existing?'Запись изменена и сохранена в облаке.':'Запись подтверждена и сохранена в облаке.'))}else{cloudBookedSlots=[...cloudBookedSlots,{...cloudAp,cloudMasterId:selectedCloudMasterId,cloudClientId:profiles.client.cloudId,isOwn:true,status:'booked',source:'client-booking'}];renderClientCalendar()}})}else{const created=data.appointments[data.appointments.length-1];if(created){created.cloudMasterId=selectedCloudMasterId;created.cloudClientId=profiles.client.cloudId;syncCloudAppointment(created,'client','upsert').then(ok=>{if(ok){loadCloudScheduleForMaster(cloudMasterDirectory.find(m=>String(m.cloudId)===selectedCloudMasterId)||{cloudId:selectedCloudMasterId});showAppToast(t('Запись подтверждена и сохранена в облаке.'))}else{cloudBookedSlots=[...cloudBookedSlots,{...created,cloudMasterId:selectedCloudMasterId,cloudClientId:profiles.client.cloudId,isOwn:true,status:'booked',source:'client-booking'}];renderClientCalendar()}})}}}if(!(cloudReady()&&selectedCloudMasterId))showAppToast(t(existing?'Запись изменена в этом браузере.':'Запись сохранена в этом браузере.'))};
+$('clientBookingForm').onsubmit=e=>{e.preventDefault();if(nailoraRuSelectedMasterId){showAppToast('Запись к российскому мастеру здесь пока не включена.');return;}const id=$('clientBookingId').value,date=$('clientBookingDate').value,time=$('clientBookingTime').value,start=timeToMinutes(time),option=$('clientBookingService').selectedOptions[0],service=String(option?.dataset.name||'').trim(),durationMinutes=Math.max(15,Math.min(480,Number(option?.dataset.duration)||0)),end=start+durationMinutes,name=String((profiles.client||{}).name||'').trim()||String((id?findClientAppointment(id)?.name:'')||'').trim(),phone=String((profiles.client||{}).phone||'').trim()||String((id?findClientAppointment(id)?.phone:'')||'').trim(),notes=$('clientBookingNotes').value.trim(),photos=clientCommentPhotos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS),serviceId=option&&!String(option.value).startsWith('legacy:')?option.value:(option?.dataset.serviceId||''),price=Math.max(0,Number(option?.dataset.price)||0),existing=id?findClientAppointment(id):null;if(id&&(!existing||!clientOwnsAppointment(existing))){alert(t('Эта запись недоступна для изменения.'));return}if(!name||!service||!option||!durationMinutes){alert(t('Заполни имя и выбери услугу из списка мастера.'));return}if(!date||!time||!/^\d{2}:\d{2}$/.test(time)){alert(t('Выбери дату и время.'));return}if(date<iso(new Date())||(date===iso(new Date())&&start<=new Date().getHours()*60+new Date().getMinutes())){alert(t('Нельзя забронировать время в прошлом.'));return}if(isDayOff(date)){alert(t('Этот день отмечен как выходной.'));return}if(cloudReady()&&selectedCloudMasterId){if(!intervalFitsWorkWindow(date,start,end,true)){alert(t('Эта услуга не помещается целиком в один рабочий интервал мастера. Выбери другое время.'));return}}else{const hours=getMonthHours(date);if(start<timeToMinutes(hours.start)||end>timeToMinutes(hours.end)){alert(t('Выбранная длительность не помещается в рабочее время. Выбери другое время.'));return}}if(hasBlockedOverlap(date,start,end)){alert(t('Часть выбранного времени заблокирована. Выбери другой интервал.'));return}if(getAppointmentsOn(date).some(a=>String(a.id)!==String(id)&&start<appointmentInterval(a).end&&end>appointmentInterval(a).start)){alert(t('Запись пересекается с другой записью. Выбери другое время.'));return}const client=ensureClientCard({name,phone,service,price});const profileId=getClientProfileId(true);if(existing){Object.assign(existing,{clientId:client?.id||existing.clientId||'',clientProfileId:profileId,name,phone,service,serviceId,durationMinutes,price,date,time,notes,photos,source:'client-booking'})}else{data.appointments.push({id:(crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random()),clientId:client?.id||'',clientProfileId:profileId,name,phone,service,serviceId,price,date,time,notes,photos,paid:false,durationMinutes,source:'client-booking'})}profiles.client={...(profiles.client||{}),profileId,name,phone};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));clientSelectedDate=date;clientCursor=new Date(date+'T12:00:00');clientCursor.setDate(1);const cloudAp=existing||data.appointments.find(a=>String(a.id)===String(currentClientBookingId));closeClientBooking();save();if(cloudReady()&&selectedCloudMasterId){if(cloudAp){cloudAp.cloudMasterId=selectedCloudMasterId;cloudAp.cloudClientId=profiles.client.cloudId;syncCloudAppointment(cloudAp,'client','upsert').then(ok=>{if(ok){loadCloudScheduleForMaster(cloudMasterDirectory.find(m=>String(m.cloudId)===selectedCloudMasterId)||{cloudId:selectedCloudMasterId});showAppToast(t(existing?'Запись изменена и сохранена в облаке.':'Запись подтверждена и сохранена в облаке.'))}else{cloudBookedSlots=[...cloudBookedSlots,{...cloudAp,cloudMasterId:selectedCloudMasterId,cloudClientId:profiles.client.cloudId,isOwn:true,status:'booked',source:'client-booking'}];renderClientCalendar()}})}else{const created=data.appointments[data.appointments.length-1];if(created){created.cloudMasterId=selectedCloudMasterId;created.cloudClientId=profiles.client.cloudId;syncCloudAppointment(created,'client','upsert').then(ok=>{if(ok){loadCloudScheduleForMaster(cloudMasterDirectory.find(m=>String(m.cloudId)===selectedCloudMasterId)||{cloudId:selectedCloudMasterId});showAppToast(t('Запись подтверждена и сохранена в облаке.'))}else{cloudBookedSlots=[...cloudBookedSlots,{...created,cloudMasterId:selectedCloudMasterId,cloudClientId:profiles.client.cloudId,isOwn:true,status:'booked',source:'client-booking'}];renderClientCalendar()}})}}}if(!(cloudReady()&&selectedCloudMasterId))showAppToast(t(existing?'Запись изменена в этом браузере.':'Запись сохранена в этом браузере.'))};
 
 function renderMasterServices(){const list=$('masterServicesList');if(!list)return;const services=Array.isArray(data.services)?data.services:[];list.innerHTML=services.length?services.map(s=>`<div class="service-row"><div class="service-description"><strong>${escapeHtml(s.name)}</strong><span>${Math.max(15,Math.min(480,Number(s.durationMinutes)||60))} ${escapeHtml(t('мин.'))}${Number(s.price)>0?' · '+escapeHtml(startingPrice(s.price)):''}</span></div><div class="service-actions"><button class="btn fixed" type="button" onclick="editMasterService('${escapeHtml(s.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="deleteMasterService('${escapeHtml(s.id)}')">${escapeHtml(t('Удалить'))}</button></div></div>`).join(''):`<p class="muted">${escapeHtml(t('Услуг пока нет. Добавь первую услугу.'))}</p>`}
 function resetMasterServiceForm(){ $('masterServiceId').value='';$('masterServiceName').value='';$('masterServiceDuration').value='90';$('masterServicePrice').value='0';$('masterServiceEditorSummary').textContent=t('+ Добавить услугу');$('cancelMasterServiceEdit').classList.add('hidden') }
