@@ -1169,7 +1169,7 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
           body = await resp.json();
         }
         if (!resp.ok) {
-          const e = new Error(typeof body?.detail === 'string' ? body.detail : 'RU API error (' + resp.status + ')');
+          const e = new Error(typeof body?.error === 'string' ? body.error : (typeof body?.detail === 'string' ? body.detail : 'RU API error (' + resp.status + ')'));
           e.status = resp.status; throw e;
         }
         return body;
@@ -1193,20 +1193,58 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
       health(){return request('GET','/healthz')},
       ready(){return request('GET','/readyz')},
       directory(filters){return request('GET','/v1/directory',{query:qs(filters)})},
-      availability(masterId,on){return request('GET','/v1/masters/'+uuid(masterId)+'/availability',{query:qs({on})})},
+      services(masterId){return request('GET','/v1/masters/'+uuid(masterId)+'/services')},
+      // Read availability for the master's service location, not the client's nationality.
+      availability(masterId,date,serviceId){
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date||''))) throw new Error('Invalid availability date');
+        return request('GET','/v1/masters/'+uuid(masterId)+'/availability',{
+          query:qs({date,service_id:serviceId})
+        });
+      },
+      register(email,password){return request('POST','/v1/auth/register',{body:{email,password}})},
+      resend(email){return request('POST','/v1/auth/resend',{body:{email}})},
+      async verify(email,code){
+        if (!/^\d{8}$/.test(String(code||''))) throw new Error('Нужен восьмизначный код');
+        const r=await request('POST','/v1/auth/verify',{body:{email,code}});
+        if (!r?.success || typeof r.access_token !== 'string' || !r.access_token) throw new Error('Invalid RU verification response');
+        bearer=r.access_token; return {success:true,expires_in:r.expires_in};
+      },
       async login(email,password){
         const r=await request('POST','/v1/auth/login',{body:{email,password}});
-        if (typeof r?.access_token !== 'string' || !r.access_token) throw new Error('Invalid RU session response');
-        bearer=r.access_token; return {role:r.role,expires_in:r.expires_in};
+        if (!r?.success || typeof r.access_token !== 'string' || !r.access_token) throw new Error('Invalid RU session response');
+        bearer=r.access_token; return {success:true,expires_in:r.expires_in};
       },
       async logout(){try{if(bearer)await request('POST','/v1/auth/logout',{auth:true});}finally{bearer=null}},
       me(){return request('GET','/v1/me',{auth:true})},
+      createProfile(x){
+        if (!x || !['client','master'].includes(x.role) || typeof x.name !== 'string' || !x.name.trim()) throw new Error('Некорректные данные профиля');
+        return request('POST','/v1/me/profiles',{auth:true,body:{
+          role:x.role,name:x.name,city:x.city||'',country:'Россия',
+          ...(x.details === undefined ? {} : {details:x.details})
+        }});
+      },
       updateMe(fields){return request('PATCH','/v1/me',{body:fields,auth:true})},
       schedule(){return request('GET','/v1/me/schedule',{auth:true})},
       saveSchedule(scheduleData){return request('PUT','/v1/me/schedule',{body:scheduleData,auth:true})},
       appointments(params){return request('GET','/v1/appointments',{auth:true,query:qs(params)})},
       // By design NEVER accepts client-supplied price, paid, owner, or status.
-      book(x){return request('POST','/v1/appointments',{auth:true,body:{master_id:x.master_id,service_id:x.service_id,date:x.date,time:x.time,notes:x.notes||''}})},
+      // request_id MUST stay the same when retrying the same booking intent.
+      // No price, paid status, phone, photos, or notes sent until server support is verified.
+      book(x){
+        const body={
+          master_id:uuid(x?.master_id),
+          service_id:String(x?.service_id||''),
+          date:String(x?.date||''),
+          start_time:String(x?.start_time||''),
+          request_id:uuid(x?.request_id)
+        };
+        if(!body.service_id || !/^\d{4}-\d{2}-\d{2}$/.test(body.date) || !/^([01]\d|2[0-3]):(00|30)$/.test(body.start_time)) {
+          throw new Error('Invalid booking parameters');
+        }
+        // Explicit refusal prevents losing the client's photos or comments silently.
+        if (String(x?.notes||'').trim() || (Array.isArray(x?.photos) && x.photos.length)) throw new Error('Комментарии и фото пока не поддерживаются российским API');
+        return request('POST','/v1/appointments',{auth:true,body});
+      },
       reschedule(id,x){return request('POST','/v1/appointments/'+uuid(id)+'/reschedule',{auth:true,body:{service_id:x.service_id,date:x.date,time:x.time}})},
       cancel(id){return request('POST','/v1/appointments/'+uuid(id)+'/cancel',{auth:true})},
       // Master-only operation; rights enforced on server.
@@ -1253,13 +1291,8 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
   <p class="muted" style="margin:20px 0 0;text-align:center">Выбери свой тип аккаунта</p>
   <div class="row" style="margin-top:12px"><button class="btn primary" id="chooseMaster" type="button">Я мастер</button><button class="btn primary" id="chooseClient" type="button">Я клиент</button></div>
   <div id="roleAccessPanel" class="panel hidden" style="margin-top:14px;padding:16px"><h3 id="roleAccessTitle" style="margin:0 0 6px">Аккаунт мастера</h3><p id="roleAccessMessage" class="muted small" aria-live="polite" style="margin:0 0 12px">Выбери регистрацию или вход.</p><div class="row"><button class="btn primary" id="roleRegisterButton" type="button">Создать профиль мастера</button><button class="btn" id="roleLoginButton" type="button">Войти</button><button class="btn" id="roleAccessBack" type="button">Назад</button></div></div>
-  <div class="panel" style="margin-top:14px;padding:14px" aria-label="Тест российского каталога">
-    <strong>🇷🇺 Российский каталог — тест подключения</strong>
-    <p class="muted small">Проверка только чтения опубликованных анкет. Регистрация и запись на российском сервере пока отключены.</p>
-    <button class="btn" type="button" id="ruCatalogProbe">Проверить российский каталог</button>
-    <p class="muted small" id="ruCatalogProbeStatus" role="status" aria-live="polite">Нажми кнопку для проверки соединения.</p>
-  </div>
-  <div class="row" style="margin-top:12px"><span id="cloudStatus" class="muted small">Проверка подключения…</span></div><p class="muted small" id="nailoraCloudInfo" style="margin-top:18px">Регион хранения определяется при регистрации и сохраняется для следующих входов.</p>
+  <span id="cloudStatus" class="hidden" aria-hidden="true"></span>
+  <span id="nailoraCloudInfo" class="hidden" aria-hidden="true"></span>
   <div class="policy-welcome-footer"><button type="button" class="nailora-policy-link" data-nailora-privacy>Политика конфиденциальности</button></div>
  </div>
 </section>
@@ -1280,8 +1313,8 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
  </div>
  <div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn primary" type="submit" id="createProfileButton">Создать профиль</button><button class="btn hidden" id="registerOpenLogin" type="button" tabindex="-1" aria-hidden="true">Войти</button><button class="btn" id="backWelcome" type="button">Назад</button></div><p id="registerStatus" class="muted small" aria-live="polite" style="margin-top:10px"></p></form>
  </div></section>
-<section id="verifyEmail" class="wrap hidden" style="max-width:720px;padding-top:6vh"><div class="panel verify-panel"><div class="verify-mark" aria-hidden="true">✉</div><h2 class="verify-title">Подтверди электронную почту</h2><p class="verify-subtitle">Остался всего один небольшой шаг, и можно будет пользоваться Nailora.</p><p id="verifyEmailMessage" class="verify-intro" aria-live="polite">Мы отправили письмо со ссылкой для подтверждения. Открой его, чтобы подтвердить адрес.</p><ol class="verify-steps"><li><strong>Зайди в свою электронную почту</strong><span>Открой почтовый ящик, который указал при регистрации.</span></li><li><strong>Найди письмо от Nailora</strong><span>Если его не видно во входящих, загляни в папку «Спам».</span></li><li><strong>Открой письмо и перейди по ссылке</strong><span>Это подтвердит адрес электронной почты.</span></li></ol><p class="verify-note">После подтверждения вернись в Nailora. Если сессия восстановится успешно, приложение откроет твой профиль автоматически.</p><div class="verify-help small" style="margin-top:16px"><button type="button" id="verifyNoEmailToggle" class="link-button" aria-expanded="false" aria-controls="verifyNoEmailDetails">Письмо не пришло?</button><div id="verifyNoEmailDetails" class="hidden" style="margin-top:10px;padding:14px;border:1px solid #e9dff3;background:#faf7fc;border-radius:12px;text-align:left"><p style="margin:0 0 10px;color:#62566e">Проверь папку «Спам». Если письма там нет, можно отправить ссылку ещё раз здесь. Если аккаунт уже создан, не создавай его повторно.</p><div class="row" style="flex-wrap:wrap"><button type="button" id="resendVerifyEmail" class="btn primary">Отправить письмо ещё раз</button><button type="button" id="verifyBackToRegister" class="btn">Вернуться к регистрации</button></div><p id="verifyHelpStatus" class="muted small" aria-live="polite" style="margin:10px 0 0"></p></div></div></div></section>
-<section id="login" class="wrap hidden" style="max-width:650px;padding-top:5vh"><div class="panel"><h2>Вход в Nailora</h2><form id="loginForm">
+<section id="verifyEmail" class="wrap hidden" style="max-width:720px;padding-top:6vh"><div class="panel verify-panel"><div class="verify-mark" aria-hidden="true">✉</div><h2 class="verify-title">Подтверди электронную почту</h2><p class="verify-subtitle">Остался всего один небольшой шаг, и можно будет пользоваться Nailora.</p><p id="verifyEmailMessage" class="verify-intro" aria-live="polite">Мы отправили письмо со ссылкой для подтверждения. Открой его, чтобы подтвердить адрес.</p><div id="ruVerifyCodeArea" class="hidden"><label for="ruVerifyCode">Восьмизначный код из письма</label><input id="ruVerifyCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{8}" placeholder="00000000"><button id="ruVerifyConfirm" type="button" class="btn primary" style="margin:12px 0">Подтвердить email</button><button id="ruVerifyBackLogin" type="button" class="btn" style="margin:12px 0 12px 8px">← Назад ко входу</button><p id="ruVerifyStatus" class="muted small" aria-live="polite"></p></div><ol class="verify-steps" id="verifyEmailSteps"><li><strong>Зайди в свою электронную почту</strong><span>Открой почтовый ящик, который указал при регистрации.</span></li><li><strong>Найди письмо от Nailora</strong><span>Если его не видно во входящих, загляни в папку «Спам».</span></li><li><strong>Открой письмо и перейди по ссылке</strong><span>Это подтвердит адрес электронной почты.</span></li></ol><p class="verify-note" id="verifyEmailNote">После подтверждения вернись в Nailora. Если сессия восстановится успешно, приложение откроет твой профиль автоматически.</p><div class="verify-help small" style="margin-top:16px"><button type="button" id="verifyNoEmailToggle" class="link-button" aria-expanded="false" aria-controls="verifyNoEmailDetails">Письмо не пришло?</button><div id="verifyNoEmailDetails" class="hidden" style="margin-top:10px;padding:14px;border:1px solid #e9dff3;background:#faf7fc;border-radius:12px;text-align:left"><p style="margin:0 0 10px;color:#62566e">Проверь папку «Спам». Если письма там нет, можно отправить ссылку ещё раз здесь. Если аккаунт уже создан, не создавай его повторно.</p><div class="row" style="flex-wrap:wrap"><button type="button" id="resendVerifyEmail" class="btn primary">Отправить письмо ещё раз</button><button type="button" id="verifyBackToRegister" class="btn">Вернуться к регистрации</button></div><p id="verifyHelpStatus" class="muted small" aria-live="polite" style="margin:10px 0 0"></p></div></div></div></section>
+<section id="login" class="wrap hidden" style="max-width:650px;padding-top:5vh"><div class="panel"><h2>Вход в профиль</h2><form id="loginForm">
  <div id="nailoraDiscoverCodePanel" class="hidden" style="border:1px solid var(--border, #ddd);padding:12px;border-radius:12px;margin-bottom:14px">
   <label for="nailoraDiscoverCode">Код подтверждения из письма</label>
   <input id="nailoraDiscoverCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Код из письма">
@@ -3416,15 +3449,16 @@ function nailoraRegionAllowed(action){
  return nailoraActiveRegion===NAILORA_REGION_GLOBAL;
 }
 function nailoraRefreshRegionUi(){
- const note=$('nailoraRegistrationRegionNote');
+  const p=$('regPassword');const isRu=nailoraIsRussianCountry($('regCountry')?.value);if(p)p.minLength=isRu?12:8;const passwordLabel=document.querySelector('label[for="regPassword"]');if(passwordLabel)passwordLabel.textContent=isRu?'Пароль (не менее 12 символов) *':'Пароль (не менее 8 символов) *';
+  const note=$('nailoraRegistrationRegionNote');
  const country=$('regCountry')?.value||'';
  if(note)note.textContent=!country.trim()
-  ?'Страну указывают один раз при регистрации. По ней выбирается сервер аккаунта.'
+  ?'Выбери страну проживания.'
   :nailoraIsRussianCountry(country)
-    ?'Для России предусмотрен российский сервер. Регистрация здесь пока закрыта до проверки безопасности.'
+     ?'Выбрана страна: Россия.'
     :'Вы выбрали страну: '+country+'. Пожалуйста, проверьте правильность выбора.';
  const info=$('nailoraCloudInfo');
- if(info)info.textContent='При регистрации выбирается страна. При следующих входах приложение запоминает нужный сервер.';
+ if(info)info.textContent='';
 }
 nailoraRefreshRegionUi();
 $('regCountry')?.addEventListener('input',nailoraRefreshRegionUi);
@@ -3473,7 +3507,7 @@ let uiSettings={theme:'light',background:'solid'};
 try{uiSettings={...uiSettings,...JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')}}catch(e){}
 function applyUiSettings(){document.body.dataset.theme=uiSettings.theme||'light';document.body.dataset.bg=uiSettings.background||'solid';if($('themeChoice'))$('themeChoice').value=uiSettings.theme||'light';if($('backgroundChoice'))$('backgroundChoice').value=uiSettings.background||'solid';refreshCurrencyLabels()}
 function persistUiSettings(){localStorage.setItem(SETTINGS_KEY,JSON.stringify(uiSettings));applyUiSettings()}
-let currentScreen='welcome';function showOnly(id){['welcome','register','verifyEmail','login','resetPassword','clientApp','masterApp'].forEach(x=>$(x).classList.toggle('hidden',x!==id));currentScreen=id}
+let currentScreen='welcome';function showOnly(id){['welcome','register','verifyEmail','login','resetPassword','clientApp','masterApp'].forEach(x=>$(x).classList.toggle('hidden',x!==id));currentScreen=id;if(id==='verifyEmail')ruSetVerifyVisibility()}
 window.addEventListener('popstate',event=>{if(event.state&&event.state.nailoraVerifyEmail){showOnly('verifyEmail')}else if(currentScreen==='verifyEmail'){showOnly('register');$('registerStatus').textContent='Если письмо не пришло, нажми «Отправить письмо повторно».'}});
 let selectedEntryRole='master';
 const registrationDrafts={};
@@ -3513,7 +3547,7 @@ function returnFromRegistrationToLogin(){
 $('verifyNoEmailToggle').onclick=()=>{const details=$('verifyNoEmailDetails'),toggle=$('verifyNoEmailToggle'),opening=details.classList.contains('hidden');details.classList.toggle('hidden',!opening);toggle.setAttribute('aria-expanded',String(opening));};
 $('verifyBackToRegister').onclick=()=>{const pending=readPendingVerification();const role=pending?.role||chosenRole||selectedEntryRole||'client';const email=String(pending?.email||$('regEmail')?.value||profiles[role]?.email||'').trim();beginRegistration(role);if(email)$('regEmail').value=email;$('registerStatus').textContent='Если аккаунт уже создан, не создавай его повторно. Для нового письма вернись на экран подтверждения.';$('regEmail').focus();};
 function prepareLogin(role){selectedEntryRole=role;chosenRole=role;$('loginRole').value=role;$('loginRole').disabled=true;$('loginEmail').value=String($('regEmail')?.value||profiles[role]?.email||'').trim();$('loginPassword').value='';$('loginStatus').textContent=t(role==='master'?'Введи email и пароль аккаунта мастера.':'Введи email и пароль аккаунта клиента.');showOnly('login')}
-function openPasswordRecovery(){const email=String($('loginEmail')?.value||$('regEmail')?.value||profiles[chosenRole||selectedEntryRole||'client']?.email||'').trim();$('resetEmail').value=email;$('requestPasswordReset').classList.remove('hidden');$('setNewPassword').classList.add('hidden');$('resetRequestStatus').textContent='';$('newPasswordStatus').textContent='';showOnly('resetPassword');if(!email)$('resetEmail').focus()}
+function openPasswordRecovery(){if(ruIsAccount()){showAppToast('Восстановление пароля российского профиля пока не подключено. Данные не изменены.');return;}const email=String($('loginEmail')?.value||$('regEmail')?.value||profiles[chosenRole||selectedEntryRole||'client']?.email||'').trim();$('resetEmail').value=email;$('requestPasswordReset').classList.remove('hidden');$('setNewPassword').classList.add('hidden');$('resetRequestStatus').textContent='';$('newPasswordStatus').textContent='';showOnly('resetPassword');if(!email)$('resetEmail').focus()}
 $('forgotPasswordButton').onclick=openPasswordRecovery;$('backResetRequest').onclick=()=>{showOnly('login');$('loginStatus').textContent=t('Введи email и пароль. Если пароль забыт, можно запросить письмо для восстановления.')};
 $('requestPasswordResetForm').onsubmit=async e=>{e.preventDefault();const email=$('resetEmail').value.trim().toLowerCase(),status=$('resetRequestStatus'),button=$('sendPasswordResetButton');if(!cloud){status.textContent='Supabase не загрузился. Проверь интернет и повтори попытку.';return}button.disabled=true;status.textContent='Отправляю письмо…';try{const redirectTo=getEmailRedirectUrl();const {error}=await cloud.auth.resetPasswordForEmail(email,redirectTo?{redirectTo}:{});if(error)throw error;status.textContent='Если аккаунт с таким адресом существует, письмо для восстановления отправлено. Проверь входящие и папку «Спам».';}catch(err){console.error('Password recovery request failed',err);status.textContent='Не удалось отправить письмо: '+(err?.message||'ошибка Supabase');}finally{button.disabled=false}};
 $('setNewPasswordForm').onsubmit=async e=>{e.preventDefault();const password=$('newPassword').value,confirm=$('confirmNewPassword').value,status=$('newPasswordStatus');if(password.length<8){status.textContent='Пароль должен содержать не менее 8 символов.';return}if(password!==confirm){status.textContent='Пароли не совпадают.';return}if(!cloud){status.textContent='Supabase не загрузился. Проверь интернет и повтори попытку.';return}status.textContent='Сохраняю новый пароль…';try{const {error}=await cloud.auth.updateUser({password});if(error)throw error;sessionStorage.removeItem('nailoraPasswordRecoveryActive');await cloud.auth.signOut();$('loginEmail').value=$('resetEmail').value.trim().toLowerCase();$('loginPassword').value='';$('loginRole').disabled=false;$('loginRole').value=chosenRole||selectedEntryRole||'client';showOnly('login');$('loginStatus').textContent='Пароль изменён. Теперь войди с новым паролем.';}catch(err){console.error('Password update failed',err);status.textContent='Не удалось изменить пароль: '+(err?.message||'ссылка могла истечь. Запроси новое письмо.')}};
@@ -3522,6 +3556,94 @@ $('chooseMaster').onclick=()=>prepareLogin('master');$('chooseClient').onclick=(
 const NAILORA_SUPABASE_URL='https://frtdsqzgepcasojzcynd.supabase.co';
 const NAILORA_SUPABASE_KEY='sb_publishable_-1TkkaMKrUdXmKfApv_8ew_Ao4e2GVk';
 let cloud=null,cloudUser=null,cloudMasterDirectory=[],cloudFavoriteMasters=[],selectedCloudMasterId='',cloudScheduleData=null,cloudBookedSlots=[],cloudNotifications=[],cloudPollTimer=null,cloudScheduleLoading=false,cloudScheduleLoadError='',cloudScheduleWarning='';
+
+// RU client integration (staging). The account server stays separate from the service-location server.
+const RU_STAGE_LIVE_BOOKINGS=false; // Preview safety: mock-tested booking only until explicit live acceptance.
+const RU_CLIENT_PROFILE_CACHE='manicureRoleProfiles_v1_ru_v898';
+let ruApiClient=null,ruSelectedMasterId='',ruServices=[],ruSelectedServiceId='',ruDaySequence=0,ruAvailableStarts=[],ruAvailableContext='',ruBookingRequest=null;
+function ruSdk(){
+  if(!ruApiClient){
+    ruApiClient=window.NailoraRuSDK.createClient({
+      baseUrl:window.NAILORA_RU_API_BASE,
+      getRegion:()=>nailoraActiveRegion===NAILORA_REGION_RU||nailoraIsRussianCountry($('searchCountry')?.value)||!!ruSelectedMasterId?'ru':'global'
+    });
+  }
+  return ruApiClient;
+}
+function ruIsAccount(){return nailoraActiveRegion===NAILORA_REGION_RU}
+function ruIsMasterSelected(){return !!ruSelectedMasterId}
+function ruNewRequestId(){
+ if(typeof crypto.randomUUID==='function')return crypto.randomUUID();
+ if(typeof crypto.getRandomValues!=='function')throw new Error('Для бронирования требуется защищённое соединение');
+ const b=crypto.getRandomValues(new Uint8Array(16));b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;
+ const h=Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');
+ return [h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20)].join('-');
+}
+function ruNormalizeServices(result){
+  const arr=Array.isArray(result)?result:Array.isArray(result?.items)?result.items:Array.isArray(result?.services)?result.services:[];
+  return arr.filter(x=>x&&typeof x.id==='string'&&typeof x.name==='string'&&Number(x.durationMinutes??x.duration_minutes)>0).map(x=>({
+    id:String(x.id),name:String(x.name),durationMinutes:Number(x.durationMinutes??x.duration_minutes),price:Math.max(0,Number(x.price)||0)
+  }));
+}
+function ruProfileData(me,role){return Array.isArray(me?.profiles)?me.profiles.find(x=>x.role===role):null}
+async function ruOpenClientAccount(email){
+  const me=await ruSdk().me();
+  const p=ruProfileData(me,'client');
+  if(!p||!p.profile_id)throw new Error('Профиль клиента не найден. Подтверди регистрацию или обратись в поддержку.');
+  const accountEmail=String(email||me?.email||'').trim().toLowerCase();
+  let saved={};
+  try{saved=JSON.parse(localStorage.getItem(RU_CLIENT_PROFILE_CACHE)||'{}').client||{};}catch(_){}
+  const candidate=String(profiles.client?.email||'').trim().toLowerCase()===accountEmail?(profiles.client||{}):saved;
+  const cached=String(candidate.email||'').trim().toLowerCase()===accountEmail?candidate:{};
+  profiles.client={...cached,name:p.name||cached.name||'',phone:p.phone||cached.phone||'',country:'Россия',city:p.city||cached.city||'',email:accountEmail,profileId:p.profile_id,cloudId:'',language:currentLanguage};
+  try{localStorage.setItem(RU_CLIENT_PROFILE_CACHE,JSON.stringify({master:null,client:profiles.client}));}catch(_){}
+  chosenRole='client';activeRole='client';
+  nailoraRememberEmailRegion(email,NAILORA_REGION_RU);
+  await openRole('client');
+  setCloudStatus('Профиль клиента открыт');
+}
+async function ruLogin(email,password,role,status){
+  if(role!=='client')throw new Error('Вход мастера ещё не подключён к серверному календарю. Данные мастера не изменены.');
+  await ruSdk().login(email,password);
+  try{await ruOpenClientAccount(email)}catch(err){ruSdk().clearSession();throw err}
+  $('loginPassword').value='';
+  if(status)status.textContent='Вход выполнен';
+}
+async function ruAfterVerification(){
+  const pending=readPendingVerification(),email=pending?.email,role=pending?.role||'client',status=$('ruVerifyStatus');
+  const code=String($('ruVerifyCode').value||'').trim();
+  if(!email||!/^\d{8}$/.test(code)){status.textContent='Введи восьмизначный код из письма.';return;}
+  if(role!=='client'){status.textContent='Регистрация мастера пока требует дополнительной настройки календаря.';return;}
+  const button=$('ruVerifyConfirm');button.disabled=true;
+  try{
+    await ruSdk().verify(email,code);
+    const me=await ruSdk().me();
+    if(!ruProfileData(me,'client')){
+      const draft=profiles.client||registrationDrafts.client||{};
+      if(!draft.name||!draft.city)throw new Error('Не хватает имени или города. Вернись к регистрации, сохрани данные и войди вновь.');
+      await ruSdk().createProfile({role:'client',name:draft.name,city:draft.city,country:'Россия'});
+    }
+    clearPendingVerification();
+    $('ruVerifyCode').value='';
+    await ruOpenClientAccount(email);
+  }catch(e){status.textContent=e?.message||'Не удалось подтвердить email';}
+  finally{button.disabled=false;}
+}
+$('ruVerifyConfirm').addEventListener('click',ruAfterVerification);
+$('ruVerifyBackLogin').addEventListener('click',()=>{const p=readPendingVerification();prepareLogin(p?.role||'client');if(p?.email)$('loginEmail').value=p.email;});
+function ruSetVerifyVisibility(){
+  const isRu=ruIsAccount();
+  const el=$('ruVerifyCodeArea');if(el)el.classList.toggle('hidden',!isRu);
+  // The Russian mailer sends an eight-digit code; the foreign mailer sends a link.
+  const steps=$('verifyEmailSteps');
+  const third=steps?.querySelector('li:nth-child(3)');
+  if(third)third.classList.toggle('hidden',isRu);
+  const note=$('verifyEmailNote');
+  if(note)note.textContent=isRu
+    ?'Введи код из письма и нажми «Подтвердить email». После этого откроется твой профиль.'
+    :'После подтверждения вернись в Nailora. Если сессия восстановится успешно, приложение откроет твой профиль автоматически.';
+}
+
 let editingAvailabilityDate='';
 const KEY='manicureAppData_v1'+nailoraRuCacheSuffix;
 let data={clients:[],appointments:[],expenses:[],daysOff:[],monthlyHours:{},blockedSlots:[],services:[{id:'nailora-service-default',name:'Маникюр с покрытием',durationMinutes:90,price:0}]};
@@ -3610,7 +3732,13 @@ $('loginForm').onsubmit=async e=>{
  chosenRole=role;
  $('nailoraLegacyLogin').classList.add('hidden');
  if(!email||!password){status.textContent='Введи email и пароль.';return;}
- const known=nailoraKnownEmailRegion(email,role);
+  const known=nailoraKnownEmailRegion(email,role);
+  if(ruIsAccount() || known===NAILORA_REGION_RU){
+    if(!ruIsAccount()){if(!nailoraChangeRegion(NAILORA_REGION_RU))return;}
+    status.textContent='Выполняю вход…';
+    try{await ruLogin(email,password,role,status)}catch(err){status.textContent='Не удалось войти: '+(err?.message||'ошибка сервера')}
+    return;
+  }
  if(known===NAILORA_REGION_RU){
   if(nailoraChangeRegion(NAILORA_REGION_RU))nailoraRegionAllowed('Вход');
   return;
@@ -3660,7 +3788,7 @@ let pendingVerificationEmail='',pendingVerificationRole='client';
 function savePendingVerification(email,role){pendingVerificationEmail=String(email||'').trim().toLowerCase();pendingVerificationRole=role==='master'?'master':'client';try{localStorage.setItem(PENDING_VERIFICATION_KEY,JSON.stringify({email:pendingVerificationEmail,role:pendingVerificationRole}))}catch(_){}}
 function readPendingVerification(){try{const value=JSON.parse(localStorage.getItem(PENDING_VERIFICATION_KEY)||'null');if(value&&typeof value.email==='string')return {email:value.email,role:value.role==='master'?'master':'client'}}catch(_){}return null}
 function clearPendingVerification(){pendingVerificationEmail='';pendingVerificationRole='client';try{localStorage.removeItem(PENDING_VERIFICATION_KEY)}catch(_){}}
-$('resendVerifyEmail').onclick=async()=>{const pending=readPendingVerification(),email=String(pending?.email||$('regEmail')?.value||'').trim().toLowerCase(),status=$('verifyHelpStatus'),button=$('resendVerifyEmail');if(!email){status.textContent='Не удалось найти адрес регистрации. Вернись к форме и проверь email.';return}if(!cloud){status.textContent='Supabase не загрузился. Проверь интернет и повтори попытку.';return}button.disabled=true;status.textContent='Отправляю новое письмо…';try{const {error}=await cloud.auth.resend({type:'signup',email,options:confirmationEmailRedirectOptions()});if(error)throw error;savePendingVerification(email,pending?.role||chosenRole||'client');status.textContent='Запрос отправлен. Проверь входящие и папку «Спам»; используй самое новое письмо.';}catch(err){console.error('Confirmation resend failed',err);status.textContent='Не удалось отправить письмо: '+(err?.message||'ошибка Supabase')+'. Если аккаунт уже подтверждён, просто войди.';}finally{button.disabled=false}};
+$('resendVerifyEmail').onclick=async()=>{const pending=readPendingVerification(),email=String(pending?.email||$('regEmail')?.value||'').trim().toLowerCase(),status=$('verifyHelpStatus'),button=$('resendVerifyEmail');if(!email){status.textContent='Не удалось найти адрес регистрации. Вернись к форме и проверь email.';return}if(ruIsAccount()){button.disabled=true;try{await ruSdk().resend(email);status.textContent='Если регистрация ожидает подтверждения, новый код отправлен на почту.';}catch(err){status.textContent=err?.message||'Не удалось отправить код';}finally{button.disabled=false;}return;}if(!cloud){status.textContent='Supabase не загрузился. Проверь интернет и повтори попытку.';return}button.disabled=true;status.textContent='Отправляю новое письмо…';try{const {error}=await cloud.auth.resend({type:'signup',email,options:confirmationEmailRedirectOptions()});if(error)throw error;savePendingVerification(email,pending?.role||chosenRole||'client');status.textContent='Запрос отправлен. Проверь входящие и папку «Спам»; используй самое новое письмо.';}catch(err){console.error('Confirmation resend failed',err);status.textContent='Не удалось отправить письмо: '+(err?.message||'ошибка Supabase')+'. Если аккаунт уже подтверждён, просто войди.';}finally{button.disabled=false}};
 $('registerForm').onsubmit=async e=>{
  e.preventDefault();
  const status=$('registerStatus');status.textContent='';
@@ -3670,7 +3798,25 @@ $('registerForm').onsubmit=async e=>{
  const registrationRole=chosenRole||selectedEntryRole||'client';
  const previous=profiles[registrationRole]||{};
  const profile={...previous,name:$('regName').value.trim(),phone,country:$('regCountry').value.trim(),city:$('regCity').value.trim(),area:registrationRole==='master'? $('regArea').value.trim():(previous.area||''),address:registrationRole==='master'? $('regAddress').value.trim():(previous.address||''),specialty:registrationRole==='master'? $('regSpecialty').value.trim():(previous.specialty||''),activityDirection:registrationRole==='master'? $('regActivityDirection').value:(previous.activityDirection||''),publicPhoneConsent:registrationRole==='master'&&$('regPublicPhoneConsent').checked===true,email,language:currentLanguage};
- if(nailoraIsRussianCountry(profile.country)){status.textContent='Российский сервер пока не активирован. Регистрацию временно не проводим; данные в зарубежную базу не отправляются.';return;}
+   if(nailoraIsRussianCountry(profile.country)){
+    if(registrationRole!=='client'){status.textContent='Регистрация мастера будет доступна после подключения серверного календаря. Существующий профиль мастера сохранён.';return;}
+    if(password.length<12){status.textContent='Для российского профиля пароль должен содержать не менее 12 символов.';return;}
+    if(!profile.name||!profile.city||!profile.phone){status.textContent='Заполни имя, телефон и город.';return;}
+    if(!nailoraChangeRegion(NAILORA_REGION_RU))return;
+    const submit=$('createProfileButton');submit.disabled=true;
+    try{
+      await ruSdk().register(email,password);
+      profiles.client={...(profiles.client||{}),...profile};
+      localStorage.setItem(RU_CLIENT_PROFILE_CACHE,JSON.stringify({master:null,client:profiles.client}));
+      savePendingVerification(email,'client');
+      nailoraRememberEmailRegion(email,NAILORA_REGION_RU);
+      $('regPassword').value='';
+      $('verifyEmailMessage').textContent='Мы отправили восьмизначный код подтверждения на '+email+'. Введи его ниже.';
+      ruSetVerifyVisibility();showOnly('verifyEmail');
+    }catch(err){status.textContent='Не удалось начать регистрацию: '+(err?.message||'ошибка сервера');}
+    finally{submit.disabled=false;}
+    return;
+  }
  if(!profile.name||!profile.country||!profile.city||!profile.phone){status.textContent='Заполни имя, телефон, страну и город.';return}
  if(registrationRole==='master'&&!profile.address){status.textContent='Укажи адрес оказания услуг.';return}
  const submit=$('createProfileButton');submit.disabled=true;
@@ -4015,11 +4161,13 @@ if(nailoraActiveRegion===NAILORA_REGION_GLOBAL){
   showOnly('welcome');document.body.classList.remove('auth-pending');
  });
 }else{
-  showOnly('welcome');
+  const pending=nailoraActiveRegion===NAILORA_REGION_RU?readPendingVerification():null;
+  if(pending?.role==='client'&&nailoraKnownEmailRegion(pending.email,'client')===NAILORA_REGION_RU){
+    $('verifyEmailMessage').textContent='Мы отправили восьмизначный код подтверждения на '+pending.email+'. Введи его ниже.';
+    showOnly('verifyEmail');
+  }else showOnly('welcome');
   document.body.classList.remove('auth-pending');
-  setCloudStatus(nailoraActiveRegion===NAILORA_REGION_RU
-    ?'Российский сервер готовится к запуску.'
-    :'Выбери «Я мастер» или «Я клиент», затем войди или создай профиль.');
+  setCloudStatus('Выбери «Я мастер» или «Я клиент», затем войди или создай профиль.');
 }
 async function openRole(role){
  activeRole=role;chosenRole=role;
@@ -4051,6 +4199,7 @@ async function openRole(role){
  }
 }
 async function logout(){
+ if(ruIsAccount()){if($('settingsDialog').open)$('settingsDialog').close();try{await ruSdk().logout()}catch(_){}activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);showOnly('welcome');setCloudStatus('Выход выполнен');return;}
  if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=null;
  if($('settingsDialog').open)$('settingsDialog').close();
  setCloudStatus('Выхожу из аккаунта…');
@@ -4257,7 +4406,8 @@ $('downloadNailoraQr').onclick=()=>{
 };
 $('settingsDeleteAccount').onclick=async()=>{
  if(!activeRole)return;
- const confirmText='Удалить аккаунт Nailora ПОЛНОСТЬЮ? Будут безвозвратно удалены профиль мастера/клиента, все связанные записи, уведомления и расписание в Supabase, а также локальные данные Nailora в этом браузере. Восстановить их будет нельзя.';
+   if(ruIsAccount()){alert('Удаление российского профиля пока не подключено. Ничего не удалено.');return;}
+  const confirmText='Удалить аккаунт Nailora ПОЛНОСТЬЮ? Будут безвозвратно удалены профиль мастера/клиента, все связанные записи, уведомления и расписание в Supabase, а также локальные данные Nailora в этом браузере. Восстановить их будет нельзя.';
  if(!confirm(confirmText))return;
  const button=$('settingsDeleteAccount');button.disabled=true;
  try{
@@ -4370,6 +4520,7 @@ const backgroundChoice=$('backgroundChoice');if(backgroundChoice)backgroundChoic
 $('masterCurrencyChoice').onchange=async()=>{if(activeRole!=='master')return;const currency=String($('masterCurrencyChoice').value||'RUB').toUpperCase();if(!CURRENCY_CODES.includes(currency))return;const nextProfiles={...profiles,master:{...(profiles.master||{}),currency}};if(persistProfilesSafely(nextProfiles)){refreshCurrencyLabels();renderAll();if(cloudReady()){if(!profiles.master?.cloudId){showAppToast('Валюта сохранена на этом устройстве, но не удалось найти облачный профиль мастера.');return}const synced=await syncMasterScheduleToCloud();if(!synced){showAppToast('Валюта сохранена на этом устройстве, но не удалось передать её клиентам.');return}}showAppToast(t('Валюта цен сохранена.'))}};
 $('accountEditForm').onsubmit=async e=>{
  e.preventDefault();if(!activeRole)return;
+ if(ruIsAccount()){alert('Изменение российского профиля пока не подключено к серверу. Ничего не сохранено.');return;}
  if(nailoraIsRussianCountry($('settingsCountry').value)){alert('Для России предназначен отдельный сервер. Изменение региона аккаунта будет возможно после миграции.');return;}
  const role=activeRole,old=profiles[role]||{};
  const updated={...old,name:$('settingsName').value.trim(),phone:$('settingsPhone').value.trim(),country:$('settingsCountry').value.trim(),city:$('settingsCity').value.trim(),area:role==='master' ? $('settingsArea').value.trim():(old.area||''),address:role==='master'? $('settingsAddress').value.trim():(old.address||''),specialty:role==='master'? $('settingsSpecialty').value.trim():(old.specialty||''),activityDirection:role==='master'? $('settingsActivityDirection').value:(old.activityDirection||''),publicPhoneConsent:role==='master'?$('settingsPublicPhoneConsent').checked===true:false};
@@ -4401,7 +4552,7 @@ $('clientNext').onclick=()=>moveClientMonth(1);
 let selectedClientMasterKey='';
 function iso(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){alert(t('Не удалось сохранить данные в браузере. Возможно, хранилище заполнено фотографиями. Удали часть фото или экспортируй резервную копию.'))}renderAll();if(activeRole==='master'&&cloudReady())syncMasterScheduleToCloud()}
-function getPriceCurrency(){let currency;if(activeRole==='client'&&selectedCloudMasterId&&cloudScheduleData){currency=String(cloudScheduleData.currency||'RUB').toUpperCase()}else{currency=String((profiles.master&&profiles.master.currency)||'RUB').toUpperCase()}return CURRENCY_CODES.includes(currency)?currency:'RUB'}
+function getPriceCurrency(){if(ruIsMasterSelected())return 'RUB';let currency;if(activeRole==='client'&&selectedCloudMasterId&&cloudScheduleData){currency=String(cloudScheduleData.currency||'RUB').toUpperCase()}else{currency=String((profiles.master&&profiles.master.currency)||'RUB').toUpperCase()}return CURRENCY_CODES.includes(currency)?currency:'RUB'}
 function refreshCurrencyLabels(){const mark='('+(CURRENCY_SYMBOLS[getPriceCurrency()]||getPriceCurrency())+')';['masterServicePriceCurrency','appointmentPriceCurrency','clientPriceCurrency','expenseAmountCurrency'].forEach(id=>{const el=$(id);if(el)el.textContent=mark})}
 function money(n){const amount=Number(n)||0;try{return new Intl.NumberFormat(LOCALES[currentLanguage]||currentLanguage,{style:'currency',currency:getPriceCurrency(),currencyDisplay:'narrowSymbol',minimumFractionDigits:2,maximumFractionDigits:2}).format(amount)}catch(e){return amount.toLocaleString(LOCALES[currentLanguage]||currentLanguage,{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(CURRENCY_SYMBOLS[getPriceCurrency()]||getPriceCurrency())}}
 function startingPrice(n){const amount=Number(n)||0;return amount>0?t('от')+' '+money(amount):money(amount)}
@@ -4565,8 +4716,32 @@ $('closeReviewDialog').onclick=closeReviewDialog;$('cancelReviewDialog').onclick
 $('reviewForm').onsubmit=e=>{e.preventDefault();const appointmentId=String($('reviewAppointmentId').value||''),appointment=data.appointments.find(a=>String(a.id)===appointmentId);if(activeRole!=='client'||!appointment||!clientOwnsAppointment(appointment)||!appointmentHasPassed(appointment)){alert(t('Эту запись нельзя оценить.'));return}if(!profiles.master){alert(t('Профиль мастера не найден.'));return}const pid=getClientProfileId(true),reviews=getMasterReviews().slice(),oldIndex=reviews.findIndex(r=>String(r.appointmentId)===appointmentId&&String(r.clientProfileId||'')===String(pid));const review={id:oldIndex>=0?reviews[oldIndex].id:((crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random())),appointmentId,clientProfileId:pid,clientNickname:profileNickname('client'),rating:Math.max(1,Math.min(5,Number($('reviewRating').value)||5)),comment:String($('reviewComment').value||'').trim(),createdAt:oldIndex>=0&&reviews[oldIndex].createdAt?reviews[oldIndex].createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};if(oldIndex>=0)reviews[oldIndex]=review;else reviews.push(review);profiles.master={...profiles.master,reviews};if(!persistProfilesSafely(profiles))return;closeReviewDialog();renderMasterReviews();renderMasterSearch();renderClientCalendar();showAppToast(t(oldIndex>=0?'Отзыв обновлён.':'Спасибо за отзыв!'))};
 async function renderMasterSearch(){
  const country=String($('searchCountry')?.value||'').trim(),city=String($('searchCity')?.value||'').trim(),box=$('masterSearchResults');if(!box)return;
- if(nailoraIsRussianCountry(country)){box.innerHTML='<p class="muted">🇷🇺 Мастера России будут доступны через российскую базу после её подключения.</p>';cloudMasterDirectory=[];return;}
- if(!country||!city){box.innerHTML=`<p class="muted">${escapeHtml(t('Введи страну и город для поиска.'))}</p>`;if(selectedClientMasterKey){selectedClientMasterKey='';selectedCloudMasterId='';renderClientCalendar()}translatePage();return}
+   if(nailoraIsRussianCountry(country)){
+    if(!city){box.innerHTML='<p class="muted">Введи город для поиска мастера.</p>';return;}
+    box.innerHTML='<p class="muted">Ищу мастеров…</p>';
+    try{
+      const result=await ruSdk().directory({city,country:'Россия',limit:100});
+      if(!Array.isArray(result?.items))throw new Error('Некорректный ответ каталога');
+      let found=result.items.filter(m=>m&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(m.id||''))&&cityMatches(String(m.city||''),city)).map(m=>({
+        cloudId:String(m.id),profileId:String(m.id),masterId:String(m.id),
+        name:String(m.name||''),city:String(m.city||''),area:String(m.area||''),country:String(m.country||'Россия'),
+        specialty:String(m.specialty||''),activityDirection:String(m.activity_direction||''),
+        avatar:String(m.avatar_url||''),avatarUrl:String(m.avatar_url||''),reviews:[]
+      }));
+      const direction=String($('searchActivityDirection')?.value||'').trim();
+      if(direction)found=found.filter(m=>m.activityDirection===direction);
+      cloudMasterDirectory=found;
+      if(!found.length){box.innerHTML='<p class="muted">В этом городе пока нет опубликованных мастеров по выбранным условиям.</p>';return;}
+      box.innerHTML=found.map(m=>{
+        const id=escapeHtml(m.masterId),avatar=isAvatarImage(m.avatar)?`<img class="master-card-avatar" src="${escapeHtml(m.avatar)}" alt="Аватар мастера">`:'<div class="master-card-avatar-placeholder" aria-hidden="true">👤</div>';
+        return `<article class="card"><div class="master-card-head">${avatar}<div style="flex:1;min-width:0"><h3>${escapeHtml(m.name)}</h3><div class="muted small">${escapeHtml(m.activityDirection||'Направление не указано')}</div><div>${escapeHtml(m.specialty)}</div><div class="muted">📍 ${escapeHtml(m.city)}, ${escapeHtml(m.country)}</div></div></div><div class="row" style="margin-top:10px"><button class="btn primary fixed" type="button" onclick="chooseMasterForBooking('${id}')">${escapeHtml(t('Выбрать мастера'))}</button></div></article>`;
+      }).join('');
+      translatePage();
+    }catch(err){box.innerHTML=`<p class="muted">Не удалось загрузить российских мастеров: ${escapeHtml(err?.message||'ошибка соединения')}</p>`;}
+    return;
+  }
+   if(ruSelectedMasterId){ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';ruAvailableContext='';ruDaySequence++;selectedClientMasterKey='';}
+  if(!country||!city){box.innerHTML=`<p class="muted">${escapeHtml(t('Введи страну и город для поиска.'))}</p>`;if(selectedClientMasterKey){selectedClientMasterKey='';selectedCloudMasterId='';renderClientCalendar()}translatePage();return}
  let found=[];
  if(cloud&&cloudUser){try{const {data:rows,error}=await cloud.from('nailora_master_public_directory').select('*').eq('is_active',true).ilike('country',country).ilike('city',city).limit(100);if(error)throw error;found=(rows||[]).map(r=>({...profileFromCloudRow('master',r),cloudId:r.id,profileId:r.id,masterId:r.id,phone:r.phone||'',avatar:r.avatar_url||'',avatarUrl:r.avatar_url||'',reviews:[]}));cloudMasterDirectory=found;}catch(err){console.error(err);box.innerHTML=`<p class="muted">Не удалось загрузить мастеров из Supabase: ${escapeHtml(err.message||'ошибка')}</p>`;translatePage();return}}
  else {const master=profiles.master||null;const masterCity=master?.city||master?.area||'',masterCountry=master?.country||'';found=master&&cityMatches(masterCity,city)&&countryKey(masterCountry)===countryKey(country)?[master]:[];cloudMasterDirectory=found;}
@@ -4661,7 +4836,19 @@ function showClientMasterView(view='search'){
 }
 $('clientSearchTab').onclick=()=>showClientMasterView('search');
 $('clientFavoritesTab').onclick=()=>showClientMasterView('favorites');
-async function chooseMasterForBooking(cloudId=''){const master=[...cloudMasterDirectory,...cloudFavoriteMasters].find(m=>String(m.cloudId||m.profileId||m.masterId||'')===String(cloudId))||profiles.master;if(!master)return;const key=masterSelectionKey(master);if(selectedClientMasterKey===key){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';renderMasterSearch();renderClientCalendar();showAppToast(t('Выбор мастера снят. Выбери мастера, чтобы открыть расписание.'));return}selectedClientMasterKey=key;selectedCloudMasterId=cloudUser?String(master.cloudId||master.profileId||master.masterId||''):'';cloudScheduleData=null;cloudBookedSlots=[];cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';const today=iso(new Date());let ds=clientSelectedDate>=today&&!isDayOff(clientSelectedDate)?clientSelectedDate:nextAvailableDate(today);if(!ds)ds=today;clientSelectedDate=ds;clientCursor=new Date(ds+'T12:00:00');clientCursor.setDate(1);renderMasterSearch();if(cloudUser&&selectedCloudMasterId){await loadCloudScheduleForMaster(master)}renderClientCalendar();$('clientDaySchedule').scrollIntoView({behavior:'smooth',block:'center'});showAppToast(t('Мастер выбран. Нажми на свободный интервал, чтобы забронировать время.'));}
+async function chooseMasterForBooking(cloudId=''){const master=[...cloudMasterDirectory,...cloudFavoriteMasters].find(m=>String(m.cloudId||m.profileId||m.masterId||'')===String(cloudId))||profiles.master;if(!master)return;if(nailoraIsRussianCountry(master.country)){
+  const masterId=String(master.masterId||master.profileId||master.cloudId||'');
+  if(ruSelectedMasterId===masterId){ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';selectedClientMasterKey='';renderMasterSearch();renderClientCalendar();return;}
+  try{
+    const fetched=ruNormalizeServices(await ruSdk().services(masterId));
+    if(!fetched.length)throw new Error('У мастера пока нет доступных услуг');
+    ruSelectedMasterId=masterId;ruServices=fetched;ruSelectedServiceId=fetched[0].id;
+    selectedClientMasterKey=masterSelectionKey(master);selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;
+    clientSelectedDate=iso(new Date());clientCursor=new Date(clientSelectedDate+'T12:00:00');clientCursor.setDate(1);
+    renderClientCalendar();$('clientDaySchedule')?.scrollIntoView({behavior:'smooth',block:'center'});
+  }catch(err){showAppToast('Не удалось открыть расписание: '+(err?.message||'ошибка сервера'));}
+  return;
+}ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';const key=masterSelectionKey(master);if(selectedClientMasterKey===key){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';renderMasterSearch();renderClientCalendar();showAppToast(t('Выбор мастера снят. Выбери мастера, чтобы открыть расписание.'));return}selectedClientMasterKey=key;selectedCloudMasterId=cloudUser?String(master.cloudId||master.profileId||master.masterId||''):'';cloudScheduleData=null;cloudBookedSlots=[];cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';const today=iso(new Date());let ds=clientSelectedDate>=today&&!isDayOff(clientSelectedDate)?clientSelectedDate:nextAvailableDate(today);if(!ds)ds=today;clientSelectedDate=ds;clientCursor=new Date(ds+'T12:00:00');clientCursor.setDate(1);renderMasterSearch();if(cloudUser&&selectedCloudMasterId){await loadCloudScheduleForMaster(master)}renderClientCalendar();$('clientDaySchedule').scrollIntoView({behavior:'smooth',block:'center'});showAppToast(t('Мастер выбран. Нажми на свободный интервал, чтобы забронировать время.'));}
 $('searchMastersButton').onclick=renderMasterSearch;
 $('searchActivityDirection').onchange=renderMasterSearch;
 $('searchCountry').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();renderMasterSearch()}});
@@ -4671,6 +4858,7 @@ $('resetMasterSearch').onclick=()=>{$('searchCountry').value=profiles.client?.co
 function selectClientScheduleDay(ds){if(!ds)return;clientSelectedDate=ds;clientCursor=new Date(ds+'T12:00:00');clientCursor.setDate(1);renderClientCalendar();const target=$('clientDaySchedule');if(target)target.scrollIntoView({behavior:'smooth',block:'start'})}
 function clientDayLabel(ds){const d=new Date(ds+'T12:00:00');return new Intl.DateTimeFormat(LOCALES[currentLanguage]||currentLanguage,{weekday:'short',day:'numeric',month:'short'}).format(d)}
 function renderClientCalendar(){
+  if(ruIsMasterSelected()){ruRenderClientCalendar();return;}
  const grid=$('clientCalendarGrid');if(!grid)return;grid.innerHTML='';
  const selectedMaster=selectedClientMasterKey?([...cloudMasterDirectory,...cloudFavoriteMasters].find(m=>masterSelectionKey(m)===selectedClientMasterKey)||(profiles.master&&masterSelectionKey(profiles.master)===selectedClientMasterKey?profiles.master:null)):null;
  if(!selectedMaster){selectedClientMasterKey='';$('clientMonthTitle').textContent=t('Мастер не выбран');grid.innerHTML=`<div class="schedule-empty" style="grid-column:1 / -1">${escapeHtml(t('Сначала выбери мастера в разделе «Найти мастера», чтобы увидеть его расписание.'))}</div>`;$('clientDaySchedule').innerHTML=`<div class="schedule-empty">${escapeHtml(t('Выбери мастера, чтобы открыть расписание.'))}</div>`;translatePage();return}
@@ -4691,7 +4879,104 @@ function renderClientCalendar(){
  }
  renderClientDaySchedule();translatePage();if(activeRole==='client'&&selectedCloudMasterId&&cloudUser){const currentRangeKey=selectedCloudMasterId+'|'+clientCursor.getFullYear()+'-'+clientCursor.getMonth();if(window._nailoraLoadedClientRange!==currentRangeKey&&!cloudScheduleLoading){window._nailoraLoadedClientRange=currentRangeKey;loadCloudScheduleForMaster(selectedMaster)}}
 }
-function renderClientDaySchedule(){const box=$('clientDaySchedule');if(!box)return;const ds=clientSelectedDate||iso(new Date());const windows=clientAvailabilityIntervals(ds);const label=isDayOff(ds)?t('Выходной'):(formatAvailabilityIntervals(windows)||t('График не задан'));box.innerHTML=`<div class="schedule-header"><strong>${escapeHtml(formatDate(new Date(ds+'T12:00:00')))}</strong><span class="schedule-badge">${escapeHtml(label)}</span></div>${dailyScheduleHtml(ds,true)}`;bindClientBookingSlots(box);}
+
+// RU calendar uses dates already available in the existing interface; daily slots come from the VPS.
+function ruRenderClientCalendar(){
+  const grid=$('clientCalendarGrid');if(!grid)return;grid.innerHTML='';
+  const date=new Date(clientCursor.getFullYear(),clientCursor.getMonth(),1),year=date.getFullYear(),month=date.getMonth();
+  $('clientMonthTitle').textContent=formatMonth(date)+' '+year;
+  localizedWeekdays().forEach(x=>{const d=document.createElement('div');d.className='dayname muted';d.textContent=x;grid.append(d)});
+  for(let i=0;i<(date.getDay()+6)%7;i++)grid.append(document.createElement('div'));
+  const days=new Date(year,month+1,0).getDate();
+  for(let day=1;day<=days;day++){
+    const ds=iso(new Date(year,month,day));const b=document.createElement('button');
+    b.type='button';b.className='day'+(ds===clientSelectedDate?' selected':'')+(ds===iso(new Date())?' today':'');
+    b.innerHTML=`<span class="num">${day}</span>`;b.title=ds;
+    b.onclick=()=>{clientSelectedDate=ds;ruRenderClientCalendar();};grid.append(b);
+  }
+  ruRenderDay();translatePage();
+}
+async function ruRenderDay(){
+  const box=$('clientDaySchedule');if(!box||!ruSelectedMasterId)return;
+  const id=ruSelectedMasterId,date=clientSelectedDate||iso(new Date()),service=ruServices.find(x=>x.id===ruSelectedServiceId)||ruServices[0];
+  if(!service){box.innerHTML='<div class="schedule-empty">Услуги пока не доступны.</div>';return;}
+  const seq=++ruDaySequence;
+  box.innerHTML=`<div class="schedule-header"><strong>${escapeHtml(formatDate(new Date(date+'T12:00:00')))}</strong></div><label for="ruDayService">Услуга</label><select id="ruDayService">${ruServices.map(s=>`<option value="${escapeHtml(s.id)}"${s.id===service.id?' selected':''}>${escapeHtml(s.name)} · ${s.durationMinutes} мин.</option>`).join('')}</select><div class="schedule-empty">Загружаю свободное время…</div>`;
+  $('ruDayService').onchange=e=>{ruSelectedServiceId=e.target.value;ruAvailableContext='';ruRenderDay();};
+  ruAvailableContext='';ruAvailableStarts=[];
+  try{
+    const data=await ruSdk().availability(id,date,service.id);
+    if(seq!==ruDaySequence||id!==ruSelectedMasterId||date!==clientSelectedDate||ruSelectedServiceId!==service.id)return;
+    if(!Array.isArray(data?.available_starts))throw new Error('Неверный формат свободного времени');
+    const starts=data.available_starts.map(v=>typeof v==='string'?v:v?.time||v?.start_time).filter(v=>/^([01]\d|2[0-3]):(00|30)$/.test(String(v||'')));
+    ruAvailableStarts=starts;ruAvailableContext=[id,date,service.id].join('|');
+    const html=starts.map(slotTime=>{const start=timeToMinutes(slotTime);return scheduleRowHtml(start,start+service.durationMinutes,'free',t('Свободно'),service.name,null,date,true,null,service.id)}).join('');
+    const choices=box.querySelector('#ruDayService');
+    box.innerHTML=`<div class="schedule-header"><strong>${escapeHtml(formatDate(new Date(date+'T12:00:00')))}</strong></div><label for="ruDayService">Услуга</label><select id="ruDayService">${ruServices.map(s=>`<option value="${escapeHtml(s.id)}"${s.id===service.id?' selected':''}>${escapeHtml(s.name)} · ${s.durationMinutes} мин.</option>`).join('')}</select><div class="schedule-list">${html||'<div class="schedule-empty">На этот день нет свободного времени для выбранной услуги.</div>'}</div>`;
+    $('ruDayService').onchange=e=>{ruSelectedServiceId=e.target.value;ruAvailableContext='';ruRenderDay();};
+    bindClientBookingSlots(box);
+  }catch(err){if(seq!==ruDaySequence)return;box.innerHTML=`<div class="schedule-empty">Не удалось загрузить свободное время: ${escapeHtml(err?.message||'ошибка сервера')}</div>`;}
+}
+function ruOpenBooking(date,start,end,appointmentId,preferredServiceId){
+  if(appointmentId){showAppToast('Перенос российских записей пока недоступен.');return;}
+  const service=ruServices.find(x=>x.id===(preferredServiceId||ruSelectedServiceId));
+  const time=minutesToTime(start);
+  if(!service||ruAvailableContext!==[ruSelectedMasterId,date,service.id].join('|')||!ruAvailableStarts.includes(time)){
+    showAppToast('Список времени обновляется. Выбери свободный интервал ещё раз.');ruRenderDay();return;
+  }
+  $('clientBookingId').value='';currentClientBookingId='';
+  $('clientBookingTitle').textContent=t('Бронирование времени');$('clientBookingSubmit').textContent=t('Подтвердить запись');
+  $('clientBookingDate').value=date;$('clientBookingTime').value=time;
+  $('clientBookingName').value=profiles.client?.name||'';$('clientBookingPhone').value=profiles.client?.phone||'';
+  $('clientBookingNotes').value='';clientCommentPhotos=[];$('clientBookingPhotos').value='';renderPhotoPreviews('clientBookingPhotoPreview',[],()=>{});
+  ruSelectedServiceId=service.id;populateClientServiceOptions(service.id);
+  ruUpdateBookingDuration();
+  const dlg=$('clientBookingDialog');if(typeof dlg.showModal==='function')dlg.showModal();else dlg.setAttribute('open','');translatePage();
+}
+async function ruUpdateBookingDuration(){
+  const select=$('clientBookingService'),opt=select?.selectedOptions?.[0],service=ruServices.find(x=>x.id===opt?.value);
+  if(!service)return;
+  ruSelectedServiceId=service.id;
+  $('clientBookingDuration').value=service.durationMinutes;
+  $('clientBookingServicePrice').textContent=t('Цена')+': '+startingPrice(service.price);
+  const date=$('clientBookingDate').value,time=$('clientBookingTime').value;
+  $('clientBookingSlotLabel').textContent=date+' · '+time+'–'+minutesToTime(timeToMinutes(time)+service.durationMinutes);
+  const submit=$('clientBookingSubmit'),hint=$('clientBookingAvailabilityHint');submit.disabled=true;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!/^([01]\d|2[0-3]):(00|30)$/.test(time)){hint.textContent='Выбери дату и время с шагом 30 минут.';return;}
+  hint.textContent='Проверяю время на сервере…';
+  try{
+    const result=await ruSdk().availability(ruSelectedMasterId,date,service.id);
+    if(ruSelectedServiceId!==service.id||$('clientBookingDate').value!==date||$('clientBookingTime').value!==time)return;
+    if(!Array.isArray(result?.available_starts))throw new Error('Неверный формат');
+    const ok=result.available_starts.some(x=>(typeof x==='string'?x:x?.time||x?.start_time)===time);
+    hint.textContent=ok?'':'Это время уже недоступно. Выбери другое.';submit.disabled=!ok;
+  }catch(err){hint.textContent='Не удалось проверить время: '+(err?.message||'ошибка соединения');submit.disabled=true;}
+}
+async function ruSubmitBooking(){
+  const button=$('clientBookingSubmit');if(button.disabled)return;
+  if(nailoraActiveRegion!==NAILORA_REGION_RU || !ruSdk().isAuthenticated()){
+    showAppToast('Для записи из зарубежного профиля нужен безопасный единый вход, который пока не подключён. Повторный профиль создавать не нужно.');return;
+  }
+  if(!RU_STAGE_LIVE_BOOKINGS){showAppToast('Тестовая версия: настоящая запись пока не отправляется.');return;}
+  const service=$('clientBookingService').value,date=$('clientBookingDate').value,time=$('clientBookingTime').value;
+  const master=ruSelectedMasterId;
+  if(!ruServices.some(s=>s.id===service)){showAppToast('Выбери услугу мастера.');return;}
+  if($('clientBookingNotes').value.trim()||clientCommentPhotos.length){
+    showAppToast('Комментарии и фотографии пока не принимаются российским сервером. Запись не отправлена.');return;
+  }
+  const key=[master,service,date,time].join('|');
+  if(!ruBookingRequest||ruBookingRequest.key!==key){ruBookingRequest={key,id:ruNewRequestId()};}
+  button.disabled=true;
+  try{
+    const result=await ruSdk().book({master_id:master,service_id:service,date,start_time:time,request_id:ruBookingRequest.id});
+    if(result?.success!==true||typeof result?.booking?.id!=='string')throw new Error('Сервер не подтвердил сохранение записи');
+    ruBookingRequest=null;closeClientBooking();
+    showAppToast('Запись подтверждена российским сервером.');
+    await ruRenderDay();
+  }catch(err){showAppToast('Запись не подтверждена: '+(err?.message||'ошибка соединения')+'. При повторе используем тот же запрос.');ruUpdateBookingDuration();}
+}
+
+function renderClientDaySchedule(){if(ruIsMasterSelected()){ruRenderDay();return;}const box=$('clientDaySchedule');if(!box)return;const ds=clientSelectedDate||iso(new Date());const windows=clientAvailabilityIntervals(ds);const label=isDayOff(ds)?t('Выходной'):(formatAvailabilityIntervals(windows)||t('График не задан'));box.innerHTML=`<div class="schedule-header"><strong>${escapeHtml(formatDate(new Date(ds+'T12:00:00')))}</strong><span class="schedule-badge">${escapeHtml(label)}</span></div>${dailyScheduleHtml(ds,true)}`;bindClientBookingSlots(box);}
 
 function appendGapRows(rows,date,start,end,clientView){
  let cursor=start;const blocks=getBlockedSlotsOn(date);
@@ -4820,17 +5105,17 @@ function bindMasterSlotGestures(container){if(!container)return;container.queryS
 function bindClientBookingSlots(container){if(!container)return;container.querySelectorAll('.schedule-row.client-bookable[data-slot-date]').forEach(row=>{const activate=()=>openClientBooking(row.dataset.slotDate,Number(row.dataset.slotStart),Number(row.dataset.slotEnd),null,row.dataset.slotServiceId||'');row.addEventListener('click',e=>{if(e.target.closest('button'))return;activate()});row.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate()}})});}
 function getClientProfileId(create=false){const p=profiles.client;if(!p)return '';if(!p.profileId&&create){p.profileId='client-'+((crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random()));try{localStorage.setItem(ROLE_KEY,JSON.stringify(profiles))}catch(e){}}return String(p.profileId||'')}
 function clientOwnsAppointment(a){const p=profiles.client||{};if(!a||a.source!=='client-booking')return false;if(a.isOwn)return true;if(a.cloudClientId&&p.cloudId&&String(a.cloudClientId)===String(p.cloudId))return true;const pid=getClientProfileId(false);if(a.clientProfileId)return !!pid&&String(a.clientProfileId)===pid;const apPhone=normalizePhone(a.phone),myPhone=normalizePhone(p.phone);return !!myPhone&&!!apPhone&&apPhone===myPhone}
-function populateClientServiceOptions(selectedId='',selectedName='',duration=60,price=0,preserveExisting=false){const select=$('clientBookingService');select.innerHTML='';const serviceSource=(activeRole==='client'&&selectedCloudMasterId&&cloudScheduleData?cloudScheduleData.services:data.services);const services=Array.isArray(serviceSource)?serviceSource:[];services.forEach(s=>{const o=document.createElement('option');o.value=String(s.id);o.dataset.name=String(s.name);o.dataset.duration=String(appointmentDurationMinutes({durationMinutes:s.durationMinutes}));o.dataset.price=String(Math.max(0,Number(s.price)||0));o.textContent=`${s.name} · ${o.dataset.duration} ${t('мин.')} · ${startingPrice(o.dataset.price)}`;select.append(o)});let match=selectedId?Array.from(select.options).find(o=>o.value===String(selectedId)):null;if(!match&&selectedName)match=Array.from(select.options).find(o=>o.dataset.name.trim().toLocaleLowerCase()===String(selectedName).trim().toLocaleLowerCase());const savedDuration=Math.max(15,Math.min(480,Number(duration)||60)),savedPrice=Math.max(0,Number(price)||0);if(preserveExisting&&match&&(Number(match.dataset.duration)!==savedDuration||Number(match.dataset.price)!==savedPrice||match.dataset.name!==selectedName)){const o=document.createElement('option');o.value='legacy:current';o.dataset.name=selectedName||match.dataset.name;o.dataset.duration=String(savedDuration);o.dataset.price=String(savedPrice);o.dataset.serviceId=selectedId||'';o.textContent=`${o.dataset.name} · ${o.dataset.duration} ${t('мин.')} · ${startingPrice(o.dataset.price)} (${t('сохранённая услуга')})`;select.prepend(o);match=o}if(!match&&selectedName){const o=document.createElement('option');o.value='legacy:current';o.dataset.name=selectedName;o.dataset.duration=String(savedDuration);o.dataset.price=String(savedPrice);o.dataset.serviceId=selectedId||'';o.textContent=`${selectedName} · ${o.dataset.duration} ${t('мин.')} · ${startingPrice(o.dataset.price)} (${t('сохранённая услуга')})`;select.append(o);match=o}if(match)select.value=match.value;else if(services.length)select.selectedIndex=0;else{const o=document.createElement('option');o.value='';o.textContent=t('Сначала настройте услуги у мастера');o.dataset.duration='0';select.append(o);select.value=''}updateClientBookingDuration()}
-function updateClientBookingDuration(){const select=$('clientBookingService'),o=select?.selectedOptions?.[0],duration=Math.max(0,Number(o?.dataset.duration)||0),price=Math.max(0,Number(o?.dataset.price)||0);$('clientBookingDuration').value=duration||'';const priceLabel=$('clientBookingServicePrice');if(priceLabel)priceLabel.textContent=t('Цена')+': '+startingPrice(price);const date=$('clientBookingDate').value,time=$('clientBookingTime').value,start=time?timeToMinutes(time):0,end=start+duration;if(date&&time)$('clientBookingSlotLabel').textContent=formatDate(new Date(date+'T12:00:00'))+' · '+minutesToTime(start)+'–'+minutesToTime(end);const hint=$('clientBookingAvailabilityHint'),submit=$('clientBookingSubmit');let reason='';if(date&&time&&duration&&selectedCloudMasterId){if(cloudScheduleLoading||cloudScheduleLoadError||!cloudScheduleData)reason=t('Не удалось проверить расписание. Подожди загрузки и повтори попытку.');else if(!intervalFitsWorkWindow(date,start,end,true))reason=t('Эта услуга не помещается целиком в выбранный рабочий интервал. Выбери другое время или услугу.');else if(isDayOff(date))reason=t('Мастер не принимает в этот день.');else if(hasBlockedOverlap(date,start,end))reason=t('Выбранное время пересекается с перерывом или заблокированным интервалом.');else if(getAppointmentsOn(date).some(a=>String(a.id)!==String(currentClientBookingId)&&a.status!=='cancelled'&&start<appointmentInterval(a).end&&end>appointmentInterval(a).start))reason=t('Это время уже занято другой записью.');}if(hint)hint.textContent=reason;if(submit)submit.disabled=!!reason||!duration||!o||!o.dataset.name;}
+function populateClientServiceOptions(selectedId='',selectedName='',duration=60,price=0,preserveExisting=false){const select=$('clientBookingService');select.innerHTML='';const serviceSource=ruIsMasterSelected()?ruServices:(activeRole==='client'&&selectedCloudMasterId&&cloudScheduleData?cloudScheduleData.services:data.services);const services=Array.isArray(serviceSource)?serviceSource:[];services.forEach(s=>{const o=document.createElement('option');o.value=String(s.id);o.dataset.name=String(s.name);o.dataset.duration=String(appointmentDurationMinutes({durationMinutes:s.durationMinutes}));o.dataset.price=String(Math.max(0,Number(s.price)||0));o.textContent=`${s.name} · ${o.dataset.duration} ${t('мин.')} · ${startingPrice(o.dataset.price)}`;select.append(o)});let match=selectedId?Array.from(select.options).find(o=>o.value===String(selectedId)):null;if(!match&&selectedName)match=Array.from(select.options).find(o=>o.dataset.name.trim().toLocaleLowerCase()===String(selectedName).trim().toLocaleLowerCase());const savedDuration=Math.max(15,Math.min(480,Number(duration)||60)),savedPrice=Math.max(0,Number(price)||0);if(preserveExisting&&match&&(Number(match.dataset.duration)!==savedDuration||Number(match.dataset.price)!==savedPrice||match.dataset.name!==selectedName)){const o=document.createElement('option');o.value='legacy:current';o.dataset.name=selectedName||match.dataset.name;o.dataset.duration=String(savedDuration);o.dataset.price=String(savedPrice);o.dataset.serviceId=selectedId||'';o.textContent=`${o.dataset.name} · ${o.dataset.duration} ${t('мин.')} · ${startingPrice(o.dataset.price)} (${t('сохранённая услуга')})`;select.prepend(o);match=o}if(!match&&selectedName){const o=document.createElement('option');o.value='legacy:current';o.dataset.name=selectedName;o.dataset.duration=String(savedDuration);o.dataset.price=String(savedPrice);o.dataset.serviceId=selectedId||'';o.textContent=`${selectedName} · ${o.dataset.duration} ${t('мин.')} · ${startingPrice(o.dataset.price)} (${t('сохранённая услуга')})`;select.append(o);match=o}if(match)select.value=match.value;else if(services.length)select.selectedIndex=0;else{const o=document.createElement('option');o.value='';o.textContent=t('Сначала настройте услуги у мастера');o.dataset.duration='0';select.append(o);select.value=''}updateClientBookingDuration()}
+function updateClientBookingDuration(){if(ruIsMasterSelected()){ruUpdateBookingDuration();return;}const select=$('clientBookingService'),o=select?.selectedOptions?.[0],duration=Math.max(0,Number(o?.dataset.duration)||0),price=Math.max(0,Number(o?.dataset.price)||0);$('clientBookingDuration').value=duration||'';const priceLabel=$('clientBookingServicePrice');if(priceLabel)priceLabel.textContent=t('Цена')+': '+startingPrice(price);const date=$('clientBookingDate').value,time=$('clientBookingTime').value,start=time?timeToMinutes(time):0,end=start+duration;if(date&&time)$('clientBookingSlotLabel').textContent=formatDate(new Date(date+'T12:00:00'))+' · '+minutesToTime(start)+'–'+minutesToTime(end);const hint=$('clientBookingAvailabilityHint'),submit=$('clientBookingSubmit');let reason='';if(date&&time&&duration&&selectedCloudMasterId){if(cloudScheduleLoading||cloudScheduleLoadError||!cloudScheduleData)reason=t('Не удалось проверить расписание. Подожди загрузки и повтори попытку.');else if(!intervalFitsWorkWindow(date,start,end,true))reason=t('Эта услуга не помещается целиком в выбранный рабочий интервал. Выбери другое время или услугу.');else if(isDayOff(date))reason=t('Мастер не принимает в этот день.');else if(hasBlockedOverlap(date,start,end))reason=t('Выбранное время пересекается с перерывом или заблокированным интервалом.');else if(getAppointmentsOn(date).some(a=>String(a.id)!==String(currentClientBookingId)&&a.status!=='cancelled'&&start<appointmentInterval(a).end&&end>appointmentInterval(a).start))reason=t('Это время уже занято другой записью.');}if(hint)hint.textContent=reason;if(submit)submit.disabled=!!reason||!duration||!o||!o.dataset.name;}
 $('clientBookingService').onchange=updateClientBookingDuration;$('clientBookingDate').onchange=updateClientBookingDuration;$('clientBookingTime').onchange=updateClientBookingDuration;
-function openClientBooking(date,start,end,appointmentId=null,preferredServiceId=''){const existing=appointmentId?findClientAppointment(appointmentId):null;if(appointmentId&&(!existing||!clientOwnsAppointment(existing))){showAppToast(t('Эта запись недоступна для изменения.'));return}clientCommentPhotos=Array.isArray(existing?.photos)?existing.photos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS):[];$('clientBookingPhotos').value='';renderPhotoPreviews('clientBookingPhotoPreview',clientCommentPhotos,index=>removeCommentPhoto('client'));if(!existing){if(isDayOff(date)){showAppToast(t('Этот день отмечен как выходной.'));return}if(hasBlockedOverlap(date,start,end)||getAppointmentsOn(date).some(a=>a.status!=='cancelled'&&start<appointmentInterval(a).end&&end>appointmentInterval(a).start)){showAppToast(t('Это время уже занято. Выбери другой интервал.'));return}}currentClientBookingId=existing?String(existing.id):'';const p=profiles.client||{};$('clientBookingId').value=currentClientBookingId;$('clientBookingTitle').textContent=t(existing?'Изменить запись':'Бронирование времени');$('clientBookingSubmit').textContent=t(existing?'Сохранить изменения':'Подтвердить запись');$('clientBookingDate').required=false;$('clientBookingTime').required=false;$('clientBookingName').required=false;$('clientBookingDate').value=existing?.date||date;$('clientBookingTime').value=existing?.time||minutesToTime(start);$('clientBookingName').value=p.name||existing?.name||'';$('clientBookingPhone').value=p.phone||existing?.phone||'';$('clientBookingSlotLabel').textContent=formatDate(new Date((existing?.date||date)+'T12:00:00'))+' · '+minutesToTime(timeToMinutes(existing?.time||minutesToTime(start)))+'–'+minutesToTime(appointmentInterval(existing||{date,time:minutesToTime(start),durationMinutes:Math.max(15,Number(end)-Number(start))}).end);$('clientBookingNotes').value=existing?.notes||'';populateClientServiceOptions(existing?.serviceId||preferredServiceId||'',existing?.service||'',existing?appointmentDurationMinutes(existing):60,existing?.price||0,!!existing);updateClientBookingDuration();if(typeof $('clientBookingDialog').showModal==='function')$('clientBookingDialog').showModal();else $('clientBookingDialog').setAttribute('open','');translatePage()}
+function openClientBooking(date,start,end,appointmentId=null,preferredServiceId=''){if(ruIsMasterSelected()){ruOpenBooking(date,start,end,appointmentId,preferredServiceId);return;}const existing=appointmentId?findClientAppointment(appointmentId):null;if(appointmentId&&(!existing||!clientOwnsAppointment(existing))){showAppToast(t('Эта запись недоступна для изменения.'));return}clientCommentPhotos=Array.isArray(existing?.photos)?existing.photos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS):[];$('clientBookingPhotos').value='';renderPhotoPreviews('clientBookingPhotoPreview',clientCommentPhotos,index=>removeCommentPhoto('client'));if(!existing){if(isDayOff(date)){showAppToast(t('Этот день отмечен как выходной.'));return}if(hasBlockedOverlap(date,start,end)||getAppointmentsOn(date).some(a=>a.status!=='cancelled'&&start<appointmentInterval(a).end&&end>appointmentInterval(a).start)){showAppToast(t('Это время уже занято. Выбери другой интервал.'));return}}currentClientBookingId=existing?String(existing.id):'';const p=profiles.client||{};$('clientBookingId').value=currentClientBookingId;$('clientBookingTitle').textContent=t(existing?'Изменить запись':'Бронирование времени');$('clientBookingSubmit').textContent=t(existing?'Сохранить изменения':'Подтвердить запись');$('clientBookingDate').required=false;$('clientBookingTime').required=false;$('clientBookingName').required=false;$('clientBookingDate').value=existing?.date||date;$('clientBookingTime').value=existing?.time||minutesToTime(start);$('clientBookingName').value=p.name||existing?.name||'';$('clientBookingPhone').value=p.phone||existing?.phone||'';$('clientBookingSlotLabel').textContent=formatDate(new Date((existing?.date||date)+'T12:00:00'))+' · '+minutesToTime(timeToMinutes(existing?.time||minutesToTime(start)))+'–'+minutesToTime(appointmentInterval(existing||{date,time:minutesToTime(start),durationMinutes:Math.max(15,Number(end)-Number(start))}).end);$('clientBookingNotes').value=existing?.notes||'';populateClientServiceOptions(existing?.serviceId||preferredServiceId||'',existing?.service||'',existing?appointmentDurationMinutes(existing):60,existing?.price||0,!!existing);updateClientBookingDuration();if(typeof $('clientBookingDialog').showModal==='function')$('clientBookingDialog').showModal();else $('clientBookingDialog').setAttribute('open','');translatePage()}
 function findClientAppointment(id){return data.appointments.find(x=>String(x.id)===String(id))||cloudBookedSlots.find(x=>String(x.id)===String(id))||null}
-function editClientBooking(id){const a=findClientAppointment(id);if(!a||!clientOwnsAppointment(a)){showAppToast(t('Эта запись недоступна для изменения.'));return}openClientBooking(a.date,timeToMinutes(a.time),appointmentInterval(a).end,a.id)}
-async function deleteClientBooking(id){const a=findClientAppointment(id);if(!a||!clientOwnsAppointment(a)){showAppToast(t('Эта запись недоступна для удаления.'));return}if(confirm(t('Удалить вашу запись?'))){if(a.cloudId&&cloudReady()){const synced=await syncCloudAppointment(a,'client','cancel');if(!synced)return}data.appointments=data.appointments.filter(x=>String(x.id)!==String(id));cloudBookedSlots=cloudBookedSlots.filter(x=>String(x.id)!==String(id));save();showAppToast(t('Запись удалена.'))}}
+function editClientBooking(id){if(ruIsMasterSelected()){showAppToast('Перенос российской записи пока не подключён. Запись на сервере не изменена.');return;}const a=findClientAppointment(id);if(!a||!clientOwnsAppointment(a)){showAppToast(t('Эта запись недоступна для изменения.'));return}openClientBooking(a.date,timeToMinutes(a.time),appointmentInterval(a).end,a.id)}
+async function deleteClientBooking(id){if(ruIsMasterSelected()){showAppToast('Отмена российской записи пока не подключена. Запись на сервере не изменена.');return;}const a=findClientAppointment(id);if(!a||!clientOwnsAppointment(a)){showAppToast(t('Эта запись недоступна для удаления.'));return}if(confirm(t('Удалить вашу запись?'))){if(a.cloudId&&cloudReady()){const synced=await syncCloudAppointment(a,'client','cancel');if(!synced)return}data.appointments=data.appointments.filter(x=>String(x.id)!==String(id));cloudBookedSlots=cloudBookedSlots.filter(x=>String(x.id)!==String(id));save();showAppToast(t('Запись удалена.'))}}
 let currentClientBookingId='';
 function closeClientBooking(){const d=$('clientBookingDialog');if(d.open&&typeof d.close==='function')d.close();else d.removeAttribute('open');currentClientBookingId='';$('clientBookingId').value='';clientCommentPhotos=[];$('clientBookingPhotos').value='';renderPhotoPreviews('clientBookingPhotoPreview',clientCommentPhotos,()=>{})}
 $('closeClientBooking').onclick=closeClientBooking;$('cancelClientBooking').onclick=closeClientBooking;$('clientBookingDialog').addEventListener('click',e=>{if(e.target===$('clientBookingDialog'))closeClientBooking()});
-$('clientBookingForm').onsubmit=e=>{e.preventDefault();const id=$('clientBookingId').value,date=$('clientBookingDate').value,time=$('clientBookingTime').value,start=timeToMinutes(time),option=$('clientBookingService').selectedOptions[0],service=String(option?.dataset.name||'').trim(),durationMinutes=Math.max(15,Math.min(480,Number(option?.dataset.duration)||0)),end=start+durationMinutes,name=String((profiles.client||{}).name||'').trim()||String((id?findClientAppointment(id)?.name:'')||'').trim(),phone=String((profiles.client||{}).phone||'').trim()||String((id?findClientAppointment(id)?.phone:'')||'').trim(),notes=$('clientBookingNotes').value.trim(),photos=clientCommentPhotos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS),serviceId=option&&!String(option.value).startsWith('legacy:')?option.value:(option?.dataset.serviceId||''),price=Math.max(0,Number(option?.dataset.price)||0),existing=id?findClientAppointment(id):null;if(id&&(!existing||!clientOwnsAppointment(existing))){alert(t('Эта запись недоступна для изменения.'));return}if(!name||!service||!option||!durationMinutes){alert(t('Заполни имя и выбери услугу из списка мастера.'));return}if(!date||!time||!/^\d{2}:\d{2}$/.test(time)){alert(t('Выбери дату и время.'));return}if(date<iso(new Date())||(date===iso(new Date())&&start<=new Date().getHours()*60+new Date().getMinutes())){alert(t('Нельзя забронировать время в прошлом.'));return}if(isDayOff(date)){alert(t('Этот день отмечен как выходной.'));return}if(cloudReady()&&selectedCloudMasterId){if(!intervalFitsWorkWindow(date,start,end,true)){alert(t('Эта услуга не помещается целиком в один рабочий интервал мастера. Выбери другое время.'));return}}else{const hours=getMonthHours(date);if(start<timeToMinutes(hours.start)||end>timeToMinutes(hours.end)){alert(t('Выбранная длительность не помещается в рабочее время. Выбери другое время.'));return}}if(hasBlockedOverlap(date,start,end)){alert(t('Часть выбранного времени заблокирована. Выбери другой интервал.'));return}if(getAppointmentsOn(date).some(a=>String(a.id)!==String(id)&&start<appointmentInterval(a).end&&end>appointmentInterval(a).start)){alert(t('Запись пересекается с другой записью. Выбери другое время.'));return}const client=ensureClientCard({name,phone,service,price});const profileId=getClientProfileId(true);if(existing){Object.assign(existing,{clientId:client?.id||existing.clientId||'',clientProfileId:profileId,name,phone,service,serviceId,durationMinutes,price,date,time,notes,photos,source:'client-booking'})}else{data.appointments.push({id:(crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random()),clientId:client?.id||'',clientProfileId:profileId,name,phone,service,serviceId,price,date,time,notes,photos,paid:false,durationMinutes,source:'client-booking'})}profiles.client={...(profiles.client||{}),profileId,name,phone};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));clientSelectedDate=date;clientCursor=new Date(date+'T12:00:00');clientCursor.setDate(1);const cloudAp=existing||data.appointments.find(a=>String(a.id)===String(currentClientBookingId));closeClientBooking();save();if(cloudReady()&&selectedCloudMasterId){if(cloudAp){cloudAp.cloudMasterId=selectedCloudMasterId;cloudAp.cloudClientId=profiles.client.cloudId;syncCloudAppointment(cloudAp,'client','upsert').then(ok=>{if(ok){loadCloudScheduleForMaster(cloudMasterDirectory.find(m=>String(m.cloudId)===selectedCloudMasterId)||{cloudId:selectedCloudMasterId});showAppToast(t(existing?'Запись изменена и сохранена в облаке.':'Запись подтверждена и сохранена в облаке.'))}else{cloudBookedSlots=[...cloudBookedSlots,{...cloudAp,cloudMasterId:selectedCloudMasterId,cloudClientId:profiles.client.cloudId,isOwn:true,status:'booked',source:'client-booking'}];renderClientCalendar()}})}else{const created=data.appointments[data.appointments.length-1];if(created){created.cloudMasterId=selectedCloudMasterId;created.cloudClientId=profiles.client.cloudId;syncCloudAppointment(created,'client','upsert').then(ok=>{if(ok){loadCloudScheduleForMaster(cloudMasterDirectory.find(m=>String(m.cloudId)===selectedCloudMasterId)||{cloudId:selectedCloudMasterId});showAppToast(t('Запись подтверждена и сохранена в облаке.'))}else{cloudBookedSlots=[...cloudBookedSlots,{...created,cloudMasterId:selectedCloudMasterId,cloudClientId:profiles.client.cloudId,isOwn:true,status:'booked',source:'client-booking'}];renderClientCalendar()}})}}}if(!(cloudReady()&&selectedCloudMasterId))showAppToast(t(existing?'Запись изменена в этом браузере.':'Запись сохранена в этом браузере.'))};
+$('clientBookingForm').onsubmit=e=>{if(ruIsMasterSelected()){e.preventDefault();ruSubmitBooking();return;}e.preventDefault();const id=$('clientBookingId').value,date=$('clientBookingDate').value,time=$('clientBookingTime').value,start=timeToMinutes(time),option=$('clientBookingService').selectedOptions[0],service=String(option?.dataset.name||'').trim(),durationMinutes=Math.max(15,Math.min(480,Number(option?.dataset.duration)||0)),end=start+durationMinutes,name=String((profiles.client||{}).name||'').trim()||String((id?findClientAppointment(id)?.name:'')||'').trim(),phone=String((profiles.client||{}).phone||'').trim()||String((id?findClientAppointment(id)?.phone:'')||'').trim(),notes=$('clientBookingNotes').value.trim(),photos=clientCommentPhotos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS),serviceId=option&&!String(option.value).startsWith('legacy:')?option.value:(option?.dataset.serviceId||''),price=Math.max(0,Number(option?.dataset.price)||0),existing=id?findClientAppointment(id):null;if(id&&(!existing||!clientOwnsAppointment(existing))){alert(t('Эта запись недоступна для изменения.'));return}if(!name||!service||!option||!durationMinutes){alert(t('Заполни имя и выбери услугу из списка мастера.'));return}if(!date||!time||!/^\d{2}:\d{2}$/.test(time)){alert(t('Выбери дату и время.'));return}if(date<iso(new Date())||(date===iso(new Date())&&start<=new Date().getHours()*60+new Date().getMinutes())){alert(t('Нельзя забронировать время в прошлом.'));return}if(isDayOff(date)){alert(t('Этот день отмечен как выходной.'));return}if(cloudReady()&&selectedCloudMasterId){if(!intervalFitsWorkWindow(date,start,end,true)){alert(t('Эта услуга не помещается целиком в один рабочий интервал мастера. Выбери другое время.'));return}}else{const hours=getMonthHours(date);if(start<timeToMinutes(hours.start)||end>timeToMinutes(hours.end)){alert(t('Выбранная длительность не помещается в рабочее время. Выбери другое время.'));return}}if(hasBlockedOverlap(date,start,end)){alert(t('Часть выбранного времени заблокирована. Выбери другой интервал.'));return}if(getAppointmentsOn(date).some(a=>String(a.id)!==String(id)&&start<appointmentInterval(a).end&&end>appointmentInterval(a).start)){alert(t('Запись пересекается с другой записью. Выбери другое время.'));return}const client=ensureClientCard({name,phone,service,price});const profileId=getClientProfileId(true);if(existing){Object.assign(existing,{clientId:client?.id||existing.clientId||'',clientProfileId:profileId,name,phone,service,serviceId,durationMinutes,price,date,time,notes,photos,source:'client-booking'})}else{data.appointments.push({id:(crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random()),clientId:client?.id||'',clientProfileId:profileId,name,phone,service,serviceId,price,date,time,notes,photos,paid:false,durationMinutes,source:'client-booking'})}profiles.client={...(profiles.client||{}),profileId,name,phone};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));clientSelectedDate=date;clientCursor=new Date(date+'T12:00:00');clientCursor.setDate(1);const cloudAp=existing||data.appointments.find(a=>String(a.id)===String(currentClientBookingId));closeClientBooking();save();if(cloudReady()&&selectedCloudMasterId){if(cloudAp){cloudAp.cloudMasterId=selectedCloudMasterId;cloudAp.cloudClientId=profiles.client.cloudId;syncCloudAppointment(cloudAp,'client','upsert').then(ok=>{if(ok){loadCloudScheduleForMaster(cloudMasterDirectory.find(m=>String(m.cloudId)===selectedCloudMasterId)||{cloudId:selectedCloudMasterId});showAppToast(t(existing?'Запись изменена и сохранена в облаке.':'Запись подтверждена и сохранена в облаке.'))}else{cloudBookedSlots=[...cloudBookedSlots,{...cloudAp,cloudMasterId:selectedCloudMasterId,cloudClientId:profiles.client.cloudId,isOwn:true,status:'booked',source:'client-booking'}];renderClientCalendar()}})}else{const created=data.appointments[data.appointments.length-1];if(created){created.cloudMasterId=selectedCloudMasterId;created.cloudClientId=profiles.client.cloudId;syncCloudAppointment(created,'client','upsert').then(ok=>{if(ok){loadCloudScheduleForMaster(cloudMasterDirectory.find(m=>String(m.cloudId)===selectedCloudMasterId)||{cloudId:selectedCloudMasterId});showAppToast(t('Запись подтверждена и сохранена в облаке.'))}else{cloudBookedSlots=[...cloudBookedSlots,{...created,cloudMasterId:selectedCloudMasterId,cloudClientId:profiles.client.cloudId,isOwn:true,status:'booked',source:'client-booking'}];renderClientCalendar()}})}}}if(!(cloudReady()&&selectedCloudMasterId))showAppToast(t(existing?'Запись изменена в этом браузере.':'Запись сохранена в этом браузере.'))};
 
 function renderMasterServices(){const list=$('masterServicesList');if(!list)return;const services=Array.isArray(data.services)?data.services:[];list.innerHTML=services.length?services.map(s=>`<div class="service-row"><div class="service-description"><strong>${escapeHtml(s.name)}</strong><span>${Math.max(15,Math.min(480,Number(s.durationMinutes)||60))} ${escapeHtml(t('мин.'))}${Number(s.price)>0?' · '+escapeHtml(startingPrice(s.price)):''}</span></div><div class="service-actions"><button class="btn fixed" type="button" onclick="editMasterService('${escapeHtml(s.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="deleteMasterService('${escapeHtml(s.id)}')">${escapeHtml(t('Удалить'))}</button></div></div>`).join(''):`<p class="muted">${escapeHtml(t('Услуг пока нет. Добавь первую услугу.'))}</p>`}
 function resetMasterServiceForm(){ $('masterServiceId').value='';$('masterServiceName').value='';$('masterServiceDuration').value='90';$('masterServicePrice').value='0';$('masterServiceEditorSummary').textContent=t('+ Добавить услугу');$('cancelMasterServiceEdit').classList.add('hidden') }
@@ -5088,30 +5373,5 @@ setInterval(checkMasterReminders,30000);
  dlg.addEventListener('click',function(event){if(event.target===dlg){if(typeof dlg.close==='function')dlg.close();else dlg.removeAttribute('open');}});
 })();
 </script>
-<script>
-/* Standalone, opt-in RU catalog smoke test — does not authenticate or modify data. */
-(function () {
-  'use strict';
-  const button = document.getElementById('ruCatalogProbe');
-  const status = document.getElementById('ruCatalogProbeStatus');
-  if (!button || !status) return;
-  button.addEventListener('click', async function () {
-    button.disabled = true;
-    status.textContent = 'Проверяю подключение…';
-    try {
-      const client = window.NailoraRuSDK.createClient({
-        baseUrl: window.NAILORA_RU_API_BASE,
-        getRegion: () => 'ru' // Explicit read-only probe, not the user's account region.
-      });
-      const catalog = await client.directory({ limit: 50 });
-      if (!catalog || !Array.isArray(catalog.items)) throw new Error('Неверный формат ответа');
-      status.textContent = '✅ Каталог доступен. Получено опубликованных анкет: ' + catalog.items.length + (catalog.items.length === 50 ? ' (первые 50)' : '') + '.';
-    } catch (err) {
-      status.textContent = '⚠️ Не удалось загрузить каталог: ' + String(err && err.message || 'ошибка соединения');
-    } finally {
-      button.disabled = false;
-    }
-  });
-})();
-</script>
+
 </body></html>
