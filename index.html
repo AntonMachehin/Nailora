@@ -1112,7 +1112,7 @@ html.nailora-load-timeout::before{content:"Nailora загружается дол
 .nailora-region-panel[data-region="global"]{border-color:#bcdccc;background:#f4fbf7}
 </style>
 <script>
-window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only test; no RU authentication enabled
+window.NAILORA_RU_API_BASE = ''; // Replace only after VPS has HTTPS and DNS
 /* Nailora RU API v0.3 browser transport. No Supabase calls; no token persistence.
  * Preview build: the UI only uses the read-only probe. Authentication and
  * mutations are defined for later private tests, NOT enabled in HTML.
@@ -1253,12 +1253,6 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
   <p class="muted" style="margin:20px 0 0;text-align:center">Выбери свой тип аккаунта</p>
   <div class="row" style="margin-top:12px"><button class="btn primary" id="chooseMaster" type="button">Я мастер</button><button class="btn primary" id="chooseClient" type="button">Я клиент</button></div>
   <div id="roleAccessPanel" class="panel hidden" style="margin-top:14px;padding:16px"><h3 id="roleAccessTitle" style="margin:0 0 6px">Аккаунт мастера</h3><p id="roleAccessMessage" class="muted small" aria-live="polite" style="margin:0 0 12px">Выбери регистрацию или вход.</p><div class="row"><button class="btn primary" id="roleRegisterButton" type="button">Создать профиль мастера</button><button class="btn" id="roleLoginButton" type="button">Войти</button><button class="btn" id="roleAccessBack" type="button">Назад</button></div></div>
-  <div class="panel" style="margin-top:14px;padding:14px" aria-label="Тест российского каталога">
-    <strong>🇷🇺 Российский каталог — тест подключения</strong>
-    <p class="muted small">Проверка только чтения опубликованных анкет. Регистрация и запись на российском сервере пока отключены.</p>
-    <button class="btn" type="button" id="ruCatalogProbe">Проверить российский каталог</button>
-    <p class="muted small" id="ruCatalogProbeStatus" role="status" aria-live="polite">Нажми кнопку для проверки соединения.</p>
-  </div>
   <div class="row" style="margin-top:12px"><span id="cloudStatus" class="muted small">Проверка подключения…</span></div><p class="muted small" id="nailoraCloudInfo" style="margin-top:18px">Регион хранения определяется при регистрации и сохраняется для следующих входов.</p>
   <div class="policy-welcome-footer"><button type="button" class="nailora-policy-link" data-nailora-privacy>Политика конфиденциальности</button></div>
  </div>
@@ -1280,7 +1274,11 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
  </div>
  <div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn primary" type="submit" id="createProfileButton">Создать профиль</button><button class="btn hidden" id="registerOpenLogin" type="button" tabindex="-1" aria-hidden="true">Войти</button><button class="btn" id="backWelcome" type="button">Назад</button></div><p id="registerStatus" class="muted small" aria-live="polite" style="margin-top:10px"></p></form>
  </div></section>
-<section id="verifyEmail" class="wrap hidden" style="max-width:720px;padding-top:6vh"><div class="panel verify-panel"><div class="verify-mark" aria-hidden="true">✉</div><h2 class="verify-title">Подтверди электронную почту</h2><p class="verify-subtitle">Остался всего один небольшой шаг, и можно будет пользоваться Nailora.</p><p id="verifyEmailMessage" class="verify-intro" aria-live="polite">Мы отправили письмо со ссылкой для подтверждения. Открой его, чтобы подтвердить адрес.</p><ol class="verify-steps"><li><strong>Зайди в свою электронную почту</strong><span>Открой почтовый ящик, который указал при регистрации.</span></li><li><strong>Найди письмо от Nailora</strong><span>Если его не видно во входящих, загляни в папку «Спам».</span></li><li><strong>Открой письмо и перейди по ссылке</strong><span>Это подтвердит адрес электронной почты.</span></li></ol><p class="verify-note">После подтверждения вернись в Nailora. Если сессия восстановится успешно, приложение откроет твой профиль автоматически.</p><div class="verify-help small" style="margin-top:16px"><button type="button" id="verifyNoEmailToggle" class="link-button" aria-expanded="false" aria-controls="verifyNoEmailDetails">Письмо не пришло?</button><div id="verifyNoEmailDetails" class="hidden" style="margin-top:10px;padding:14px;border:1px solid #e9dff3;background:#faf7fc;border-radius:12px;text-align:left"><p style="margin:0 0 10px;color:#62566e">Проверь папку «Спам». Если письма там нет, можно отправить ссылку ещё раз здесь. Если аккаунт уже создан, не создавай его повторно.</p><div class="row" style="flex-wrap:wrap"><button type="button" id="resendVerifyEmail" class="btn primary">Отправить письмо ещё раз</button><button type="button" id="verifyBackToRegister" class="btn">Вернуться к регистрации</button></div><p id="verifyHelpStatus" class="muted small" aria-live="polite" style="margin:10px 0 0"></p></div></div></div></section>
+<section id="verifyEmail" class="wrap hidden" style="max-width:720px;padding-top:6vh"><div class="panel verify-panel"><div class="verify-mark" aria-hidden="true">✉</div><h2 class="verify-title">Подтверди электронную почту</h2><p class="verify-subtitle">Остался всего один небольшой шаг, и можно будет пользоваться Nailora.</p><p id="verifyEmailMessage" class="verify-intro" aria-live="polite">Мы отправили письмо со ссылкой для подтверждения. Открой его, чтобы подтвердить адрес.</p><ol class="verify-steps"><li><strong>Зайди в свою электронную почту</strong><span>Открой почтовый ящик, который указал при регистрации.</span></li><li><strong>Найди письмо от Nailora</strong><span>Если его не видно во входящих, загляни в папку «Спам».</span></li><li><strong>Открой письмо и перейди по ссылке</strong><span>Это подтвердит адрес электронной почты.</span></li></ol><p class="verify-note">После подтверждения вернись в Nailora. Если сессия восстановится успешно, приложение откроет твой профиль автоматически.</p><div class="verify-help small" style="margin-top:16px"><button type="button" id="verifyNoEmailToggle" class="link-button" aria-expanded="false" aria-controls="verifyNoEmailDetails">Письмо не пришло?</button><div id="verifyNoEmailDetails" class="hidden" style="margin-top:10px;padding:14px;border:1px solid #e9dff3;background:#faf7fc;border-radius:12px;text-align:left"><p style="margin:0 0 10px;color:#62566e">Проверь папку «Спам». Если письма там нет, можно отправить ссылку ещё раз здесь. Если аккаунт уже создан, не создавай его повторно.</p><div class="row" style="flex-wrap:wrap"><button type="button" id="resendVerifyEmail" class="btn primary">Отправить письмо ещё раз</button><button type="button" id="verifyBackToRegister" class="btn">Вернуться к регистрации</button></div><p id="verifyHelpStatus" class="muted small" aria-live="polite" style="margin:10px 0 0"></p></div></div>
+ <div class="row" style="margin-top:18px;justify-content:center">
+  <button type="button" id="primaryVerifyBackToLogin" class="btn" aria-label="Вернуться ко входу в профиль">← Назад ко входу</button>
+ </div>
+ </div></section>
 <section id="login" class="wrap hidden" style="max-width:650px;padding-top:5vh"><div class="panel"><h2>Вход в Nailora</h2><form id="loginForm">
  <div id="nailoraDiscoverCodePanel" class="hidden" style="border:1px solid var(--border, #ddd);padding:12px;border-radius:12px;margin-bottom:14px">
   <label for="nailoraDiscoverCode">Код подтверждения из письма</label>
@@ -1288,6 +1286,7 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
   <p class="muted small">На новом устройстве сначала подтверждаем email и автоматически находим сервер аккаунта. Пароль в сервис поиска не передаётся.</p>
   <button type="button" id="nailoraDiscoverFinish" class="btn fixed">Подтвердить email</button>
   <button type="button" id="nailoraDiscoverCancel" class="btn fixed">Отмена</button>
+  <button type="button" id="primaryDiscoverBackToWelcome" class="btn fixed" style="margin-top:8px">← Назад на главную</button>
  </div>
  <div id="nailoraLegacyLogin" class="hidden" style="margin-bottom:12px">
   <p class="muted small">Сервис автоматического поиска аккаунтов пока не запущен. Если профиль уже был создан в старой версии Nailora на Supabase, можно войти в него напрямую один раз.</p>
@@ -4000,7 +3999,7 @@ try{
  const lastRole=localStorage.getItem(ACTIVE_ROLE_KEY);
  if(nailoraActiveRegion===NAILORA_REGION_GLOBAL&&(lastRole==='master'||lastRole==='client')&&profiles[lastRole]&&!nailoraIsRussianCountry(profiles[lastRole].country)){
   activeRole=lastRole;chosenRole=lastRole;
-   queueMicrotask(() => openRole(lastRole).catch(err => console.warn('Cached profile restore failed:', err)));
+  openRole(lastRole);
   setCloudStatus('Восстанавливаю сохранённый профиль…');
  }
 }catch(cacheRestoreError){console.warn('Local profile fast restore failed:',cacheRestoreError)}
@@ -5088,29 +5087,24 @@ setInterval(checkMasterReminders,30000);
  dlg.addEventListener('click',function(event){if(event.target===dlg){if(typeof dlg.close==='function')dlg.close();else dlg.removeAttribute('open');}});
 })();
 </script>
-<script>
-/* Standalone, opt-in RU catalog smoke test — does not authenticate or modify data. */
-(function () {
+
+<script id="primaryVerificationNavigationFix">
+/* Navigation only: does not create accounts, change auth state, or contact servers. */
+(function(){
   'use strict';
-  const button = document.getElementById('ruCatalogProbe');
-  const status = document.getElementById('ruCatalogProbeStatus');
-  if (!button || !status) return;
-  button.addEventListener('click', async function () {
-    button.disabled = true;
-    status.textContent = 'Проверяю подключение…';
-    try {
-      const client = window.NailoraRuSDK.createClient({
-        baseUrl: window.NAILORA_RU_API_BASE,
-        getRegion: () => 'ru' // Explicit read-only probe, not the user's account region.
-      });
-      const catalog = await client.directory({ limit: 50 });
-      if (!catalog || !Array.isArray(catalog.items)) throw new Error('Неверный формат ответа');
-      status.textContent = '✅ Каталог доступен. Получено опубликованных анкет: ' + catalog.items.length + (catalog.items.length === 50 ? ' (первые 50)' : '') + '.';
-    } catch (err) {
-      status.textContent = '⚠️ Не удалось загрузить каталог: ' + String(err && err.message || 'ошибка соединения');
-    } finally {
-      button.disabled = false;
-    }
+  const emailBack=document.getElementById('primaryVerifyBackToLogin');
+  const codeBack=document.getElementById('primaryDiscoverBackToWelcome');
+  if(!emailBack || !codeBack) return;
+  emailBack.addEventListener('click',function(){
+    const pending=typeof readPendingVerification==='function' ? readPendingVerification():null;
+    const role=pending?.role || chosenRole || selectedEntryRole || 'client';
+    prepareLogin(role);
+    if(pending?.email) document.getElementById('loginEmail').value=pending.email;
+  });
+  codeBack.addEventListener('click',function(){
+    document.getElementById('nailoraDiscoverCode').value='';
+    document.getElementById('nailoraDiscoverCodePanel').classList.add('hidden');
+    showOnly('welcome');
   });
 })();
 </script>
