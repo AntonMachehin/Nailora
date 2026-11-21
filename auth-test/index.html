@@ -5253,4 +5253,44 @@ document.addEventListener('click', function(event){
 </script>
 
 <script src="./ru-registration.js"></script>
+<script id="ruVerifyEscapeFix">
+/* Test preview: an always-available way out of the email verification screen.
+   No auth tokens, profile records, or API calls are changed. */
+(() => {
+  'use strict';
+  const screen = document.getElementById('verifyEmail');
+  if (!screen) return;
+
+  function addBackButton() {
+    if (screen.querySelector('[data-ru-verification-back="1"]')) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn';
+    button.dataset.ruVerificationBack = '1';
+    button.textContent = '← Назад ко входу';
+    button.style.margin = '16px auto 0';
+    button.style.display = 'block';
+    button.setAttribute('aria-label', 'Вернуться к входу в профиль');
+    screen.append(button); // Outside the inner panel, which the registration script can redraw.
+  }
+
+  screen.addEventListener('click', event => {
+    const button = event.target.closest?.('[data-ru-verification-back="1"]');
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof prepareLogin === 'function') {
+      prepareLogin(chosenRole || selectedEntryRole || 'client');
+    } else if (typeof showOnly === 'function') {
+      showOnly('login');
+    }
+  });
+
+  addBackButton();
+  const observer = new MutationObserver(() => {
+    if (!screen.querySelector('[data-ru-verification-back="1"]')) addBackButton();
+  });
+  observer.observe(screen, {childList: true, subtree: true});
+})();
+</script>
 </body></html>
