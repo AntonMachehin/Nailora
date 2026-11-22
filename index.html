@@ -3587,7 +3587,7 @@ const NAILORA_SUPABASE_KEY='sb_publishable_-1TkkaMKrUdXmKfApv_8ew_Ao4e2GVk';
 let cloud=null,cloudUser=null,cloudMasterDirectory=[],cloudFavoriteMasters=[],selectedCloudMasterId='',cloudScheduleData=null,cloudBookedSlots=[],cloudNotifications=[],cloudPollTimer=null,cloudScheduleLoading=false,cloudScheduleLoadError='',cloudScheduleWarning='';
 
 // RU client integration (staging). The account server stays separate from the service-location server.
-const RU_STAGE_LIVE_BOOKINGS=false; // Step 01: test RU account login only; no live appointments may be created.
+const RU_STAGE_LIVE_BOOKINGS=true; // Step 05: live RU appointments via authenticated POST /v1/appointments.
 const RU_CLIENT_PROFILE_CACHE='manicureRoleProfiles_v1_ru_v898';
 let ruApiClient=null,ruSelectedMasterId='',ruServices=[],ruSelectedServiceId='',ruDaySequence=0,ruAvailableStarts=[],ruAvailableContext='',ruBookingRequest=null;
 function ruSdk(){
