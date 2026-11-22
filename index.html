@@ -1255,6 +1255,21 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
         if(typeof notes!=='string'||notes.length>500)throw new Error('Комментарий слишком длинный');
         return request('PATCH','/v1/appointments/'+uuid(id)+'/notes',{auth:true,body:{notes}});
       },
+      // Client can update own future booking's service and/or comment atomically.
+      updateBooking(id,changes){
+        if(!changes||typeof changes!=='object'||Array.isArray(changes))throw new Error('Некорректные изменения');
+        const body={};
+        if(Object.prototype.hasOwnProperty.call(changes,'service_id')){
+          if(typeof changes.service_id!=='string'||!changes.service_id.trim()||changes.service_id.length>200)throw new Error('Некорректная услуга');
+          body.service_id=changes.service_id;
+        }
+        if(Object.prototype.hasOwnProperty.call(changes,'notes')){
+          if(typeof changes.notes!=='string'||changes.notes.length>500)throw new Error('Комментарий слишком длинный');
+          body.notes=changes.notes;
+        }
+        if(!Object.keys(body).length)throw new Error('Нет изменений для сохранения');
+        return request('PATCH','/v1/appointments/'+uuid(id),{auth:true,body});
+      },
       // Master-only operation; rights enforced on server.
       finance(id,changes){return request('PATCH','/v1/appointments/'+uuid(id)+'/finance',{auth:true,body:changes})}
     });
@@ -1497,12 +1512,15 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
  </form></div>
 </dialog>
 <dialog id="ruBookingCommentDialog" aria-labelledby="ruBookingCommentTitle">
- <div class="dialog-head"><h2 id="ruBookingCommentTitle" style="margin:0">Комментарий к записи</h2><button type="button" class="btn fixed" id="ruBookingCommentClose" aria-label="Закрыть">✕</button></div>
+ <div class="dialog-head"><h2 id="ruBookingCommentTitle" style="margin:0">Изменить запись</h2><button type="button" class="btn fixed" id="ruBookingCommentClose" aria-label="Закрыть">✕</button></div>
  <div class="dialog-body"><form id="ruBookingCommentForm">
+  <label for="ruBookingEditService">Услуга</label>
+  <select id="ruBookingEditService"></select>
+  <p id="ruBookingEditServiceHint" class="muted small" role="status" aria-live="polite"></p>
   <label for="ruBookingCommentInput">Комментарий для мастера</label>
   <textarea id="ruBookingCommentInput" rows="4" maxlength="500" placeholder="Например, пожелания к дизайну"></textarea>
   <p id="ruBookingCommentStatus" class="muted small" role="status" aria-live="polite"></p>
-  <div class="account-actions"><button class="btn primary" id="ruBookingCommentSave" type="submit">Сохранить комментарий</button><button type="button" class="btn" id="ruBookingCommentCancel">Отмена</button></div>
+  <div class="account-actions"><button class="btn primary" id="ruBookingCommentSave" type="submit">Сохранить изменения</button><button type="button" class="btn" id="ruBookingCommentCancel">Отмена</button></div>
  </form></div>
 </dialog>
 <dialog id="reviewDialog" aria-labelledby="reviewDialogTitle">
@@ -5201,36 +5219,90 @@ function ruCloseBookingComment(){
 function ruEditBookingComment(id){
   const booking=ruAuthorizedBooking(id);
   if(!booking){showAppToast('Не удалось подтвердить вашу запись. Обнови календарь.');return;}
+  if(!(new Date(booking.start_time).getTime()>Date.now())||booking.paid===true){
+    showAppToast('Изменять можно только будущую неоплаченную запись.');return;
+  }
   ruEditBookingId='';ruBookingEditingNoteId=String(id);
+  const select=$('ruBookingEditService');
+  select.replaceChildren();
+  const unchanged=document.createElement('option');
+  unchanged.value='';unchanged.textContent='Не менять услугу (сейчас: '+String(booking.service_name||'услуга не указана')+')';
+  select.append(unchanged);
+  ruServices.forEach(service=>{
+    const option=document.createElement('option');
+    option.value=service.id;
+    option.textContent=service.name+' · '+service.durationMinutes+' мин. · '+startingPrice(service.price);
+    select.append(option);
+  });
+  select.value='';
+  const hint=$('ruBookingEditServiceHint');
+  function updateHint(){
+    const service=ruServices.find(x=>x.id===select.value);
+    hint.textContent=service
+      ?'Новая услуга: '+service.durationMinutes+' мин., цена '+startingPrice(service.price)+'. Дата и время останутся прежними. Сервер проверит доступность.'
+      :'Дата, время и текущая услуга сохранятся без изменений.';
+  }
+  select.onchange=updateHint;
+  updateHint();
   $('ruBookingCommentInput').value=String(booking.notes||'');
   $('ruBookingCommentStatus').textContent='';
   const dlg=$('ruBookingCommentDialog');
   if(typeof dlg.showModal==='function')dlg.showModal();else dlg.setAttribute('open','');
-  $('ruBookingCommentInput').focus();
 }
 $('ruBookingCommentClose').onclick=ruCloseBookingComment;
 $('ruBookingCommentCancel').onclick=ruCloseBookingComment;
 $('ruBookingCommentForm').onsubmit=async e=>{
   e.preventDefault();if(ruNoteSaving)return;
-  const id=ruBookingEditingNoteId,booking=ruAuthorizedBooking(id),notes=$('ruBookingCommentInput').value.trim();
+  const id=ruBookingEditingNoteId,booking=ruAuthorizedBooking(id);
   if(!booking){$('ruBookingCommentStatus').textContent='Запись больше не доступна для изменения.';return;}
-  if(notes===String(booking.notes||'')){ruCloseBookingComment();return;}
+  if(!(new Date(booking.start_time).getTime()>Date.now())||booking.paid===true){
+    $('ruBookingCommentStatus').textContent='Изменять можно только будущую неоплаченную запись.';return;
+  }
+  const serviceId=$('ruBookingEditService').value;
+  const service=serviceId?ruServices.find(x=>x.id===serviceId):null;
+  if(serviceId&&!service){$('ruBookingCommentStatus').textContent='Услуга больше не доступна. Обнови страницу.';return;}
+  const notes=$('ruBookingCommentInput').value.trim();
   if(notes.length>500){$('ruBookingCommentStatus').textContent='Не более 500 символов.';return;}
+  const changedNotes=notes!==String(booking.notes||'').trim();
+  const changedService=!!service&&String(booking.booking_service_id||'')!==service.id;
+  if(!changedNotes&&!changedService){ruCloseBookingComment();return;}
+  const changes={};
+  if(changedService)changes.service_id=service.id;
+  if(changedNotes)changes.notes=notes;
   ruNoteSaving=true;$('ruBookingCommentSave').disabled=true;
+  let accepted=false;
   try{
-    const response=await ruSdk().updateNotes(id,notes);
-    if(response?.success!==true)throw new Error('Сервер не подтвердил изменение комментария');
-    // Server read-back required; do not silently save a local-only comment.
+    const response=await ruSdk().updateBooking(id,changes);
+    if(response?.success!==true||String(response.booking?.id)!==id||response.booking?.status!=='booked'){
+      throw new Error('Сервер не подтвердил изменение записи');
+    }
+    accepted=true;
+    if(changedService&&(
+      String(response.booking.booking_service_id)!==service.id||
+      String(response.booking.service_name)!==service.name||
+      Number(response.booking.duration_minutes)!==service.durationMinutes
+    ))throw new Error('Сервер не подтвердил выбранную услугу');
+    if(changedNotes&&String(response.booking.notes||'')!==notes)throw new Error('Сервер не подтвердил комментарий');
+    // Read the persisted result back; never show a local-only edit as saved.
     const after=await ruSdk().appointments({role:'client'});
-    if(after?.success!==true||after.role!=='client'||!Array.isArray(after.items))throw new Error('Не удалось проверить комментарий после сохранения');
+    if(after?.success!==true||after.role!=='client'||!Array.isArray(after.items)){
+      throw new Error('Не удалось проверить запись повторным чтением');
+    }
     const updated=after.items.find(x=>String(x.id)===id);
-    if(!updated||String(updated.notes||'')!==notes)throw new Error('Сервер не подтвердил сохранённый комментарий при повторном чтении');
+    if(!updated)throw new Error('Запись не найдена после сохранения');
+    if(changedNotes&&String(updated.notes||'')!==notes)throw new Error('Комментарий не совпал после обновления');
+    if(changedService&&(
+      String(updated.service_name||'')!==service.name||
+      Number(updated.duration_minutes)!==service.durationMinutes
+    ))throw new Error('Услуга не совпала после обновления');
     ruOwnBookings=after.items;
-    $('ruBookingCommentStatus').textContent='Комментарий сохранён.';
     ruNoteSaving=false;ruCloseBookingComment();
-    await ruRenderDay();ruPaintCalendarDays();showAppToast('Комментарий сохранён на сервере.');
+    await ruRenderDay();ruPaintCalendarDays();
+    showAppToast('Изменения записи сохранены на AdminVPS.');
   }catch(err){
-    $('ruBookingCommentStatus').textContent='Не удалось подтвердить сохранение: '+(err?.message||'ошибка сервера')+'. Запись не удалена. Не повторяй отправку, пока не проверишь комментарий.';
+    $('ruBookingCommentStatus').textContent=(accepted
+      ?'Сервер принял изменение, но не удалось повторно проверить результат: '
+      :'Сохранение не подтверждено: ')+(err?.message||'ошибка соединения')+'. Проверь запись после обновления страницы перед повтором.';
   }finally{ruNoteSaving=false;$('ruBookingCommentSave').disabled=false;}
 };
 async function ruCancelOwnBooking(id){
