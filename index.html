@@ -3617,7 +3617,7 @@ async function ruOpenClientAccount(email){
 }
 // RU read-only booking list lives in memory and feeds the EXISTING calendar.
 // Never reuse Supabase/local browser bookings as evidence of a Russian booking.
-let ruOwnBookings=[],ruBookingsLoadSequence=0,ruMasterTimeZone='';
+let ruOwnBookings=[],ruBookingsLoadSequence=0,ruMasterTimeZone='',ruEditBookingId='';
 const ruDaySummary=new Map();
 function ruMasterLocalTime(value){
   if(!ruMasterTimeZone||!value)return null;
@@ -4294,7 +4294,7 @@ async function openRole(role){
   cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';
   // Never reuse a previous account's selected master, availability or bookings.
   ++ruDaySequence;ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';
-  ruAvailableStarts=[];ruAvailableContext='';ruBookingRequest=null;
+  ruAvailableStarts=[];ruAvailableContext='';ruBookingRequest=null;ruEditBookingId='';
  }
  setLanguage(profiles[role]?.language||currentLanguage);
  renderProfileAvatar(role);refreshRoleGreetings();
@@ -4320,7 +4320,7 @@ async function openRole(role){
  }
 }
 async function logout(){
- if(ruIsAccount()){++ruBookingsLoadSequence;++ruDaySequence;ruOwnBookings=[];ruDaySummary.clear();ruMasterTimeZone='';ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';ruAvailableStarts=[];ruAvailableContext='';ruBookingRequest=null;selectedClientMasterKey='';if($('settingsDialog').open)$('settingsDialog').close();try{await ruSdk().logout()}catch(_){}activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);showOnly('welcome');setCloudStatus('Выход выполнен');return;}
+ if(ruIsAccount()){++ruBookingsLoadSequence;++ruDaySequence;ruOwnBookings=[];ruDaySummary.clear();ruMasterTimeZone='';ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';ruAvailableStarts=[];ruAvailableContext='';ruBookingRequest=null;ruEditBookingId='';selectedClientMasterKey='';if($('settingsDialog').open)$('settingsDialog').close();try{await ruSdk().logout()}catch(_){}activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);showOnly('welcome');setCloudStatus('Выход выполнен');return;}
  if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=null;
  if($('settingsDialog').open)$('settingsDialog').close();
  setCloudStatus('Выхожу из аккаунта…');
@@ -4961,6 +4961,7 @@ function showClientMasterView(view='search'){
 $('clientSearchTab').onclick=()=>showClientMasterView('search');
 $('clientFavoritesTab').onclick=()=>showClientMasterView('favorites');
 async function chooseMasterForBooking(cloudId=''){
+ ruEditBookingId='';
  const master=[...cloudMasterDirectory,...cloudFavoriteMasters].find(m=>String(m.cloudId||m.profileId||m.masterId||'')===String(cloudId))||profiles.master;
  if(!master)return;
  if(nailoraIsRussianCountry(master.country)){
@@ -5076,23 +5077,39 @@ async function ruRenderDay(){
     ruDaySummary.set(id+'|'+date,{day_off:data.day_off===true,work_intervals:work});
     ruPaintCalendarDays();
     const own=ruOwnForDay(id,date);
-    const ownHtml=own.map(a=>scheduleRowHtml(a.start,a.end,'busy',t('Ваша запись'),[a.service,a.duration?a.duration+' мин.':''].filter(Boolean).join(' · '),null,date,true)).join('');
+    const ownHtml=own.map(a=>scheduleRowHtml(a.start,a.end,'busy',t('Ваша запись'),[a.service,a.duration?a.duration+' мин.':''].filter(Boolean).join(' · '),null,date,true,null,'',a.id)).join('');
     const html=starts.map(slotTime=>{const start=timeToMinutes(slotTime);return scheduleRowHtml(start,start+service.durationMinutes,'free',t('Свободно'),service.name,null,date,true,null,service.id)}).join('');
     const choices=box.querySelector('#ruDayService');
     box.innerHTML=`<div class="schedule-header"><strong>${escapeHtml(formatDate(new Date(date+'T12:00:00')))}</strong></div><label for="ruDayService">Услуга</label><select id="ruDayService">${ruServices.map(s=>`<option value="${escapeHtml(s.id)}"${s.id===service.id?' selected':''}>${escapeHtml(s.name)} · ${s.durationMinutes} мин.</option>`).join('')}</select><div class="schedule-list">${ownHtml}${html||'<div class="schedule-empty">На этот день нет свободного времени для выбранной услуги.</div>'}</div>`;
     $('ruDayService').onchange=e=>{ruSelectedServiceId=e.target.value;ruAvailableContext='';ruRenderDay();};
     bindClientBookingSlots(box);
+    box.querySelectorAll('button[data-ru-edit-booking-id]').forEach(button=>button.addEventListener('click',()=>ruStartReschedule(button.dataset.ruEditBookingId)));
   }catch(err){if(seq!==ruDaySequence)return;box.innerHTML=`<div class="schedule-empty">Не удалось загрузить свободное время: ${escapeHtml(err?.message||'ошибка сервера')}</div>`;}
 }
+function ruStartReschedule(id){
+  const booking=ruOwnBookings.find(x=>String(x.id)===String(id));
+  if(!ruIsAccount()||activeRole!=='client'||!ruSdk().isAuthenticated()||!booking||String(booking.master_id)!==String(ruSelectedMasterId)||['cancelled','canceled','completed'].includes(String(booking.status||'').toLowerCase())){
+    showAppToast('Не удалось подтвердить вашу запись. Обнови список и попробуй снова.');return;
+  }
+  ruEditBookingId=String(id);
+  const originalService=String(booking.service_id||'');
+  if(ruServices.some(x=>x.id===originalService)&&ruSelectedServiceId!==originalService){
+    ruSelectedServiceId=originalService;
+    ruRenderDay();
+  }
+  showAppToast('Для изменения нажми на новое свободное время в календаре. Исходная запись сохранится, пока сервер не подтвердит перенос.');
+}
 function ruOpenBooking(date,start,end,appointmentId,preferredServiceId){
-  if(appointmentId){showAppToast('Перенос российских записей пока недоступен.');return;}
+  if(appointmentId){showAppToast('Для переноса выбери кнопку «Изменить» у своей записи.');return;}
+  const edit=ruEditBookingId?ruOwnBookings.find(x=>String(x.id)===String(ruEditBookingId)&&String(x.master_id)===String(ruSelectedMasterId)):null;
+  if(ruEditBookingId&&!edit){ruEditBookingId='';showAppToast('Исходная запись больше не доступна для изменения.');return;}
   const service=ruServices.find(x=>x.id===(preferredServiceId||ruSelectedServiceId));
   const time=minutesToTime(start);
   if(!service||ruAvailableContext!==[ruSelectedMasterId,date,service.id].join('|')||!ruAvailableStarts.includes(time)){
     showAppToast('Список времени обновляется. Выбери свободный интервал ещё раз.');ruRenderDay();return;
   }
-  $('clientBookingId').value='';currentClientBookingId='';
-  $('clientBookingTitle').textContent=t('Бронирование времени');$('clientBookingSubmit').textContent=t('Подтвердить запись');
+  $('clientBookingId').value=edit?String(edit.id):'';currentClientBookingId=edit?String(edit.id):'';
+  $('clientBookingTitle').textContent=t(edit?'Изменить запись':'Бронирование времени');$('clientBookingSubmit').textContent=t(edit?'Сохранить изменения':'Подтвердить запись');
   $('clientBookingDate').value=date;$('clientBookingTime').value=time;
   $('clientBookingName').value=profiles.client?.name||'';$('clientBookingPhone').value=profiles.client?.phone||'';
   $('clientBookingNotes').value='';clientCommentPhotos=[];$('clientBookingPhotos').value='';renderPhotoPreviews('clientBookingPhotoPreview',[],()=>{});
@@ -5124,24 +5141,46 @@ async function ruSubmitBooking(){
   if(nailoraActiveRegion!==NAILORA_REGION_RU || !ruSdk().isAuthenticated()){
     showAppToast('Для записи из зарубежного профиля нужен безопасный единый вход, который пока не подключён. Повторный профиль создавать не нужно.');return;
   }
-  if(!RU_STAGE_LIVE_BOOKINGS){showAppToast('Тестовая версия: настоящая запись пока не отправляется.');return;}
+  const editId=String($('clientBookingId').value||'');
+  const original=editId?ruOwnBookings.find(x=>String(x.id)===editId&&String(x.master_id)===String(ruSelectedMasterId)):null;
+  if(editId&&(!original||ruEditBookingId!==editId||['cancelled','canceled','completed'].includes(String(original.status||'').toLowerCase()))){
+    showAppToast('Исходная запись недоступна. Ничего не изменено.');return;
+  }
+  if(!editId&&!RU_STAGE_LIVE_BOOKINGS){showAppToast('Тестовая версия: настоящая запись пока не отправляется.');return;}
   const service=$('clientBookingService').value,date=$('clientBookingDate').value,time=$('clientBookingTime').value;
   const master=ruSelectedMasterId;
   if(!ruServices.some(s=>s.id===service)){showAppToast('Выбери услугу мастера.');return;}
   if($('clientBookingNotes').value.trim()||clientCommentPhotos.length){
     showAppToast('Комментарии и фотографии пока не принимаются российским сервером. Запись не отправлена.');return;
   }
+  if(editId&&!confirm('Перенести существующую запись на '+date+' в '+time+'?'))return;
   const key=[master,service,date,time].join('|');
-  if(!ruBookingRequest||ruBookingRequest.key!==key){ruBookingRequest={key,id:ruNewRequestId()};}
+  if(!editId&&(!ruBookingRequest||ruBookingRequest.key!==key)){ruBookingRequest={key,id:ruNewRequestId()};}
   button.disabled=true;
   try{
-    const result=await ruSdk().book({master_id:master,service_id:service,date,start_time:time,request_id:ruBookingRequest.id});
-    if(result?.success!==true||typeof result?.booking?.id!=='string')throw new Error('Сервер не подтвердил сохранение записи');
-    ruBookingRequest=null;closeClientBooking();
-    showAppToast('Запись подтверждена российским сервером.');
-    await ruRenderDay();
-    void ruLoadMyBookings();
-  }catch(err){showAppToast('Запись не подтверждена: '+(err?.message||'ошибка соединения')+'. При повторе используем тот же запрос.');ruUpdateBookingDuration();}
+    const result=editId
+      ?await ruSdk().reschedule(editId,{service_id:service,date,time})
+      :await ruSdk().book({master_id:master,service_id:service,date,start_time:time,request_id:ruBookingRequest.id});
+    if(result?.success!==true||(!editId&&typeof result?.booking?.id!=='string'))throw new Error('Сервер не подтвердил сохранение записи');
+    ruBookingRequest=null;ruEditBookingId='';closeClientBooking();
+    if(editId){
+      // No optimistic local mutation: read the server-authorized booking list after confirmation.
+      showAppToast('Сервер принял изменение. Обновляю календарь…');
+      await ruLoadMyBookings();
+      await ruRenderDay();
+      const updated=ruOwnBookings.find(x=>String(x.id)===editId);
+      const local=updated&&ruMasterLocalTime(updated.start_time);
+      if(local&&local.date===date&&local.time===time)showAppToast('Запись изменена и подтверждена сервером.');
+      else showAppToast('Сервер принял изменение. Проверь новую дату и время после обновления страницы.');
+    }else{
+      showAppToast('Запись подтверждена российским сервером.');
+      await ruRenderDay();
+      void ruLoadMyBookings();
+    }
+  }catch(err){
+    showAppToast(editId?'Не удалось подтвердить перенос: '+(err?.message||'ошибка соединения')+'. Проверь исходную запись перед повтором.':'Запись не подтверждена: '+(err?.message||'ошибка соединения')+'. При повторе используем тот же запрос.');
+    ruUpdateBookingDuration();
+  }
 }
 
 function renderClientDaySchedule(){if(ruIsMasterSelected()){ruRenderDay();return;}const box=$('clientDaySchedule');if(!box)return;const ds=clientSelectedDate||iso(new Date());const windows=clientAvailabilityIntervals(ds);const label=isDayOff(ds)?t('Выходной'):(formatAvailabilityIntervals(windows)||t('График не задан'));box.innerHTML=`<div class="schedule-header"><strong>${escapeHtml(formatDate(new Date(ds+'T12:00:00')))}</strong><span class="schedule-badge">${escapeHtml(label)}</span></div>${dailyScheduleHtml(ds,true)}`;bindClientBookingSlots(box);}
@@ -5249,7 +5288,7 @@ function dailyScheduleHtml(date,clientView=false){
  if(!rows.length&&!outsideHtml)return `<div class="schedule-empty">${escapeHtml(t('На этот день записей пока нет. Дважды щёлкни дату в календаре, чтобы настроить рабочие интервалы.'))}</div>`;
  return `<div class="schedule-list">${rows.join('')}</div>${outsideHtml}`;
 }
-function scheduleRowHtml(start,end,kind,label,detail='',appointmentId=null,date=null,clientView=false,blockId=null,slotServiceId=''){
+function scheduleRowHtml(start,end,kind,label,detail='',appointmentId=null,date=null,clientView=false,blockId=null,slotServiceId='',ruOwnAppointmentId=''){
  const ap=appointmentId?data.appointments.find(a=>String(a.id)===String(appointmentId)):null;
  let actions='';
  if(ap&&!clientView){
@@ -5257,6 +5296,10 @@ function scheduleRowHtml(start,end,kind,label,detail='',appointmentId=null,date=
   actions=`<div class="schedule-actions"><button class="btn fixed" type="button" onclick="toggleAppointmentCompleted('${escapeHtml(ap.id)}')">${escapeHtml(t(completionLabel))}</button><button class="btn fixed" type="button" onclick="togglePaid('${escapeHtml(ap.id)}')">${escapeHtml(ap.paid?t('Снять оплату'):t('Отметить оплату'))}</button><button class="btn fixed" type="button" onclick="editAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="cancelMasterAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Отменить запись'))}</button><button class="btn fixed" type="button" onclick="remindAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Напомнить клиенту'))}</button></div>`
  }
  else if(ap&&clientView&&clientOwnsAppointment(ap)){const existingReview=getReviewForAppointment(ap);const reviewAction=appointmentHasPassed(ap)?`<button class="btn fixed" type="button" onclick="openReviewDialog('${escapeHtml(ap.id)}')">${escapeHtml(t(existingReview?'Изменить отзыв':'Оценить мастера'))}</button>`:'';actions=`<div class="schedule-actions"><button class="btn fixed" type="button" onclick="editClientBooking('${escapeHtml(ap.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="deleteClientBooking('${escapeHtml(ap.id)}')">${escapeHtml(t('Удалить'))}</button>${reviewAction}</div>`}
+ // Match the existing client's 'Изменить' action for a verified Russian booking.
+ else if(clientView&&ruOwnAppointmentId&&/^[0-9a-f-]{36}$/i.test(ruOwnAppointmentId)){
+  actions=`<div class="schedule-actions"><button class="btn fixed" type="button" data-ru-edit-booking-id="${escapeHtml(ruOwnAppointmentId)}">${escapeHtml(t('Изменить'))}</button></div>`;
+ }
  const unlock=blockId&&!clientView?`<div class="schedule-actions"><button class="btn fixed" type="button" onclick="unblockSlot('${escapeHtml(blockId)}')">${escapeHtml(t('Разблокировать'))}</button></div>`:'';
  const slotAttrs=date?` data-slot-date="${escapeHtml(date)}" data-slot-start="${start}" data-slot-end="${end}"`:'';const serviceAttrs=clientView&&kind==='free'&&slotServiceId?` data-slot-service-id="${escapeHtml(slotServiceId)}"`:'';
  const blockAttrs=blockId&&!clientView?` data-block-id="${escapeHtml(blockId)}"`:'';
@@ -5281,8 +5324,8 @@ function findClientAppointment(id){return data.appointments.find(x=>String(x.id)
 function editClientBooking(id){if(ruIsMasterSelected()){showAppToast('Перенос российской записи пока не подключён. Запись на сервере не изменена.');return;}const a=findClientAppointment(id);if(!a||!clientOwnsAppointment(a)){showAppToast(t('Эта запись недоступна для изменения.'));return}openClientBooking(a.date,timeToMinutes(a.time),appointmentInterval(a).end,a.id)}
 async function deleteClientBooking(id){if(ruIsMasterSelected()){showAppToast('Отмена российской записи пока не подключена. Запись на сервере не изменена.');return;}const a=findClientAppointment(id);if(!a||!clientOwnsAppointment(a)){showAppToast(t('Эта запись недоступна для удаления.'));return}if(confirm(t('Удалить вашу запись?'))){if(a.cloudId&&cloudReady()){const synced=await syncCloudAppointment(a,'client','cancel');if(!synced)return}data.appointments=data.appointments.filter(x=>String(x.id)!==String(id));cloudBookedSlots=cloudBookedSlots.filter(x=>String(x.id)!==String(id));save();showAppToast(t('Запись удалена.'))}}
 let currentClientBookingId='';
-function closeClientBooking(){const d=$('clientBookingDialog');if(d.open&&typeof d.close==='function')d.close();else d.removeAttribute('open');currentClientBookingId='';$('clientBookingId').value='';clientCommentPhotos=[];$('clientBookingPhotos').value='';renderPhotoPreviews('clientBookingPhotoPreview',clientCommentPhotos,()=>{})}
-$('closeClientBooking').onclick=closeClientBooking;$('cancelClientBooking').onclick=closeClientBooking;$('clientBookingDialog').addEventListener('click',e=>{if(e.target===$('clientBookingDialog'))closeClientBooking()});
+function closeClientBooking(){if(ruIsMasterSelected())ruEditBookingId='';const d=$('clientBookingDialog');if(d.open&&typeof d.close==='function')d.close();else d.removeAttribute('open');currentClientBookingId='';$('clientBookingId').value='';clientCommentPhotos=[];$('clientBookingPhotos').value='';renderPhotoPreviews('clientBookingPhotoPreview',clientCommentPhotos,()=>{})}
+$('closeClientBooking').onclick=closeClientBooking;$('cancelClientBooking').onclick=closeClientBooking;$('clientBookingDialog').addEventListener('click',e=>{if(e.target===$('clientBookingDialog'))closeClientBooking()});$('clientBookingDialog').addEventListener('close',()=>{if(ruIsMasterSelected())ruEditBookingId='';});
 $('clientBookingForm').onsubmit=e=>{if(ruIsMasterSelected()){e.preventDefault();ruSubmitBooking();return;}e.preventDefault();const id=$('clientBookingId').value,date=$('clientBookingDate').value,time=$('clientBookingTime').value,start=timeToMinutes(time),option=$('clientBookingService').selectedOptions[0],service=String(option?.dataset.name||'').trim(),durationMinutes=Math.max(15,Math.min(480,Number(option?.dataset.duration)||0)),end=start+durationMinutes,name=String((profiles.client||{}).name||'').trim()||String((id?findClientAppointment(id)?.name:'')||'').trim(),phone=String((profiles.client||{}).phone||'').trim()||String((id?findClientAppointment(id)?.phone:'')||'').trim(),notes=$('clientBookingNotes').value.trim(),photos=clientCommentPhotos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS),serviceId=option&&!String(option.value).startsWith('legacy:')?option.value:(option?.dataset.serviceId||''),price=Math.max(0,Number(option?.dataset.price)||0),existing=id?findClientAppointment(id):null;if(id&&(!existing||!clientOwnsAppointment(existing))){alert(t('Эта запись недоступна для изменения.'));return}if(!name||!service||!option||!durationMinutes){alert(t('Заполни имя и выбери услугу из списка мастера.'));return}if(!date||!time||!/^\d{2}:\d{2}$/.test(time)){alert(t('Выбери дату и время.'));return}if(date<iso(new Date())||(date===iso(new Date())&&start<=new Date().getHours()*60+new Date().getMinutes())){alert(t('Нельзя забронировать время в прошлом.'));return}if(isDayOff(date)){alert(t('Этот день отмечен как выходной.'));return}if(cloudReady()&&selectedCloudMasterId){if(!intervalFitsWorkWindow(date,start,end,true)){alert(t('Эта услуга не помещается целиком в один рабочий интервал мастера. Выбери другое время.'));return}}else{const hours=getMonthHours(date);if(start<timeToMinutes(hours.start)||end>timeToMinutes(hours.end)){alert(t('Выбранная длительность не помещается в рабочее время. Выбери другое время.'));return}}if(hasBlockedOverlap(date,start,end)){alert(t('Часть выбранного времени заблокирована. Выбери другой интервал.'));return}if(getAppointmentsOn(date).some(a=>String(a.id)!==String(id)&&start<appointmentInterval(a).end&&end>appointmentInterval(a).start)){alert(t('Запись пересекается с другой записью. Выбери другое время.'));return}const client=ensureClientCard({name,phone,service,price});const profileId=getClientProfileId(true);if(existing){Object.assign(existing,{clientId:client?.id||existing.clientId||'',clientProfileId:profileId,name,phone,service,serviceId,durationMinutes,price,date,time,notes,photos,source:'client-booking'})}else{data.appointments.push({id:(crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random()),clientId:client?.id||'',clientProfileId:profileId,name,phone,service,serviceId,price,date,time,notes,photos,paid:false,durationMinutes,source:'client-booking'})}profiles.client={...(profiles.client||{}),profileId,name,phone};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));clientSelectedDate=date;clientCursor=new Date(date+'T12:00:00');clientCursor.setDate(1);const cloudAp=existing||data.appointments.find(a=>String(a.id)===String(currentClientBookingId));closeClientBooking();save();if(cloudReady()&&selectedCloudMasterId){if(cloudAp){cloudAp.cloudMasterId=selectedCloudMasterId;cloudAp.cloudClientId=profiles.client.cloudId;syncCloudAppointment(cloudAp,'client','upsert').then(ok=>{if(ok){loadCloudScheduleForMaster(cloudMasterDirectory.find(m=>String(m.cloudId)===selectedCloudMasterId)||{cloudId:selectedCloudMasterId});showAppToast(t(existing?'Запись изменена и сохранена в облаке.':'Запись подтверждена и сохранена в облаке.'))}else{cloudBookedSlots=[...cloudBookedSlots,{...cloudAp,cloudMasterId:selectedCloudMasterId,cloudClientId:profiles.client.cloudId,isOwn:true,status:'booked',source:'client-booking'}];renderClientCalendar()}})}else{const created=data.appointments[data.appointments.length-1];if(created){created.cloudMasterId=selectedCloudMasterId;created.cloudClientId=profiles.client.cloudId;syncCloudAppointment(created,'client','upsert').then(ok=>{if(ok){loadCloudScheduleForMaster(cloudMasterDirectory.find(m=>String(m.cloudId)===selectedCloudMasterId)||{cloudId:selectedCloudMasterId});showAppToast(t('Запись подтверждена и сохранена в облаке.'))}else{cloudBookedSlots=[...cloudBookedSlots,{...created,cloudMasterId:selectedCloudMasterId,cloudClientId:profiles.client.cloudId,isOwn:true,status:'booked',source:'client-booking'}];renderClientCalendar()}})}}}if(!(cloudReady()&&selectedCloudMasterId))showAppToast(t(existing?'Запись изменена в этом браузере.':'Запись сохранена в этом браузере.'))};
 
 function renderMasterServices(){const list=$('masterServicesList');if(!list)return;const services=Array.isArray(data.services)?data.services:[];list.innerHTML=services.length?services.map(s=>`<div class="service-row"><div class="service-description"><strong>${escapeHtml(s.name)}</strong><span>${Math.max(15,Math.min(480,Number(s.durationMinutes)||60))} ${escapeHtml(t('мин.'))}${Number(s.price)>0?' · '+escapeHtml(startingPrice(s.price)):''}</span></div><div class="service-actions"><button class="btn fixed" type="button" onclick="editMasterService('${escapeHtml(s.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="deleteMasterService('${escapeHtml(s.id)}')">${escapeHtml(t('Удалить'))}</button></div></div>`).join(''):`<p class="muted">${escapeHtml(t('Услуг пока нет. Добавь первую услугу.'))}</p>`}
