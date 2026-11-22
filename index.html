@@ -1247,6 +1247,11 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
       },
       reschedule(id,x){return request('POST','/v1/appointments/'+uuid(id)+'/reschedule',{auth:true,body:{service_id:x.service_id,date:x.date,time:x.time}})},
       cancel(id){return request('POST','/v1/appointments/'+uuid(id)+'/cancel',{auth:true})},
+      // Will report unsupported if the deployed API does not implement this endpoint.
+      updateNotes(id,notes){
+        if(typeof notes!=='string'||notes.length>500)throw new Error('Комментарий слишком длинный');
+        return request('PATCH','/v1/appointments/'+uuid(id)+'/notes',{auth:true,body:{notes}});
+      },
       // Master-only operation; rights enforced on server.
       finance(id,changes){return request('PATCH','/v1/appointments/'+uuid(id)+'/finance',{auth:true,body:changes})}
     });
@@ -1486,6 +1491,15 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
   <label for="clientBookingNotes">Комментарий (необязательно)</label><textarea id="clientBookingNotes" rows="2" maxlength="500" placeholder="Например, пожелания к дизайну"></textarea><label for="clientBookingPhotos">Прикрепить фото из галереи</label><input id="clientBookingPhotos" type="file" accept="image/*" multiple><p class="photo-picker-help">До 3 фотографий к комментарию. Фото автоматически сжимаются.</p><div id="clientBookingPhotoPreview" class="photo-preview-grid"></div>
   <p class="muted small">Запись будет добавлена в этот календарь сразу. Если выбранная длительность пересекается с другим приёмом или заблокированным временем, приложение попросит выбрать другой интервал.</p>
   <div class="account-actions"><button class="btn primary" id="clientBookingSubmit" type="submit">Подтвердить запись</button><button class="btn" type="button" id="cancelClientBooking">Отмена</button></div>
+ </form></div>
+</dialog>
+<dialog id="ruBookingCommentDialog" aria-labelledby="ruBookingCommentTitle">
+ <div class="dialog-head"><h2 id="ruBookingCommentTitle" style="margin:0">Комментарий к записи</h2><button type="button" class="btn fixed" id="ruBookingCommentClose" aria-label="Закрыть">✕</button></div>
+ <div class="dialog-body"><form id="ruBookingCommentForm">
+  <label for="ruBookingCommentInput">Комментарий для мастера</label>
+  <textarea id="ruBookingCommentInput" rows="4" maxlength="500" placeholder="Например, пожелания к дизайну"></textarea>
+  <p id="ruBookingCommentStatus" class="muted small" role="status" aria-live="polite"></p>
+  <div class="account-actions"><button class="btn primary" id="ruBookingCommentSave" type="submit">Сохранить комментарий</button><button type="button" class="btn" id="ruBookingCommentCancel">Отмена</button></div>
  </form></div>
 </dialog>
 <dialog id="reviewDialog" aria-labelledby="reviewDialogTitle">
@@ -3617,7 +3631,7 @@ async function ruOpenClientAccount(email){
 }
 // RU read-only booking list lives in memory and feeds the EXISTING calendar.
 // Never reuse Supabase/local browser bookings as evidence of a Russian booking.
-let ruOwnBookings=[],ruBookingsLoadSequence=0,ruMasterTimeZone='',ruEditBookingId='';
+let ruOwnBookings=[],ruBookingsLoadSequence=0,ruMasterTimeZone='',ruEditBookingId='',ruBookingEditingNoteId='',ruNoteSaving=false,ruCancelPendingIds=new Set(),ruAvailableByService=new Map();
 const ruDaySummary=new Map();
 function ruMasterLocalTime(value){
   if(!ruMasterTimeZone||!value)return null;
@@ -3641,7 +3655,7 @@ function ruOwnForDay(masterId,date){
     id:String(a.id),date,
     start:timeToMinutes(ruMasterLocalTime(a.start_time).time),
     end:timeToMinutes(ruMasterLocalTime(a.end_time)?.time||''),
-    service:String(a.service_name||''),duration:Number(a.duration_minutes)||0
+    service:String(a.service_name||''),duration:Number(a.duration_minutes)||0,notes:String(a.notes||'')
   })).filter(a=>a.end>a.start&&a.start>=0&&a.end<=1440).sort((x,y)=>x.start-y.start);
 }
 function ruPaintCalendarDays(){
@@ -4320,7 +4334,7 @@ async function openRole(role){
  }
 }
 async function logout(){
- if(ruIsAccount()){++ruBookingsLoadSequence;++ruDaySequence;ruOwnBookings=[];ruDaySummary.clear();ruMasterTimeZone='';ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';ruAvailableStarts=[];ruAvailableContext='';ruBookingRequest=null;ruEditBookingId='';selectedClientMasterKey='';if($('settingsDialog').open)$('settingsDialog').close();try{await ruSdk().logout()}catch(_){}activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);showOnly('welcome');setCloudStatus('Выход выполнен');return;}
+ if(ruIsAccount()){++ruBookingsLoadSequence;++ruDaySequence;ruOwnBookings=[];ruDaySummary.clear();ruMasterTimeZone='';ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';ruAvailableStarts=[];ruAvailableContext='';ruBookingRequest=null;ruEditBookingId='';ruBookingEditingNoteId='';selectedClientMasterKey='';if($('settingsDialog').open)$('settingsDialog').close();try{await ruSdk().logout()}catch(_){}activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);showOnly('welcome');setCloudStatus('Выход выполнен');return;}
  if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=null;
  if($('settingsDialog').open)$('settingsDialog').close();
  setCloudStatus('Выхожу из аккаунта…');
@@ -5060,52 +5074,123 @@ function ruRenderClientCalendar(){
 }
 async function ruRenderDay(){
   const box=$('clientDaySchedule');if(!box||!ruSelectedMasterId)return;
-  const id=ruSelectedMasterId,date=clientSelectedDate||iso(new Date()),service=ruServices.find(x=>x.id===ruSelectedServiceId)||ruServices[0];
-  if(!service){box.innerHTML='<div class="schedule-empty">Услуги пока не доступны.</div>';return;}
+  const id=ruSelectedMasterId,date=clientSelectedDate||iso(new Date());
+  if(!ruServices.length){box.innerHTML='<div class="schedule-empty">Услуги пока не доступны.</div>';return;}
   const seq=++ruDaySequence;
-  box.innerHTML=`<div class="schedule-header"><strong>${escapeHtml(formatDate(new Date(date+'T12:00:00')))}</strong></div><label for="ruDayService">Услуга</label><select id="ruDayService">${ruServices.map(s=>`<option value="${escapeHtml(s.id)}"${s.id===service.id?' selected':''}>${escapeHtml(s.name)} · ${s.durationMinutes} мин.</option>`).join('')}</select><div class="schedule-empty">Загружаю свободное время…</div>`;
-  $('ruDayService').onchange=e=>{ruSelectedServiceId=e.target.value;ruAvailableContext='';ruRenderDay();};
-  ruAvailableContext='';ruAvailableStarts=[];
+  box.innerHTML=`<div class="schedule-header"><strong>${escapeHtml(formatDate(new Date(date+'T12:00:00')))}</strong></div><div class="schedule-empty">Загружаю свободное время…</div>`;
+  ruAvailableContext='';ruAvailableStarts=[];ruAvailableByService=new Map();
   try{
-    const data=await ruSdk().availability(id,date,service.id);
-    if(seq!==ruDaySequence||id!==ruSelectedMasterId||date!==clientSelectedDate||ruSelectedServiceId!==service.id)return;
-    if(!Array.isArray(data?.available_starts))throw new Error('Неверный формат свободного времени');
-    const starts=data.available_starts.map(v=>typeof v==='string'?v:v?.time||v?.start_time).filter(v=>/^([01]\d|2[0-3]):(00|30)$/.test(String(v||'')));
-    ruAvailableStarts=starts;ruAvailableContext=[id,date,service.id].join('|');
-    if(typeof data.timezone==='string'&&data.timezone.trim())ruMasterTimeZone=data.timezone.trim();
-    const work=Array.isArray(data.work_intervals)?data.work_intervals.filter(w=>/^([01]\d|2[0-3]):[0-5]\d$/.test(w?.start||'')&&/^([01]\d|2[0-3]):[0-5]\d$/.test(w?.end||'')):[];
-    ruDaySummary.set(id+'|'+date,{day_off:data.day_off===true,work_intervals:work});
+    const responses=await Promise.allSettled(ruServices.map(service=>ruSdk().availability(id,date,service.id)));
+    if(seq!==ruDaySequence||id!==ruSelectedMasterId||date!==clientSelectedDate)return;
+    const union=new Set();let timezone='',work=[],hasSuccess=false,dayOff=false;
+    for(let i=0;i<responses.length;i++){
+      const result=responses[i];if(result.status!=='fulfilled'||!Array.isArray(result.value?.available_starts))continue;
+      hasSuccess=true;
+      const data=result.value,service=ruServices[i];
+      const starts=data.available_starts.map(v=>typeof v==='string'?v:v?.time||v?.start_time)
+       .filter(v=>/^([01]\d|2[0-3]):(00|30)$/.test(String(v||'')));
+      ruAvailableByService.set(service.id,new Set(starts));starts.forEach(x=>union.add(x));
+      if(!timezone&&typeof data.timezone==='string')timezone=data.timezone.trim();
+      if(Array.isArray(data.work_intervals)&&data.work_intervals.length)work=data.work_intervals.filter(w=>/^([01]\d|2[0-3]):[0-5]\d$/.test(w?.start||'')&&/^([01]\d|2[0-3]):[0-5]\d$/.test(w?.end||''));
+      if(data.day_off===true)dayOff=true;
+    }
+    if(!hasSuccess)throw new Error('Российский сервер не подтвердил свободное время');
+    ruAvailableStarts=Array.from(union).sort();ruAvailableContext=[id,date].join('|');
+    if(timezone)ruMasterTimeZone=timezone;
+    ruDaySummary.set(id+'|'+date,{day_off:dayOff,work_intervals:work});
     ruPaintCalendarDays();
     const own=ruOwnForDay(id,date);
-    const ownHtml=own.map(a=>scheduleRowHtml(a.start,a.end,'busy',t('Ваша запись'),[a.service,a.duration?a.duration+' мин.':''].filter(Boolean).join(' · '),null,date,true,null,'',a.id)).join('');
-    const html=starts.map(slotTime=>{const start=timeToMinutes(slotTime);return scheduleRowHtml(start,start+service.durationMinutes,'free',t('Свободно'),service.name,null,date,true,null,service.id)}).join('');
-    const choices=box.querySelector('#ruDayService');
-    box.innerHTML=`<div class="schedule-header"><strong>${escapeHtml(formatDate(new Date(date+'T12:00:00')))}</strong></div><label for="ruDayService">Услуга</label><select id="ruDayService">${ruServices.map(s=>`<option value="${escapeHtml(s.id)}"${s.id===service.id?' selected':''}>${escapeHtml(s.name)} · ${s.durationMinutes} мин.</option>`).join('')}</select><div class="schedule-list">${ownHtml}${html||'<div class="schedule-empty">На этот день нет свободного времени для выбранной услуги.</div>'}</div>`;
-    $('ruDayService').onchange=e=>{ruSelectedServiceId=e.target.value;ruAvailableContext='';ruRenderDay();};
+    const ownHtml=own.map(a=>scheduleRowHtml(a.start,a.end,'busy',t('Ваша запись'),
+      [a.service,a.duration?a.duration+' мин.':'',a.notes?'Комментарий: '+a.notes:''].filter(Boolean).join(' · '),
+      null,date,true,null,'',a.id)).join('');
+    const html=ruAvailableStarts.map(slotTime=>{
+      const start=timeToMinutes(slotTime);
+      return scheduleRowHtml(start,start+30,'free',t('Свободно'),'',null,date,true,null,'','',true);
+    }).join('');
+    box.innerHTML=`<div class="schedule-header"><strong>${escapeHtml(formatDate(new Date(date+'T12:00:00')))}</strong></div><div class="schedule-list">${ownHtml}${html||'<div class="schedule-empty">Свободного времени на этот день нет.</div>'}</div>`;
     bindClientBookingSlots(box);
-    box.querySelectorAll('button[data-ru-edit-booking-id]').forEach(button=>button.addEventListener('click',()=>ruStartReschedule(button.dataset.ruEditBookingId)));
+    box.querySelectorAll('button[data-ru-edit-booking-id]').forEach(button=>button.addEventListener('click',()=>ruEditBookingComment(button.dataset.ruEditBookingId)));
+    box.querySelectorAll('button[data-ru-cancel-booking-id]').forEach(button=>button.addEventListener('click',()=>void ruCancelOwnBooking(button.dataset.ruCancelBookingId)));
   }catch(err){if(seq!==ruDaySequence)return;box.innerHTML=`<div class="schedule-empty">Не удалось загрузить свободное время: ${escapeHtml(err?.message||'ошибка сервера')}</div>`;}
 }
-function ruStartReschedule(id){
+function ruAuthorizedBooking(id){
   const booking=ruOwnBookings.find(x=>String(x.id)===String(id));
-  if(!ruIsAccount()||activeRole!=='client'||!ruSdk().isAuthenticated()||!booking||String(booking.master_id)!==String(ruSelectedMasterId)||['cancelled','canceled','completed'].includes(String(booking.status||'').toLowerCase())){
-    showAppToast('Не удалось подтвердить вашу запись. Обнови список и попробуй снова.');return;
-  }
-  ruEditBookingId=String(id);
-  const originalService=String(booking.service_id||'');
-  if(ruServices.some(x=>x.id===originalService)&&ruSelectedServiceId!==originalService){
-    ruSelectedServiceId=originalService;
-    ruRenderDay();
-  }
-  showAppToast('Для изменения нажми на новое свободное время в календаре. Исходная запись сохранится, пока сервер не подтвердит перенос.');
+  return ruIsAccount()&&activeRole==='client'&&ruSdk().isAuthenticated()&&booking
+    &&String(booking.master_id)===String(ruSelectedMasterId)
+    &&!['cancelled','canceled','completed'].includes(String(booking.status||'').toLowerCase())?booking:null;
+}
+function ruCloseBookingComment(){
+  if(ruNoteSaving)return;
+  const dlg=$('ruBookingCommentDialog');
+  if(dlg.open&&typeof dlg.close==='function')dlg.close();else dlg.removeAttribute('open');
+  ruBookingEditingNoteId='';
+}
+function ruEditBookingComment(id){
+  const booking=ruAuthorizedBooking(id);
+  if(!booking){showAppToast('Не удалось подтвердить вашу запись. Обнови календарь.');return;}
+  ruEditBookingId='';ruBookingEditingNoteId=String(id);
+  $('ruBookingCommentInput').value=String(booking.notes||'');
+  $('ruBookingCommentStatus').textContent='';
+  const dlg=$('ruBookingCommentDialog');
+  if(typeof dlg.showModal==='function')dlg.showModal();else dlg.setAttribute('open','');
+  $('ruBookingCommentInput').focus();
+}
+$('ruBookingCommentClose').onclick=ruCloseBookingComment;
+$('ruBookingCommentCancel').onclick=ruCloseBookingComment;
+$('ruBookingCommentForm').onsubmit=async e=>{
+  e.preventDefault();if(ruNoteSaving)return;
+  const id=ruBookingEditingNoteId,booking=ruAuthorizedBooking(id),notes=$('ruBookingCommentInput').value.trim();
+  if(!booking){$('ruBookingCommentStatus').textContent='Запись больше не доступна для изменения.';return;}
+  if(notes===String(booking.notes||'')){ruCloseBookingComment();return;}
+  if(notes.length>500){$('ruBookingCommentStatus').textContent='Не более 500 символов.';return;}
+  ruNoteSaving=true;$('ruBookingCommentSave').disabled=true;
+  try{
+    const response=await ruSdk().updateNotes(id,notes);
+    if(response?.success!==true)throw new Error('Сервер не подтвердил изменение комментария');
+    // Server read-back required; do not silently save a local-only comment.
+    const after=await ruSdk().appointments({role:'client'});
+    if(after?.success!==true||after.role!=='client'||!Array.isArray(after.items))throw new Error('Не удалось проверить комментарий после сохранения');
+    const updated=after.items.find(x=>String(x.id)===id);
+    if(!updated||String(updated.notes||'')!==notes)throw new Error('Сервер не подтвердил сохранённый комментарий при повторном чтении');
+    ruOwnBookings=after.items;
+    $('ruBookingCommentStatus').textContent='Комментарий сохранён.';
+    ruNoteSaving=false;ruCloseBookingComment();
+    await ruRenderDay();ruPaintCalendarDays();showAppToast('Комментарий сохранён на сервере.');
+  }catch(err){
+    $('ruBookingCommentStatus').textContent='Не удалось подтвердить сохранение: '+(err?.message||'ошибка сервера')+'. Запись не удалена. Не повторяй отправку, пока не проверишь комментарий.';
+  }finally{ruNoteSaving=false;$('ruBookingCommentSave').disabled=false;}
+};
+async function ruCancelOwnBooking(id){
+  const booking=ruAuthorizedBooking(id);
+  if(!booking){showAppToast('Запись не найдена или недоступна для отмены.');return;}
+  if(ruCancelPendingIds.has(String(id)))return;
+  const time=ruMasterLocalTime(booking.start_time);
+  if(!confirm('Удалить запись'+(time?' на '+time.date+' в '+time.time:'')+'? На сервере она будет отменена, а время освободится.'))return;
+  ruCancelPendingIds.add(String(id));let accepted=false;
+  try{
+    const response=await ruSdk().cancel(id);
+    if(response?.success!==true)throw new Error('Сервер не подтвердил отмену');
+    accepted=true;
+    const fresh=await ruSdk().appointments({role:'client'});
+    if(fresh?.success!==true||fresh.role!=='client'||!Array.isArray(fresh.items))throw new Error('Не удалось прочитать список записей после отмены');
+    const still=fresh.items.find(x=>String(x.id)===String(id));
+    if(still&&!['cancelled','canceled'].includes(String(still.status||'').toLowerCase()))throw new Error('Запись по-прежнему активна после обновления');
+    ruOwnBookings=fresh.items;
+    ruEditBookingId='';
+    await ruRenderDay();ruPaintCalendarDays();
+    showAppToast('Запись отменена на сервере и убрана из календаря.');
+  }catch(err){
+    showAppToast((accepted?'Сервер принял отмену, но не удалось проверить результат: ':'Запись не отменена: ')+(err?.message||'ошибка сервера'));
+  }finally{ruCancelPendingIds.delete(String(id));}
 }
 function ruOpenBooking(date,start,end,appointmentId,preferredServiceId){
   if(appointmentId){showAppToast('Для переноса выбери кнопку «Изменить» у своей записи.');return;}
   const edit=ruEditBookingId?ruOwnBookings.find(x=>String(x.id)===String(ruEditBookingId)&&String(x.master_id)===String(ruSelectedMasterId)):null;
   if(ruEditBookingId&&!edit){ruEditBookingId='';showAppToast('Исходная запись больше не доступна для изменения.');return;}
-  const service=ruServices.find(x=>x.id===(preferredServiceId||ruSelectedServiceId));
   const time=minutesToTime(start);
-  if(!service||ruAvailableContext!==[ruSelectedMasterId,date,service.id].join('|')||!ruAvailableStarts.includes(time)){
+  const allowed=ruServices.filter(x=>ruAvailableByService.get(x.id)?.has(time));
+  const service=allowed.find(x=>x.id===(preferredServiceId||ruSelectedServiceId))||allowed[0];
+  if(!service||ruAvailableContext!==[ruSelectedMasterId,date].join('|')||!ruAvailableStarts.includes(time)){
     showAppToast('Список времени обновляется. Выбери свободный интервал ещё раз.');ruRenderDay();return;
   }
   $('clientBookingId').value=edit?String(edit.id):'';currentClientBookingId=edit?String(edit.id):'';
@@ -5288,7 +5373,7 @@ function dailyScheduleHtml(date,clientView=false){
  if(!rows.length&&!outsideHtml)return `<div class="schedule-empty">${escapeHtml(t('На этот день записей пока нет. Дважды щёлкни дату в календаре, чтобы настроить рабочие интервалы.'))}</div>`;
  return `<div class="schedule-list">${rows.join('')}</div>${outsideHtml}`;
 }
-function scheduleRowHtml(start,end,kind,label,detail='',appointmentId=null,date=null,clientView=false,blockId=null,slotServiceId='',ruOwnAppointmentId=''){
+function scheduleRowHtml(start,end,kind,label,detail='',appointmentId=null,date=null,clientView=false,blockId=null,slotServiceId='',ruOwnAppointmentId='',showStartOnly=false){
  const ap=appointmentId?data.appointments.find(a=>String(a.id)===String(appointmentId)):null;
  let actions='';
  if(ap&&!clientView){
@@ -5298,7 +5383,7 @@ function scheduleRowHtml(start,end,kind,label,detail='',appointmentId=null,date=
  else if(ap&&clientView&&clientOwnsAppointment(ap)){const existingReview=getReviewForAppointment(ap);const reviewAction=appointmentHasPassed(ap)?`<button class="btn fixed" type="button" onclick="openReviewDialog('${escapeHtml(ap.id)}')">${escapeHtml(t(existingReview?'Изменить отзыв':'Оценить мастера'))}</button>`:'';actions=`<div class="schedule-actions"><button class="btn fixed" type="button" onclick="editClientBooking('${escapeHtml(ap.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="deleteClientBooking('${escapeHtml(ap.id)}')">${escapeHtml(t('Удалить'))}</button>${reviewAction}</div>`}
  // Match the existing client's 'Изменить' action for a verified Russian booking.
  else if(clientView&&ruOwnAppointmentId&&/^[0-9a-f-]{36}$/i.test(ruOwnAppointmentId)){
-  actions=`<div class="schedule-actions"><button class="btn fixed" type="button" data-ru-edit-booking-id="${escapeHtml(ruOwnAppointmentId)}">${escapeHtml(t('Изменить'))}</button></div>`;
+  actions=`<div class="schedule-actions"><button class="btn fixed" type="button" data-ru-edit-booking-id="${escapeHtml(ruOwnAppointmentId)}">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" data-ru-cancel-booking-id="${escapeHtml(ruOwnAppointmentId)}">${escapeHtml(t('Удалить'))}</button></div>`;
  }
  const unlock=blockId&&!clientView?`<div class="schedule-actions"><button class="btn fixed" type="button" onclick="unblockSlot('${escapeHtml(blockId)}')">${escapeHtml(t('Разблокировать'))}</button></div>`:'';
  const slotAttrs=date?` data-slot-date="${escapeHtml(date)}" data-slot-start="${start}" data-slot-end="${end}"`:'';const serviceAttrs=clientView&&kind==='free'&&slotServiceId?` data-slot-service-id="${escapeHtml(slotServiceId)}"`:'';
@@ -5310,7 +5395,7 @@ function scheduleRowHtml(start,end,kind,label,detail='',appointmentId=null,date=
  const noteHtml=canSeeAppointment&&ap.notes?`<small class="schedule-note">${escapeHtml(t('Комментарий:'))} ${escapeHtml(ap.notes)}</small>`:'';
  const photos=canSeeAppointment&&Array.isArray(ap.photos)?ap.photos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS):[];
  const photosHtml=photos.length?`<div class="schedule-photos">${photos.map((src,i)=>`<a href="${escapeHtml(src)}" target="_blank" rel="noopener" aria-label="${escapeHtml(t('Открыть фото'))} ${i+1}"><img src="${escapeHtml(src)}" alt="${escapeHtml(t('Прикреплённое фото'))}" loading="lazy"></a>`).join('')}</div>`:'';
- return `<div class="${classes}"${slotAttrs}${serviceAttrs}${blockAttrs}${clientAttrs}><div class="schedule-time">${escapeHtml(minutesToTime(start))}–${escapeHtml(minutesToTime(end))}</div><div class="schedule-info"><strong>${escapeHtml(label)}</strong>${detail?`<small>${escapeHtml(detail)}</small>`:''}${appointmentStateHtml}${noteHtml}${photosHtml}</div>${actions||unlock}</div>`;
+ return `<div class="${classes}"${slotAttrs}${serviceAttrs}${blockAttrs}${clientAttrs}><div class="schedule-time">${escapeHtml(minutesToTime(start))}${showStartOnly?'':'–'+escapeHtml(minutesToTime(end))}</div><div class="schedule-info"><strong>${escapeHtml(label)}</strong>${detail?`<small>${escapeHtml(detail)}</small>`:''}${appointmentStateHtml}${noteHtml}${photosHtml}</div>${actions||unlock}</div>`;
 }
 function bindMasterSlotGestures(container){if(!container)return;container.querySelectorAll('.schedule-row.master-slot[data-slot-date],.schedule-row.blocked[data-block-id]').forEach(row=>{let timer=null,moved=false,longPressed=false,startX=0,startY=0;const clear=()=>{if(timer){clearTimeout(timer);timer=null}};row.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;if(e.button!==undefined&&e.button!==0)return;moved=false;longPressed=false;startX=e.clientX;startY=e.clientY;timer=setTimeout(()=>{longPressed=true;if(row.dataset.blockId)unblockSlot(row.dataset.blockId);else setSlotBlocked(row.dataset.slotDate,Number(row.dataset.slotStart),Number(row.dataset.slotEnd));},700)});row.addEventListener('pointermove',e=>{if(Math.abs(e.clientX-startX)>10||Math.abs(e.clientY-startY)>10){moved=true;clear()}});['pointerup','pointerleave','pointercancel'].forEach(type=>row.addEventListener(type,clear));row.addEventListener('contextmenu',e=>e.preventDefault());row.addEventListener('click',e=>{if(longPressed||moved){e.preventDefault();e.stopPropagation();longPressed=false;return}if(row.classList.contains('free')&&row.dataset.slotDate){openAppointmentForm(null,null,{date:row.dataset.slotDate,start:Number(row.dataset.slotStart),end:Number(row.dataset.slotEnd)})}})});}
 function bindClientBookingSlots(container){if(!container)return;container.querySelectorAll('.schedule-row.client-bookable[data-slot-date]').forEach(row=>{const activate=()=>openClientBooking(row.dataset.slotDate,Number(row.dataset.slotStart),Number(row.dataset.slotEnd),null,row.dataset.slotServiceId||'');row.addEventListener('click',e=>{if(e.target.closest('button'))return;activate()});row.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate()}})});}
