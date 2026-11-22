@@ -371,6 +371,9 @@ body[data-theme="dark"] #daySchedule .schedule-time{background:rgba(255,255,255,
   }
 }
 
+/* Russian calendar: distinguish a day with no free starts from a master's day off. */
+#clientCalendarGrid .day.ru-no-free:not(.off):not(.today){background:rgba(255,241,220,.9)!important;border-color:#e2af6b!important}
+#clientCalendarGrid .day.ru-unknown:not(.today):not(.off){border-style:dashed}
 /* v8.73: не блокируем интерфейс заставкой на время восстановления Supabase-сессии. */
 body.auth-pending::before{display:none!important}
 
@@ -3633,6 +3636,63 @@ async function ruOpenClientAccount(email){
 // Never reuse Supabase/local browser bookings as evidence of a Russian booking.
 let ruOwnBookings=[],ruBookingsLoadSequence=0,ruMasterTimeZone='',ruEditBookingId='',ruBookingEditingNoteId='',ruNoteSaving=false,ruCancelPendingIds=new Set(),ruAvailableByService=new Map();
 const ruDaySummary=new Map();
+let ruOverviewSequence=0;
+const RU_OVERVIEW_CACHE_MS=90*1000;
+function ruSafeIntervals(list){
+ return Array.isArray(list)?list.filter(x=>/^([01]\d|2[0-3]):[0-5]\d$/.test(String(x?.start||''))&&/^([01]\d|2[0-3]):[0-5]\d$/.test(String(x?.end||''))):[];
+}
+function ruStartList(v){
+ return Array.isArray(v)?v.map(x=>typeof x==='string'?x:x?.time||x?.start_time)
+  .filter(x=>/^([01]\d|2[0-3]):(00|30)$/.test(String(x||''))):[];
+}
+// The monthly overview checks one short service first and only requests the rest if it has
+// no slots. A single service with free starts proves some availability; absence must be
+// checked for *all* services before claiming no free time.
+async function ruReadCalendarOverview(masterId,date,services){
+ let work=[],tz='',allOff=true,seen=0,anyFree=false,allChecked=true,explicitBusy=false;
+ for(const service of services){
+  let data;
+  try{data=await ruSdk().availability(masterId,date,service.id);}catch(_){allChecked=false;continue;}
+  if(!data||!Array.isArray(data.available_starts)){allChecked=false;continue;}
+  seen++;
+  const starts=ruStartList(data.available_starts);
+  if(!tz&&typeof data.timezone==='string')tz=data.timezone.trim();
+  if(!work.length)work=ruSafeIntervals(data.work_intervals);
+  if(data.day_off!==true)allOff=false;
+  if(Array.isArray(data.busy_intervals)&&data.busy_intervals.length)explicitBusy=true;
+  if(starts.length){anyFree=true;break;}
+  if(data.day_off===true){break;}
+ }
+ if(!seen||(!anyFree&&!allOff&&!allChecked))return {unknown:true,loaded_at:Date.now()};
+ return {day_off:allOff,work_intervals:work,available_count:anyFree?1:0,
+         busy_confirmed:explicitBusy,timezone:tz,loaded_at:Date.now()};
+}
+async function ruLoadCalendarOverview(dates,masterId,sequence){
+ if(!dates.length||!masterId||!ruServices.length)return;
+ const now=Date.now(),due=dates.filter(date=>{
+  const summary=ruDaySummary.get(masterId+'|'+date);
+  return !summary?.loaded_at||now-summary.loaded_at>RU_OVERVIEW_CACHE_MS;
+ });
+ if(!due.length)return;
+ const services=[...ruServices].sort((a,b)=>(Number(a.durationMinutes)||999)-(Number(b.durationMinutes)||999));
+ let offset=0;
+ async function worker(){
+  while(offset<due.length){
+   if(sequence!==ruOverviewSequence||ruSelectedMasterId!==masterId)return;
+   const date=due[offset++];
+   let summary;
+   try{summary=await ruReadCalendarOverview(masterId,date,services)}
+   catch(_){summary={unknown:true,loaded_at:Date.now()}}
+   if(sequence!==ruOverviewSequence||ruSelectedMasterId!==masterId)return;
+   // The selected day is fetched independently across every service and takes precedence.
+   if(date===clientSelectedDate&&ruDaySummary.get(masterId+'|'+date)?.full_day===true)continue;
+   ruDaySummary.set(masterId+'|'+date,summary);
+   if(!ruMasterTimeZone&&summary.timezone)ruMasterTimeZone=summary.timezone;
+   ruPaintCalendarDays();
+  }
+ }
+ await Promise.all(Array.from({length:Math.min(4,due.length)},()=>worker()));
+}
 function ruMasterLocalTime(value){
   if(!ruMasterTimeZone||!value)return null;
   const date=new Date(value);
@@ -3659,24 +3719,32 @@ function ruOwnForDay(masterId,date){
   })).filter(a=>a.end>a.start&&a.start>=0&&a.end<=1440).sort((x,y)=>x.start-y.start);
 }
 function ruPaintCalendarDays(){
-  const grid=$('clientCalendarGrid');if(!grid||!ruSelectedMasterId)return;
-  grid.querySelectorAll('.day[data-date]').forEach(btn=>{
-    const date=btn.dataset.date,own=ruOwnForDay(ruSelectedMasterId,date);
-    const summary=ruDaySummary.get(ruSelectedMasterId+'|'+date);
-    btn.classList.toggle('has',own.length>0);
-    btn.classList.toggle('off',summary?.day_off===true);
-    // Preserve original calendar styles; no added panels or buttons.
-    const old=btn.querySelector('.ru-day-label');if(old)old.remove();
-    if(own.length||summary){
-      const label=document.createElement('small');label.className='ru-day-label';
-      if(summary?.day_off===true)label.textContent='Выходной';
-      else if(summary?.work_intervals?.length){
-        label.textContent=summary.work_intervals.map(w=>w.start+'–'+w.end).join(' · ');
-      }else if(own.length)label.textContent='Ваша запись';
-      if(label.textContent)btn.append(label);
-      if(own.length)btn.title=date+' · Ваша запись ('+own.length+')';
-    }
-  });
+ const grid=$('clientCalendarGrid');if(!grid||!ruSelectedMasterId)return;
+ grid.querySelectorAll('.day[data-date]').forEach(btn=>{
+  const date=btn.dataset.date,own=ruOwnForDay(ruSelectedMasterId,date);
+  const summary=ruDaySummary.get(ruSelectedMasterId+'|'+date);
+  const dayOff=summary?.day_off===true;
+  const free=Number(summary?.available_count||0)>0;
+  const noFree=!!summary&&!summary.unknown&&!dayOff&&!free&&Array.isArray(summary.work_intervals)&&summary.work_intervals.length>0;
+  btn.classList.toggle('has',own.length>0||free);
+  btn.classList.toggle('off',dayOff);
+  btn.classList.toggle('ru-no-free',noFree);
+  btn.classList.toggle('ru-unknown',!!summary?.unknown);
+  const old=btn.querySelector('.ru-day-label');if(old)old.remove();
+  const label=document.createElement('small');label.className='ru-day-label';
+  if(own.length)label.textContent='Ваша запись';
+  else if(dayOff)label.textContent='Выходной';
+  else if(free)label.textContent='Есть свободное время';
+  else if(noFree)label.textContent='Нет свободного времени';
+  else if(summary?.unknown)label.textContent='Нет данных';
+  else if(summary&&!summary.work_intervals?.length)label.textContent='График не задан';
+  else label.textContent='Проверяем…';
+  btn.append(label);
+  const hours=Array.isArray(summary?.work_intervals)?summary.work_intervals.map(w=>w.start+'–'+w.end).join(' · '):'';
+  btn.title=[date,dayOff?'Выходной':free?'Есть свободное время':noFree?'Нет доступных начал записи':summary?.unknown?'Нет данных от сервера':'Расписание проверяется',hours,own.length?'Ваших записей: '+own.length:''].filter(Boolean).join(' · ');
+  // Keep the existing translation cache aligned with the server-updated tooltip.
+  if(typeof originalAttributes!=='undefined'){const oldAttrs=originalAttributes.get(btn)||{};oldAttrs.title=btn.title;originalAttributes.set(btn,oldAttrs);}
+ });
 }
 async function ruLoadMyBookings(){
   // The server authorizes this list using the session's linked client profile.
@@ -5070,7 +5138,11 @@ function ruRenderClientCalendar(){
     b.innerHTML='<span class="num">'+d.getDate()+'</span>';b.title=ds;b.dataset.date=ds;
     b.onclick=()=>{clientSelectedDate=ds;ruRenderClientCalendar()};grid.append(b);
   }
-  ruPaintCalendarDays();ruRenderDay();translatePage();
+  ruPaintCalendarDays();
+  const seq=++ruOverviewSequence;
+  const dates=Array.from(grid.querySelectorAll('.day[data-date]')).map(b=>b.dataset.date);
+  void ruLoadCalendarOverview(dates,ruSelectedMasterId,seq);
+  void ruRenderDay();translatePage();
 }
 async function ruRenderDay(){
   const box=$('clientDaySchedule');if(!box||!ruSelectedMasterId)return;
@@ -5082,9 +5154,9 @@ async function ruRenderDay(){
   try{
     const responses=await Promise.allSettled(ruServices.map(service=>ruSdk().availability(id,date,service.id)));
     if(seq!==ruDaySequence||id!==ruSelectedMasterId||date!==clientSelectedDate)return;
-    const union=new Set();let timezone='',work=[],hasSuccess=false,dayOff=false;
+    const union=new Set();let timezone='',work=[],hasSuccess=false,dayOff=false,failed=false;
     for(let i=0;i<responses.length;i++){
-      const result=responses[i];if(result.status!=='fulfilled'||!Array.isArray(result.value?.available_starts))continue;
+      const result=responses[i];if(result.status!=='fulfilled'||!Array.isArray(result.value?.available_starts)){failed=true;continue;}
       hasSuccess=true;
       const data=result.value,service=ruServices[i];
       const starts=data.available_starts.map(v=>typeof v==='string'?v:v?.time||v?.start_time)
@@ -5097,7 +5169,8 @@ async function ruRenderDay(){
     if(!hasSuccess)throw new Error('Российский сервер не подтвердил свободное время');
     ruAvailableStarts=Array.from(union).sort();ruAvailableContext=[id,date].join('|');
     if(timezone)ruMasterTimeZone=timezone;
-    ruDaySummary.set(id+'|'+date,{day_off:dayOff,work_intervals:work});
+    ruDaySummary.set(id+'|'+date,{day_off:dayOff&&union.size===0,work_intervals:work,
+      available_count:union.size,unknown:failed&&union.size===0&&!dayOff,full_day:true,loaded_at:Date.now()});
     ruPaintCalendarDays();
     const own=ruOwnForDay(id,date);
     const ownHtml=own.map(a=>scheduleRowHtml(a.start,a.end,'busy',t('Ваша запись'),
