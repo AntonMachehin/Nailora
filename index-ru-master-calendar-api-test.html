@@ -3823,7 +3823,20 @@ document.addEventListener('click',event=>{
   const button=event.target?.closest?.('#masterApp button');
   if(!button)return;
   if(button.matches('[data-tab],#prev,#next,#todayBtn,#masterAccount,#saveMonthHours'))return;
+  // Разрешаем только существующие кнопки окна ручного напоминания.
+  if(button.closest('#clientReminderDialog') &&
+     ['clientReminderOpenSms','clientReminderCopy',
+      'closeClientReminder','clientReminderCloseBottom'].includes(button.id))return;
+
   if(button.closest('#daySchedule') && /^unblockSlot\('[0-9a-fA-F-]{36}'\)$/.test(button.getAttribute('onclick')||''))return;
+  // Разрешаем напоминание только для подтверждённой серверной записи.
+  const reminderMatch=(button.getAttribute('onclick')||'').match(/^remindAppointment\('([0-9a-fA-F-]{36})'\)$/);
+  if(reminderMatch){
+    const appointment=data.appointments.find(x=>String(x.id)===reminderMatch[1]);
+    if(appointment?._ruServer===true &&
+       ['booked','completed'].includes(normalizeAppointmentStatus(appointment.status)) &&
+       String(appointment.phone||'').trim())return;
+  }
   // Financial writes are routed to PostgreSQL; all other master writes remain blocked.
   if(button.closest('#expenseForm')&&button.type==='submit')return;
   if(button.closest('#finance')&&button.getAttribute('onclick')?.startsWith('deleteExpense('))return;
@@ -6457,7 +6470,33 @@ function editAppointment(id){
  }
  if(a)openAppointmentForm(null,a);
 }
-function remindAppointment(id){const a=data.appointments.find(x=>String(x.id)===String(id));if(!a){alert(t('Запись не найдена'));return}let c=data.clients.find(x=>(a.clientId&&String(x.id)===String(a.clientId))||(normalizePhone(a.phone)&&normalizePhone(x.phone)===normalizePhone(a.phone))||String(x.name||'').trim().toLocaleLowerCase()===String(a.name||'').trim().toLocaleLowerCase());if(!c)c=ensureClientCard({id:a.clientId||'',name:a.name||'',phone:a.phone||'',service:a.service||'',price:a.price??''});if(!c){alert(t('Не удалось найти карточку клиента.'));return}openClientReminder(c.id)}
+function remindAppointment(id){
+ const a=data.appointments.find(x=>String(x.id)===String(id));
+ if(!a){alert(t('Запись не найдена'));return}
+ if(a._ruServer===true){
+   const c={
+     id:'ru-appointment:'+String(a.id),
+     name:String(a.name||'Клиент').trim(),
+     phone:String(a.phone||'').trim(),
+     service:String(a.service||''),
+     price:a.price??''
+   };
+   if(!c.phone){
+     alert(t('Добавь номер телефона в карточку клиента, чтобы отправить напоминание.'));
+     return;
+   }
+   openClientReminder(c.id,c,String(a.id));
+   return;
+ }
+ let c=data.clients.find(x=>
+   (a.clientId&&String(x.id)===String(a.clientId))||
+   (normalizePhone(a.phone)&&normalizePhone(x.phone)===normalizePhone(a.phone))||
+   String(x.name||'').trim().toLocaleLowerCase()===String(a.name||'').trim().toLocaleLowerCase()
+ );
+ if(!c)c=ensureClientCard({id:a.clientId||'',name:a.name||'',phone:a.phone||'',service:a.service||'',price:a.price??''});
+ if(!c){alert(t('Не удалось найти карточку клиента.'));return}
+ openClientReminder(c.id);
+}
 $('addClient').onclick=()=>showClientForm();
 $('cancelClient').onclick=()=>$('clientFormPanel').classList.add('hidden');
 function showClientForm(c=null){if(ruMasterReadOnly()){ruMasterReadOnlyNotice();return;}$('clientFormPanel').classList.remove('hidden');$('clientFormTitle').textContent=c?'Изменить карточку':'Новая карточка';$('clientId').value=c?.id||'';$('clientName').value=c?.name||'';$('clientPhone').value=c?.phone||'';$('clientService').value=c?.service||'';$('clientPrice').value=c?.price??'';$('clientNotes').value=c?.notes||'';$('clientName').focus();translatePage()}
@@ -6473,13 +6512,13 @@ function bookClient(id){
  if(calendarTab)calendarTab.click();
  newAppointment(c);
 }
-let activeReminderClientId='';
+let activeReminderClientId='',activeReminderClientOverride=null;
 function appointmentsForClient(client){const phone=normalizePhone(client?.phone),name=String(client?.name||'').trim().toLocaleLowerCase();const now=new Date();return data.appointments.filter(a=>{const sameId=client?.id&&a.clientId&&String(client.id)===String(a.clientId);const samePhone=phone&&normalizePhone(a.phone)===phone;const sameName=name&&String(a.name||'').trim().toLocaleLowerCase()===name;const dt=appointmentDateTime(a);return (sameId||samePhone||sameName)&&dt&&dt>now}).sort((a,b)=>appointmentDateTime(a)-appointmentDateTime(b))}
 function appointmentDateTime(a){if(!a?.date)return null;const dt=new Date(`${a.date}T${a.time||'00:00'}:00`);return Number.isNaN(dt.getTime())?null:dt}
-function openClientReminder(id){const c=data.clients.find(x=>String(x.id)===String(id));if(!c){alert(t('Клиент не найден'));return}if(!String(c.phone||'').trim()){alert(t('Добавь номер телефона в карточку клиента, чтобы отправить напоминание.'));showClientForm(c);return}activeReminderClientId=String(c.id);$('clientReminderPhone').value=c.phone;const upcoming=appointmentsForClient(c);$('clientReminderAppointment').innerHTML='<option value="">'+escapeHtml(t('Без привязки к записи'))+'</option>'+upcoming.map(a=>`<option value="${escapeHtml(a.id)}">${escapeHtml(formatDate(new Date(a.date+'T12:00:00')))} · ${escapeHtml(a.time||'')} · ${escapeHtml(a.service||t('Услуга не указана'))}</option>`).join('');$('clientReminderAppointment').value=upcoming[0]?String(upcoming[0].id):'';refreshClientReminderMessage();$('clientReminderStatus').textContent=upcoming.length?'':'В карточке нет будущих записей. Можно написать клиенту вручную.';if(typeof $('clientReminderDialog').showModal==='function')$('clientReminderDialog').showModal();else $('clientReminderDialog').setAttribute('open','');translatePage()}
-function refreshClientReminderMessage(){const c=data.clients.find(x=>String(x.id)===activeReminderClientId);if(!c)return;const ap=data.appointments.find(a=>String(a.id)===$('clientReminderAppointment').value);if(ap){const dateLabel=formatDate(new Date(ap.date+'T12:00:00'));const service=ap.service?` (${ap.service})`:'';$('clientReminderMessage').value=currentLanguage==='ru'?`Здравствуйте, ${c.name}! Напоминаю о вашей записи на ${dateLabel} в ${ap.time}${service}. До встречи!`:`Hello, ${c.name}! This is a reminder of your appointment on ${dateLabel} at ${ap.time}${service}. See you soon!`}else $('clientReminderMessage').value=currentLanguage==='ru'?`Здравствуйте, ${c.name}! Это напоминание от вашего мастера. Если у вас есть вопросы, пожалуйста, ответьте на это сообщение.`:`Hello, ${c.name}! This is a reminder from your nail artist. Please reply to this message if you have any questions.`}
+function openClientReminder(id,clientOverride=null,preferredAppointmentId=''){const c=clientOverride||data.clients.find(x=>String(x.id)===String(id));if(!c){alert(t('Клиент не найден'));return}if(!String(c.phone||'').trim()){alert(t('Добавь номер телефона в карточку клиента, чтобы отправить напоминание.'));showClientForm(c);return}activeReminderClientId=String(c.id);activeReminderClientOverride=clientOverride||null;$('clientReminderPhone').value=c.phone;const upcoming=appointmentsForClient(c);$('clientReminderAppointment').innerHTML='<option value="">'+escapeHtml(t('Без привязки к записи'))+'</option>'+upcoming.map(a=>`<option value="${escapeHtml(a.id)}">${escapeHtml(formatDate(new Date(a.date+'T12:00:00')))} · ${escapeHtml(a.time||'')} · ${escapeHtml(a.service||t('Услуга не указана'))}</option>`).join('');$('clientReminderAppointment').value=upcoming.some(a=>String(a.id)===String(preferredAppointmentId))?String(preferredAppointmentId):(upcoming[0]?String(upcoming[0].id):'');refreshClientReminderMessage();$('clientReminderStatus').textContent=upcoming.length?'':'В карточке нет будущих записей. Можно написать клиенту вручную.';if(typeof $('clientReminderDialog').showModal==='function')$('clientReminderDialog').showModal();else $('clientReminderDialog').setAttribute('open','');translatePage()}
+function refreshClientReminderMessage(){const c=activeReminderClientOverride||data.clients.find(x=>String(x.id)===activeReminderClientId);if(!c)return;const ap=data.appointments.find(a=>String(a.id)===$('clientReminderAppointment').value);if(ap){const dateLabel=formatDate(new Date(ap.date+'T12:00:00'));const service=ap.service?` (${ap.service})`:'';$('clientReminderMessage').value=currentLanguage==='ru'?`Здравствуйте, ${c.name}! Напоминаю о вашей записи на ${dateLabel} в ${ap.time}${service}. До встречи!`:`Hello, ${c.name}! This is a reminder of your appointment on ${dateLabel} at ${ap.time}${service}. See you soon!`}else $('clientReminderMessage').value=currentLanguage==='ru'?`Здравствуйте, ${c.name}! Это напоминание от вашего мастера. Если у вас есть вопросы, пожалуйста, ответьте на это сообщение.`:`Hello, ${c.name}! This is a reminder from your nail artist. Please reply to this message if you have any questions.`}
 $('clientReminderAppointment').onchange=refreshClientReminderMessage;
-function closeClientReminder(){$('clientReminderDialog').close();activeReminderClientId=''}
+function closeClientReminder(){$('clientReminderDialog').close();activeReminderClientId='';activeReminderClientOverride=null}
 $('closeClientReminder').onclick=closeClientReminder;$('clientReminderCloseBottom').onclick=closeClientReminder;$('clientReminderDialog').addEventListener('click',e=>{if(e.target===$('clientReminderDialog'))closeClientReminder()});
 $('clientReminderOpenSms').onclick=()=>{const phone=String($('clientReminderPhone').value||'').trim();if(!phone){alert(t('Добавь номер телефона в карточку клиента, чтобы отправить напоминание.'));return}const body=String($('clientReminderMessage').value||'').trim();const smsPhone=phone.replace(/[^0-9+*#,;]/g,'');window.location.href=`sms:${smsPhone}?body=${encodeURIComponent(body)}`;$('clientReminderStatus').textContent=t('Сообщение не отправлено автоматически. Откроется приложение SMS, где нужно проверить текст и нажать «Отправить». На компьютере поддержка SMS зависит от настроенных приложений.')};
 $('clientReminderCopy').onclick=async()=>{const text=$('clientReminderMessage').value;try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text)}else{throw new Error('Clipboard API unavailable')}$('clientReminderStatus').textContent=t('Скопировать текст')+' ✓'}catch(e){const ta=$('clientReminderMessage');ta.focus();ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(_){}$('clientReminderStatus').textContent=ok?t('Скопировать текст')+' ✓':'Выдели текст сообщения и скопируй его вручную.'}};
