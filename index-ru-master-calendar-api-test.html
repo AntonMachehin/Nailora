@@ -1288,6 +1288,7 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
       saveReminderPreferences(prefs){return request('PUT','/v1/me/reminders/preferences',{auth:true,body:prefs})},
       schedule(){return request('GET','/v1/me/schedule',{auth:true})},
       saveSchedule(scheduleData){return request('PUT','/v1/me/schedule',{body:scheduleData,auth:true})},
+      saveCurrency(currency){return request('PUT','/v1/me/currency',{auth:true,body:{currency}})},
       appointments(params){return request('GET','/v1/appointments',{auth:true,query:qs(params)})},
       // Master expenses: server resolves ownership from the authenticated session.
       listExpenses(){return request('GET','/v1/expenses',{auth:true})},
@@ -3711,7 +3712,7 @@ let cloud=null,cloudUser=null,cloudMasterDirectory=[],cloudFavoriteMasters=[],se
 // RU client integration (staging). The account server stays separate from the service-location server.
 const RU_STAGE_LIVE_BOOKINGS=true; // Step 05: live RU appointments via authenticated POST /v1/appointments.
 const RU_CLIENT_PROFILE_CACHE='manicureRoleProfiles_v1_ru_v898';
-let ruApiClient=null,ruSelectedMasterId='',ruServices=[],ruSelectedServiceId='',ruDaySequence=0,ruAvailableStarts=[],ruAvailableContext='',ruBookingRequest=null;
+let ruApiClient=null,ruSelectedMasterId='',ruServices=[],ruMasterCurrency='RUB',ruSelectedServiceId='',ruDaySequence=0,ruAvailableStarts=[],ruAvailableContext='',ruBookingRequest=null;
 function ruSdk(){
   if(!ruApiClient){
     ruApiClient=window.NailoraRuSDK.createClient({
@@ -3810,7 +3811,7 @@ async function ruOpenMasterAccount(email,verifiedMe){
     activityDirection:String(owner.activity_direction||''),
     avatar:String(owner.avatar_url||''),avatarUrl:String(owner.avatar_url||''),
     publicPhoneConsent:owner.phone_publication_consent===true,
-    email:accountEmail,profileId:p.profile_id,cloudId:'',currency:'RUB',language:currentLanguage
+    email:accountEmail,profileId:p.profile_id,cloudId:'',currency:(CURRENCY_CODES.includes(String(schedule.currency||'RUB').toUpperCase())?String(schedule.currency||'RUB').toUpperCase():'RUB'),language:currentLanguage
   };
   // Do not merge yesterday's browser data with a real server calendar.
   data={
@@ -4661,7 +4662,7 @@ async function openRole(role){
   selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;
   cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';
   // Never reuse a previous account's selected master, availability or bookings.
-  ++ruDaySequence;ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';
+  ++ruDaySequence;ruSelectedMasterId='';ruServices=[];ruMasterCurrency='RUB';ruSelectedServiceId='';
   ruAvailableStarts=[];ruAvailableContext='';ruBookingRequest=null;ruEditBookingId='';
  }
  setLanguage(profiles[role]?.language||currentLanguage);
@@ -4688,7 +4689,7 @@ async function openRole(role){
  }
 }
 async function logout(){
- if(ruIsAccount()){++ruBookingsLoadSequence;++ruDaySequence;ruOwnBookings=[];ruDaySummary.clear();ruMasterTimeZone='';ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';ruAvailableStarts=[];ruAvailableContext='';ruBookingRequest=null;ruEditBookingId='';ruBookingEditingNoteId='';selectedClientMasterKey='';if($('settingsDialog').open)$('settingsDialog').close();try{await ruSdk().logout()}catch(_){}activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);showOnly('welcome');setCloudStatus('Выход выполнен');return;}
+ if(ruIsAccount()){++ruBookingsLoadSequence;++ruDaySequence;ruOwnBookings=[];ruDaySummary.clear();ruMasterTimeZone='';ruSelectedMasterId='';ruServices=[];ruMasterCurrency='RUB';ruSelectedServiceId='';ruAvailableStarts=[];ruAvailableContext='';ruBookingRequest=null;ruEditBookingId='';ruBookingEditingNoteId='';selectedClientMasterKey='';if($('settingsDialog').open)$('settingsDialog').close();try{await ruSdk().logout()}catch(_){}activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);showOnly('welcome');setCloudStatus('Выход выполнен');return;}
  if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=null;
  if($('settingsDialog').open)$('settingsDialog').close();
  setCloudStatus('Выхожу из аккаунта…');
@@ -5222,7 +5223,44 @@ window.addEventListener('load',()=>{registerNailoraServiceWorker().catch(err=>co
 
 // Theme buttons use data-theme-choice; the old themeChoice select no longer exists.
 const backgroundChoice=$('backgroundChoice');if(backgroundChoice)backgroundChoice.onchange=()=>{uiSettings.background=backgroundChoice.value;persistUiSettings()};
-$('masterCurrencyChoice').onchange=async()=>{if(ruMasterReadOnly()){ruMasterReadOnlyNotice();return;}if(activeRole!=='master')return;const currency=String($('masterCurrencyChoice').value||'RUB').toUpperCase();if(!CURRENCY_CODES.includes(currency))return;const nextProfiles={...profiles,master:{...(profiles.master||{}),currency}};if(persistProfilesSafely(nextProfiles)){refreshCurrencyLabels();renderAll();if(cloudReady()){if(!profiles.master?.cloudId){showAppToast('Валюта сохранена на этом устройстве, но не удалось найти облачный профиль мастера.');return}const synced=await syncMasterScheduleToCloud();if(!synced){showAppToast('Валюта сохранена на этом устройстве, но не удалось передать её клиентам.');return}}showAppToast(t('Валюта цен сохранена.'))}};
+$('masterCurrencyChoice').onchange=async()=>{
+ if(activeRole!=='master')return;
+ const choice=$('masterCurrencyChoice');
+ const currency=String(choice.value||'RUB').toUpperCase();
+ if(!CURRENCY_CODES.includes(currency))return;
+ if(ruMasterReadOnly()){
+   const previous=String(profiles.master?.currency||'RUB').toUpperCase();
+   if(currency===previous)return;
+   choice.disabled=true;
+   try{
+     const response=await ruSdk().saveCurrency(currency);
+     if(response?.success!==true||response?.currency!==currency)
+       throw new Error('Сервер не подтвердил сохранение валюты');
+     profiles.master={...profiles.master,currency};
+     refreshCurrencyLabels();
+     renderAll();
+     showAppToast(t('Валюта цен сохранена.'));
+   }catch(error){
+     choice.value=previous;
+     showAppToast('Валюта не сохранена: '+String(error?.message||'ошибка соединения'));
+   }finally{choice.disabled=false}
+   return;
+ }
+ const nextProfiles={...profiles,master:{...(profiles.master||{}),currency}};
+ if(persistProfilesSafely(nextProfiles)){
+   refreshCurrencyLabels();renderAll();
+   if(cloudReady()){
+     if(!profiles.master?.cloudId){
+       showAppToast('Валюта сохранена на этом устройстве, но не удалось найти облачный профиль мастера.');return;
+     }
+     const synced=await syncMasterScheduleToCloud();
+     if(!synced){
+       showAppToast('Валюта сохранена на этом устройстве, но не удалось передать её клиентам.');return;
+     }
+   }
+   showAppToast(t('Валюта цен сохранена.'));
+ }
+};
 $('accountEditForm').onsubmit=async e=>{
  e.preventDefault();if(!activeRole)return;
  if(ruIsAccount()){alert('Изменение российского профиля пока не подключено к серверу. Ничего не сохранено.');return;}
@@ -5311,7 +5349,7 @@ async function ruSaveCalendarChange(transform,successMessage){
   }finally{ruCalendarSavePending=false;}
 }
 
-function getPriceCurrency(){if(ruIsMasterSelected())return 'RUB';let currency;if(activeRole==='client'&&selectedCloudMasterId&&cloudScheduleData){currency=String(cloudScheduleData.currency||'RUB').toUpperCase()}else{currency=String((profiles.master&&profiles.master.currency)||'RUB').toUpperCase()}return CURRENCY_CODES.includes(currency)?currency:'RUB'}
+function getPriceCurrency(){if(ruIsMasterSelected())return CURRENCY_CODES.includes(ruMasterCurrency)?ruMasterCurrency:'RUB';let currency;if(activeRole==='client'&&selectedCloudMasterId&&cloudScheduleData){currency=String(cloudScheduleData.currency||'RUB').toUpperCase()}else{currency=String((profiles.master&&profiles.master.currency)||'RUB').toUpperCase()}return CURRENCY_CODES.includes(currency)?currency:'RUB'}
 function refreshCurrencyLabels(){const mark='('+(CURRENCY_SYMBOLS[getPriceCurrency()]||getPriceCurrency())+')';['masterServicePriceCurrency','appointmentPriceCurrency','clientPriceCurrency','expenseAmountCurrency'].forEach(id=>{const el=$(id);if(el)el.textContent=mark})}
 function money(n){const amount=Number(n)||0;try{return new Intl.NumberFormat(LOCALES[currentLanguage]||currentLanguage,{style:'currency',currency:getPriceCurrency(),currencyDisplay:'narrowSymbol',minimumFractionDigits:2,maximumFractionDigits:2}).format(amount)}catch(e){return amount.toLocaleString(LOCALES[currentLanguage]||currentLanguage,{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(CURRENCY_SYMBOLS[getPriceCurrency()]||getPriceCurrency())}}
 function startingPrice(n){const amount=Number(n)||0;return amount>0?t('от')+' '+money(amount):money(amount)}
@@ -5535,7 +5573,7 @@ async function renderMasterSearch(){
     }catch(err){box.innerHTML=`<p class="muted">Не удалось загрузить российских мастеров: ${escapeHtml(err?.message||'ошибка соединения')}</p>`;}
     return;
   }
-   if(ruSelectedMasterId){ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';ruMasterTimeZone='';ruDaySummary.clear();ruAvailableContext='';ruDaySequence++;selectedClientMasterKey='';}
+   if(ruSelectedMasterId){ruSelectedMasterId='';ruServices=[];ruMasterCurrency='RUB';ruSelectedServiceId='';ruMasterTimeZone='';ruDaySummary.clear();ruAvailableContext='';ruDaySequence++;selectedClientMasterKey='';}
   if(!country||!city){box.innerHTML=`<p class="muted">${escapeHtml(t('Введи страну и город для поиска.'))}</p>`;if(selectedClientMasterKey){selectedClientMasterKey='';selectedCloudMasterId='';renderClientCalendar()}translatePage();return}
  let found=[];
  if(cloud&&cloudUser){try{const {data:rows,error}=await cloud.from('nailora_master_public_directory').select('*').eq('is_active',true).ilike('country',country).ilike('city',city).limit(100);if(error)throw error;found=(rows||[]).map(r=>({...profileFromCloudRow('master',r),cloudId:r.id,profileId:r.id,masterId:r.id,phone:r.phone||'',avatar:r.avatar_url||'',avatarUrl:r.avatar_url||'',reviews:[]}));cloudMasterDirectory=found;}catch(err){console.error(err);box.innerHTML=`<p class="muted">Не удалось загрузить мастеров из Supabase: ${escapeHtml(err.message||'ошибка')}</p>`;translatePage();return}}
@@ -5638,16 +5676,20 @@ async function chooseMasterForBooking(cloudId=''){
  if(nailoraIsRussianCountry(master.country)){
   const masterId=String(master.masterId||master.profileId||master.cloudId||'');
   if(ruSelectedMasterId===masterId){
-   ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';ruMasterTimeZone='';ruDaySummary.clear();ruAvailableContext='';ruDaySequence++;selectedClientMasterKey='';
+   ruSelectedMasterId='';ruServices=[];ruMasterCurrency='RUB';ruSelectedServiceId='';ruMasterTimeZone='';ruDaySummary.clear();ruAvailableContext='';ruDaySequence++;selectedClientMasterKey='';
    renderMasterSearch();renderClientCalendar();return;
   }
   const scheduleBox=$('clientDaySchedule');
   if(scheduleBox)scheduleBox.innerHTML='<div class="schedule-empty">Загружаю услуги и расписание мастера…</div>';
   try{
-   const fetched=ruNormalizeServices(await ruSdk().services(masterId));
+   const serviceResponse=await ruSdk().services(masterId);
+   const fetched=ruNormalizeServices(serviceResponse);
+   const selectedCurrency=String(serviceResponse?.currency||'RUB').toUpperCase();
    if(!fetched.length)throw new Error('У мастера пока нет доступных услуг');
    if(ruSelectedMasterId!==masterId){ruMasterTimeZone='';ruDaySummary.clear();}
    ruSelectedMasterId=masterId;ruServices=fetched;ruSelectedServiceId=fetched[0].id;
+    ruMasterCurrency=CURRENCY_CODES.includes(selectedCurrency)?selectedCurrency:'RUB';
+    refreshCurrencyLabels();
    ruAvailableContext='';ruDaySequence++;
    selectedClientMasterKey=masterSelectionKey(master);selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;
    clientSelectedDate=iso(new Date());clientCursor=new Date(clientSelectedDate+'T12:00:00');clientCursor.setDate(1);
@@ -5662,7 +5704,7 @@ async function chooseMasterForBooking(cloudId=''){
   }
   return;
  }
- ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';ruMasterTimeZone='';ruDaySummary.clear();
+ ruSelectedMasterId='';ruServices=[];ruMasterCurrency='RUB';ruSelectedServiceId='';ruMasterTimeZone='';ruDaySummary.clear();
  const key=masterSelectionKey(master);
  if(selectedClientMasterKey===key){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';renderMasterSearch();renderClientCalendar();showAppToast(t('Выбор мастера снят. Выбери мастера, чтобы открыть расписание.'));return}
  selectedClientMasterKey=key;selectedCloudMasterId=cloudUser?String(master.cloudId||master.profileId||master.masterId||''):'';cloudScheduleData=null;cloudBookedSlots=[];cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';
