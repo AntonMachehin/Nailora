@@ -1180,7 +1180,7 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
       }
       const opts = options || {};
       const headers = {'Accept':'application/json'};
-      if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+      if (opts.body !== undefined) headers['Content-Type'] = opts.masterAction?'application/vnd.beautymaster.master+json':'application/json';
       if (opts.auth) {
         if (!bearer) throw new Error('RU authentication required');
         headers.Authorization = 'Bearer ' + bearer;
@@ -1308,6 +1308,13 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
           auth:true,body:fields
         });
       },
+      // Existing buttons use server-authorized master operations, not localStorage.
+      createMasterAppointment(fields){return request('POST','/v1/appointments',{
+        auth:true, masterAction:true, body:{...fields,master_manual:true}
+      })},
+      cancelMasterAppointment(id){return request('POST','/v1/appointments/'+uuid(id)+'/cancel',{
+        auth:true, masterAction:true, body:{master_cancel:true}
+      })},
       // By design NEVER accepts client-supplied price, paid, owner, or status.
       // request_id MUST stay the same when retrying the same booking intent.
       // No price, paid status, phone, photos, or notes sent until server support is verified.
@@ -3842,6 +3849,12 @@ document.addEventListener('click',event=>{
   // Financial writes are routed to PostgreSQL; all other master writes remain blocked.
   if(button.closest('#expenseForm')&&button.type==='submit')return;
   if(button.closest('#finance')&&button.getAttribute('onclick')?.startsWith('deleteExpense('))return;
+  // Authorize only cancelling a real server-owned, still booked appointment.
+  const cancelMatch=(button.getAttribute('onclick')||'').match(/^cancelMasterAppointment\('([0-9a-fA-F-]{36})'\)$/);
+  if(cancelMatch){
+    const a=data.appointments.find(x=>String(x.id)===cancelMatch[1]);
+    if(a?._ruServer===true && normalizeAppointmentStatus(a.status)==='booked')return;
+  }
   const editMatch=(button.getAttribute('onclick')||'').match(/^editAppointment\('([0-9a-fA-F-]{36})'\)$/);
   if(editMatch){
     const appointment=data.appointments.find(x=>String(x.id)===editMatch[1]);
@@ -3850,6 +3863,7 @@ document.addEventListener('click',event=>{
   }
   if(button.closest('#appointmentForm')){
     const id=String($('appointmentId').value||'');
+    if(!id)return; // Existing form: allow creation, keep editing permission guard
     const appointment=data.appointments.find(x=>String(x.id)===id);
     if(appointment?._ruServer===true &&
        ['booked','completed'].includes(normalizeAppointmentStatus(appointment.status)))return;
@@ -3864,6 +3878,7 @@ document.addEventListener('submit',event=>{
   if(event.target?.id==='expenseForm')return;
   if(event.target?.id==='appointmentForm'){
     const id=String(event.target.querySelector('#appointmentId')?.value||'');
+    if(!id)return; // Existing form submits to the new verified master endpoint
     const appointment=data.appointments.find(x=>String(x.id)===id);
     if(appointment?._ruServer===true &&
        ['booked','completed'].includes(normalizeAppointmentStatus(appointment.status)))return;
@@ -6127,12 +6142,13 @@ function renderAppointments(){
 }
 
 function openAppointmentForm(client=null,appointment=null,slot=null){
- if(ruMasterReadOnly() && !(appointment?._ruServer===true &&
+ if(ruMasterReadOnly() && appointment && !(appointment?._ruServer===true &&
     ['booked','completed'].includes(normalizeAppointmentStatus(appointment.status)))){
    ruMasterReadOnlyNotice();return;
  }
  masterCommentPhotos=Array.isArray(appointment?.photos)?appointment.photos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS):[];$('appointmentPhotos').value='';renderPhotoPreviews('appointmentPhotoPreview',masterCommentPhotos,index=>removeCommentPhoto('master',index));
  $('appointmentFormPanel').classList.remove('hidden');
+ if(ruMasterReadOnly() && !appointment) $('appointmentForm').dataset.ruCreateRequestId=ruNewRequestId();
  $('appointmentFormTitle').textContent=appointment?'Изменить запись':'Новая запись';
  $('appointmentId').value=appointment?.id||'';
  $('appointmentDate').value=appointment?.date||slot?.date||selectedDate;
@@ -6151,6 +6167,64 @@ function openAppointmentForm(client=null,appointment=null,slot=null){
 function newAppointment(client=null){openAppointmentForm(client)}
 
 $('cancelAppointment').onclick=()=>{$('appointmentFormPanel').classList.add('hidden');$('appointmentForm').reset();$('appointmentId').value='';masterCommentPhotos=[];renderPhotoPreviews('appointmentPhotoPreview',masterCommentPhotos,()=>{})};
+let ruMasterManualCreatePending=false;
+async function ruSubmitMasterManualBooking(fields){
+  if(ruMasterManualCreatePending)return;
+  const form=$('appointmentForm');
+  const btn=form.querySelector('button[type="submit"]');
+  const rawDuration=Number($('appointmentDuration').value);
+  if(!Number.isInteger(rawDuration)||rawDuration<15||rawDuration>480||rawDuration%15!==0){
+    alert('Длительность должна быть от 15 до 480 минут с шагом 15 минут.');return;
+  }
+  if(!fields.service||fields.service.length>120||fields.phone.length>30||
+     fields.notes.length>500){
+    alert('Проверь поля новой записи.');return;
+  }
+  const requestId=form.dataset.ruCreateRequestId ||
+    (form.dataset.ruCreateRequestId=ruNewRequestId());
+  ruMasterManualCreatePending=true;
+  if(btn)btn.disabled=true;
+  try{
+    const response=await ruSdk().createMasterAppointment({
+      ...fields,request_id:requestId
+    });
+    const a=response?.item;
+    const valid=response?.success===true &&
+      /^[0-9a-f-]{36}$/i.test(String(a?.id||'')) && a.status==='booked' &&
+      a.local_date===fields.date && a.local_time===fields.time &&
+      a.client_name===fields.name && String(a.client_phone||'')===fields.phone &&
+      a.service_name===fields.service && Number(a.price)===fields.price &&
+      Number(a.duration_minutes)===fields.durationMinutes &&
+      a.paid===fields.paid && String(a.notes||'')===fields.notes &&
+      Array.isArray(a.photos) && JSON.stringify(a.photos)===JSON.stringify(fields.photos);
+    if(!valid)throw new Error('Сервер не подтвердил создание записи. Повторно проверь календарь.');
+    if(!data.appointments.some(item=>String(item.id)===a.id)){
+      data.appointments.push({
+        id:a.id,cloudId:'',_ruServer:true,source:'client-booking',
+        name:a.client_name,phone:a.client_phone,service:a.service_name,
+        date:a.local_date,time:a.local_time,
+        durationMinutes:Number(a.duration_minutes),price:Number(a.price),
+        paid:a.paid,notes:String(a.notes||''),photos:a.photos.slice(),status:'booked'
+      });
+    }
+    selectedDate=a.local_date;
+    cursor=new Date(a.local_date+'T12:00:00');cursor.setDate(1);
+    form.dataset.ruCreateRequestId='';
+    $('appointmentFormPanel').classList.add('hidden');
+    form.reset();$('appointmentId').value='';
+    masterCommentPhotos=[];$('appointmentPhotos').value='';
+    renderPhotoPreviews('appointmentPhotoPreview',masterCommentPhotos,()=>{});
+    renderCalendar();renderAppointments();renderFinance();
+    document.querySelector('[data-tab="calendar"]')?.click();
+    showAppToast('Новая запись сохранена на сервере.');
+  }catch(err){
+    showAppToast('Не удалось подтвердить создание: '+String(err?.message||'Ошибка соединения')+
+      '. Если соединение пропало, сначала проверь календарь.');
+  }finally{
+    ruMasterManualCreatePending=false;
+    if(btn)btn.disabled=false;
+  }
+}
 $('appointmentForm').onsubmit=async e=>{
  e.preventDefault();
 
@@ -6175,6 +6249,12 @@ $('appointmentForm').onsubmit=async e=>{
    ? data.appointments.find(x=>String(x.id)===String(id))
    : null;
 
+ // RU manual creation: same existing form, database-verified operation.
+ if(ruEditing && !id){
+   await ruSubmitMasterManualBooking({date,time,name,phone,service,price,
+     durationMinutes,notes,paid,photos});
+   return;
+ }
  // Российский профиль: исключительно серверное редактирование.
  if(ruEditing){
    if(!id||!ruExisting||ruExisting._ruServer!==true||
@@ -6529,7 +6609,43 @@ async function toggleAppointmentCompleted(id){if(ruMasterReadOnly()){await ruSet
  if(cloudReady())await syncCloudAppointment(appointment,'master','upsert');
  else showAppToast(t('Статус приёма сохранён на этом устройстве. Для облачной синхронизации войди в аккаунт мастера.'));
 }
-async function cancelMasterAppointment(id){if(ruMasterReadOnly()){ruMasterReadOnlyNotice();return;}const a=data.appointments.find(x=>String(x.id)===String(id));if(!a)return;if(confirm(t('Отменить эту запись? Клиент будет удалён из расписания.'))){if(a.cloudId&&cloudReady()){const synced=await syncCloudAppointment(a,'master','cancel');if(!synced)return}data.appointments=data.appointments.filter(x=>String(x.id)!==String(id));save();showAppToast(t('Запись отменена.'))}}
+const ruMasterCancelPending=new Set();
+async function cancelMasterAppointment(id){
+ if(ruMasterReadOnly()){
+   const key=String(id);
+   const a=data.appointments.find(x=>String(x.id)===key);
+   if(!a||a._ruServer!==true||normalizeAppointmentStatus(a.status)!=='booked'){
+     ruMasterReadOnlyNotice();return;
+   }
+   if(ruMasterCancelPending.has(key))return;
+   if(!confirm(t('Отменить эту запись? Клиент будет удалён из расписания.')))return;
+   ruMasterCancelPending.add(key);
+   try{
+     const response=await ruSdk().cancelMasterAppointment(key);
+     const item=response?.item;
+     if(response?.success!==true||String(item?.id)!==key||
+        item?.status!=='cancelled'||typeof item.changed!=='boolean'){
+       throw new Error('Сервер не подтвердил отмену');
+     }
+     a.status='cancelled';
+     renderCalendar();renderAppointments();renderFinance();
+     showAppToast('Запись отменена на сервере. Время освобождено.');
+   }catch(error){
+     showAppToast('Отмена не подтверждена: '+String(error?.message||'Ошибка соединения')+
+       '. Обнови календарь перед повторной попыткой.');
+   }finally{ruMasterCancelPending.delete(key)}
+   return;
+ }
+ const a=data.appointments.find(x=>String(x.id)===String(id));
+ if(!a)return;
+ if(confirm(t('Отменить эту запись? Клиент будет удалён из расписания.'))){
+   if(a.cloudId&&cloudReady()){
+     const synced=await syncCloudAppointment(a,'master','cancel');if(!synced)return;
+   }
+   data.appointments=data.appointments.filter(x=>String(x.id)!==String(id));
+   save();showAppToast(t('Запись отменена.'));
+ }
+}
 function deleteAppointment(id){if(ruMasterReadOnly()){ruMasterReadOnlyNotice();return;}if(confirm(t('Удалить эту запись?'))){data.appointments=data.appointments.filter(x=>x.id!==id);save()}}
 function editAppointment(id){
  const a=data.appointments.find(x=>String(x.id)===String(id));
