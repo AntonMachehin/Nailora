@@ -1284,6 +1284,8 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
         }});
       },
       updateMe(fields){return request('PATCH','/v1/me',{body:fields,auth:true})},
+      reminderPreferences(){return request('GET','/v1/me/reminders/preferences',{auth:true})},
+      saveReminderPreferences(prefs){return request('PUT','/v1/me/reminders/preferences',{auth:true,body:prefs})},
       schedule(){return request('GET','/v1/me/schedule',{auth:true})},
       saveSchedule(scheduleData){return request('PUT','/v1/me/schedule',{body:scheduleData,auth:true})},
       appointments(params){return request('GET','/v1/appointments',{auth:true,query:qs(params)})},
@@ -4687,7 +4689,7 @@ async function logout(){
  }
 }
 
-function openSettings(){if(!activeRole)return;const p=profiles[activeRole]||{};renderProfileAvatar(activeRole);$('settingsLanguageChoice').value=p.language||currentLanguage;$('settingsRoleLabel').textContent=t(activeRole==='master'?'Тип аккаунта: Мастер':'Тип аккаунта: Клиент');$('settingsName').value=p.name||'';$('settingsPhone').value=p.phone||'';$('settingsPublicPhoneConsent').checked=activeRole==='master'&&p.publicPhoneConsent===true;updateNailoraPhoneConsentStatus();$('settingsCountry').value=p.country||'';$('settingsCity').value=p.city||p.area||'';$('settingsMasterFields').classList.toggle('hidden',activeRole!=='master');$('masterReminderSettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencySettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencyChoice').value=CURRENCY_CODES.includes(String((profiles.master||{}).currency||'RUB').toUpperCase())?String((profiles.master||{}).currency||'RUB').toUpperCase():'RUB';$('settingsAddress').required=activeRole==='master';$('settingsArea').value=p.area||'';$('settingsAddress').value=p.address||'';$('settingsSpecialty').value=p.specialty||'';$('settingsActivityDirection').value=p.activityDirection||'Маникюр и педикюр';const reminderPrefs=getMasterReminderPrefs();$('masterRemindersEnabled').checked=!!reminderPrefs.enabled;$('masterReminderLeadTime').value=String(reminderPrefs.minutes||60);$('masterReminderLeadTime').disabled=!reminderPrefs.enabled;refreshNotificationPermissionStatus();applyUiSettings();if(typeof $('settingsDialog').showModal==='function')$('settingsDialog').showModal();else $('settingsDialog').setAttribute('open','');refreshPushSettingsStatus()}
+function openSettings(){if(!activeRole)return;if(ruIsAccount()&&activeRole==='master')ruReminderState=null;const p=profiles[activeRole]||{};renderProfileAvatar(activeRole);$('settingsLanguageChoice').value=p.language||currentLanguage;$('settingsRoleLabel').textContent=t(activeRole==='master'?'Тип аккаунта: Мастер':'Тип аккаунта: Клиент');$('settingsName').value=p.name||'';$('settingsPhone').value=p.phone||'';$('settingsPublicPhoneConsent').checked=activeRole==='master'&&p.publicPhoneConsent===true;updateNailoraPhoneConsentStatus();$('settingsCountry').value=p.country||'';$('settingsCity').value=p.city||p.area||'';$('settingsMasterFields').classList.toggle('hidden',activeRole!=='master');$('masterReminderSettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencySettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencyChoice').value=CURRENCY_CODES.includes(String((profiles.master||{}).currency||'RUB').toUpperCase())?String((profiles.master||{}).currency||'RUB').toUpperCase():'RUB';$('settingsAddress').required=activeRole==='master';$('settingsArea').value=p.area||'';$('settingsAddress').value=p.address||'';$('settingsSpecialty').value=p.specialty||'';$('settingsActivityDirection').value=p.activityDirection||'Маникюр и педикюр';const reminderPrefs=getMasterReminderPrefs();$('masterRemindersEnabled').checked=!!reminderPrefs.enabled;$('masterReminderLeadTime').value=String(reminderPrefs.minutes||60);$('masterReminderLeadTime').disabled=!reminderPrefs.enabled;refreshNotificationPermissionStatus();applyUiSettings();if(typeof $('settingsDialog').showModal==='function')$('settingsDialog').showModal();else $('settingsDialog').setAttribute('open','');refreshPushSettingsStatus();if(ruIsAccount()&&activeRole==='master')void loadRuMasterReminderPrefs()}
 function updateNailoraPhoneConsentStatus(){
  const el=$('settingsPhoneConsentStatus');if(!el)return;
  const allowed=$('settingsPublicPhoneConsent').checked;
@@ -4900,8 +4902,79 @@ $('settingsDeleteAccount').onclick=async()=>{
  finally{button.disabled=false}
 };
 $('settingsDialog').addEventListener('click',e=>{if(e.target===$('settingsDialog'))$('settingsDialog').close()});
-function getMasterReminderPrefs(){return {enabled:false,minutes:60,...(profiles.master?.reminders||{})}}
-function saveMasterReminderPrefs(){if(ruMasterReadOnly()){ruMasterReadOnlyNotice();return;}if(!profiles.master)return;profiles.master={...profiles.master,reminders:{enabled:$('masterRemindersEnabled').checked,minutes:Number($('masterReminderLeadTime').value)||60}};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));$('masterReminderLeadTime').disabled=!profiles.master.reminders.enabled;if(profiles.master.reminders.enabled)checkMasterReminders()}
+let ruReminderState = null;
+let ruReminderLoading = 0;
+let ruReminderSaving = false;
+
+function applyRuReminderState(prefs){
+  $('masterRemindersEnabled').checked = prefs.enabled;
+  $('masterReminderLeadTime').value = String(prefs.minutes);
+  $('masterRemindersEnabled').disabled = false;
+  $('masterReminderLeadTime').disabled = !prefs.enabled;
+}
+
+async function loadRuMasterReminderPrefs(){
+  const seq = ++ruReminderLoading;
+  ruReminderState = null;
+  $('masterRemindersEnabled').disabled = true;
+  $('masterReminderLeadTime').disabled = true;
+  try{
+    const result = await ruSdk().reminderPreferences();
+    if(seq !== ruReminderLoading || !ruIsAccount() || activeRole !== 'master')return;
+    const prefs = result?.reminders;
+    if(typeof prefs?.enabled !== 'boolean' ||
+       ![15,30,60,120,1440].includes(prefs.minutes))
+      throw new Error('Некорректный ответ сервера');
+    ruReminderState = {enabled:prefs.enabled,minutes:prefs.minutes};
+    applyRuReminderState(ruReminderState);
+  }catch(err){
+    if(seq !== ruReminderLoading)return;
+    showAppToast('Не удалось загрузить настройки напоминаний: '+err.message);
+  }
+}
+
+async function saveRuMasterReminderPrefs(){
+  if(!ruReminderState || ruReminderSaving)return;
+  const seq = ruReminderLoading;
+  const previous = {...ruReminderState};
+  const prefs = {
+    enabled:$('masterRemindersEnabled').checked,
+    minutes:Number($('masterReminderLeadTime').value)
+  };
+  ruReminderSaving = true;
+  $('masterRemindersEnabled').disabled = true;
+  $('masterReminderLeadTime').disabled = true;
+  try{
+    const result = await ruSdk().saveReminderPreferences(prefs);
+    if(seq !== ruReminderLoading || !ruIsAccount() || activeRole !== 'master')return;
+    const saved = result?.reminders;
+    if(typeof saved?.enabled !== 'boolean' ||
+       ![15,30,60,120,1440].includes(saved.minutes))
+      throw new Error('Некорректный ответ сервера');
+    ruReminderState = {enabled:saved.enabled,minutes:saved.minutes};
+  }catch(err){
+    if(seq === ruReminderLoading){
+      ruReminderState = previous;
+      showAppToast('Настройки не сохранены: '+err.message);
+    }
+  }finally{
+    ruReminderSaving = false;
+    if(seq === ruReminderLoading && ruReminderState)
+      applyRuReminderState(ruReminderState);
+  }
+}
+
+function getMasterReminderPrefs(){
+  if(ruIsAccount() && activeRole==='master')
+    return ruReminderState || {enabled:false,minutes:60};
+  return {enabled:false,minutes:60,...(profiles.master?.reminders||{})};
+}
+function saveMasterReminderPrefs(){
+if(ruIsAccount() && activeRole==='master'){
+  void saveRuMasterReminderPrefs();
+  return;
+}
+if(ruMasterReadOnly()){ruMasterReadOnlyNotice();return;}if(!profiles.master)return;profiles.master={...profiles.master,reminders:{enabled:$('masterRemindersEnabled').checked,minutes:Number($('masterReminderLeadTime').value)||60}};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));$('masterReminderLeadTime').disabled=!profiles.master.reminders.enabled;if(profiles.master.reminders.enabled)checkMasterReminders()}
 function refreshNotificationPermissionStatus(){const el=$('notificationPermissionStatus');if(!el)return;if(!('Notification' in window)){el.textContent='Этот браузер не поддерживает системные уведомления. Напоминания останутся внутри открытого приложения.';return}if(Notification.permission==='granted')el.textContent='Системные уведомления разрешены.';else if(Notification.permission==='denied')el.textContent='Системные уведомления запрещены настройками браузера. Внутренние напоминания продолжат работать.';else el.textContent=t('Без системного разрешения напоминание появится внутри открытого приложения.')}
 $('masterRemindersEnabled').onchange=saveMasterReminderPrefs;$('masterReminderLeadTime').onchange=saveMasterReminderPrefs;
 $('allowBrowserNotifications').onclick=async()=>{if(!('Notification' in window)){refreshNotificationPermissionStatus();return}try{await Notification.requestPermission()}catch(e){}refreshNotificationPermissionStatus();if(Notification.permission==='granted')checkMasterReminders()};
