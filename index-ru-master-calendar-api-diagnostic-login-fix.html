@@ -1250,6 +1250,11 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
         if (!r?.success || typeof r.access_token !== 'string' || !r.access_token) throw new Error('Invalid RU verification response');
         persistSession(r.access_token,r.expires_in); return {success:true,expires_in:r.expires_in};
       },
+      adoptSession(token,expiresIn){
+        assertRu();
+        if(typeof token!=='string'||!tokenPattern.test(token))throw new Error('Invalid RU session response');
+        persistSession(token,expiresIn);
+      },
       async login(email,password){
         const r=await request('POST','/v1/auth/login',{body:{email,password}});
         if (!r?.success || typeof r.access_token !== 'string' || !r.access_token) throw new Error('Invalid RU session response');
@@ -1431,17 +1436,7 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
  </div></section>
 <section id="verifyEmail" class="wrap hidden" style="max-width:720px;padding-top:6vh"><div class="panel verify-panel"><div class="verify-mark" aria-hidden="true">✉</div><h2 class="verify-title">Подтверди электронную почту</h2><p class="verify-subtitle">Остался всего один небольшой шаг, и можно будет пользоваться приложением.</p><p id="verifyEmailMessage" class="verify-intro" aria-live="polite">Мы отправили письмо со ссылкой для подтверждения. Открой его, чтобы подтвердить адрес.</p><div id="ruVerifyCodeArea" class="hidden"><label for="ruVerifyCode">Восьмизначный код из письма</label><input id="ruVerifyCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{8}" placeholder="00000000"><p id="ruVerifyStatus" class="muted small" aria-live="polite"></p></div><ol class="verify-steps" id="verifyEmailSteps"><li><strong>Зайди в свою электронную почту</strong><span>Открой почтовый ящик, который указал при регистрации.</span></li><li><strong>Найди письмо с кодом подтверждения</strong><span>Если его не видно во входящих, загляни в папку «Спам».</span></li><li><strong>Открой письмо и перейди по ссылке</strong><span>Это подтвердит адрес электронной почты.</span></li></ol><p class="verify-note" id="verifyEmailNote">После подтверждения вернись в приложение. Если сессия восстановится успешно, приложение откроет твой профиль автоматически.</p><div class="verify-help small" style="margin-top:16px"><button type="button" id="verifyNoEmailToggle" class="link-button" aria-expanded="false" aria-controls="verifyNoEmailDetails">Письмо не пришло?</button><div id="verifyNoEmailDetails" class="hidden" style="margin-top:10px;padding:14px;border:1px solid #e9dff3;background:#faf7fc;border-radius:12px;text-align:left"><p style="margin:0 0 10px;color:#62566e">Проверь папку «Спам». Если письма там нет, можно отправить ссылку ещё раз здесь. Если аккаунт уже создан, не создавай его повторно.</p><div class="row" style="flex-wrap:wrap"><button type="button" id="resendVerifyEmail" class="btn primary">Отправить письмо ещё раз</button><button type="button" id="verifyBackToRegister" class="btn">Вернуться к регистрации</button></div><p id="verifyHelpStatus" class="muted small" aria-live="polite" style="margin:10px 0 0"></p></div></div></div></section>
 <section id="login" class="wrap hidden" style="max-width:650px;padding-top:5vh"><div class="panel"><h2>Вход в профиль</h2><form id="loginForm">
- <div id="nailoraDiscoverCodePanel" class="hidden" style="border:1px solid var(--border, #ddd);padding:12px;border-radius:12px;margin-bottom:14px">
-  <label for="nailoraDiscoverCode">Код подтверждения из письма</label>
-  <input id="nailoraDiscoverCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Код из письма">
-  <p class="muted small">На новом устройстве сначала подтверждаем email и автоматически находим сервер аккаунта. Пароль в сервис поиска не передаётся.</p>
-  <button type="button" id="nailoraDiscoverFinish" class="btn fixed">Подтвердить email</button>
-  <button type="button" id="nailoraDiscoverCancel" class="btn fixed">Отмена</button>
- </div>
- <div id="nailoraLegacyLogin" class="hidden" style="margin-bottom:12px">
-  <p class="muted small">Сервис автоматического поиска аккаунтов пока не запущен. Если профиль уже был создан в старой версии Nailora на Supabase, можно войти в него напрямую один раз.</p>
-  <button type="button" id="nailoraLoginLegacyGlobal" class="btn fixed">Войти в ранее созданный аккаунт Supabase</button>
- </div><div id="loginRoleRow" class="hidden"><label for="loginRole">Тип аккаунта</label><select id="loginRole"><option value="master">Мастер</option><option value="client">Клиент</option></select></div><label for="loginEmail">Email *</label><input id="loginEmail" type="email" required autocomplete="username" maxlength="254"><label for="loginPassword">Пароль *</label><div class="password-field"><input id="loginPassword" type="password" required autocomplete="current-password" maxlength="128"><button class="password-toggle" type="button" data-password-target="loginPassword" aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 7-.4 1.1-1.2 2.3-2.4 3.4"/><path d="M6.6 6.6C4.5 8 3.1 10.1 2.5 12c.5 1.4 1.5 2.8 3 4 1.7 1.4 3.9 2.3 6.5 2.3 1.1 0 2.1-.2 3-.5"/></svg></button></div><div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn primary fixed" type="submit">Войти</button><button class="btn fixed" id="loginOpenRegister" type="button">Зарегистрироваться</button><button class="btn fixed" id="backLogin" type="button">Назад</button></div><p style="margin:12px 0 0"><button class="link-button" id="forgotPasswordButton" type="button">Забыли пароль?</button></p><p id="loginStatus" class="muted small" aria-live="polite"></p></form></div></section>
+ <div id="loginRoleRow" class="hidden"><label for="loginRole">Тип аккаунта</label><select id="loginRole"><option value="master">Мастер</option><option value="client">Клиент</option></select></div><label for="loginEmail">Email *</label><input id="loginEmail" type="email" required autocomplete="username" maxlength="254"><label for="loginPassword">Пароль *</label><div class="password-field"><input id="loginPassword" type="password" required autocomplete="current-password" maxlength="128"><button class="password-toggle" type="button" data-password-target="loginPassword" aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 7-.4 1.1-1.2 2.3-2.4 3.4"/><path d="M6.6 6.6C4.5 8 3.1 10.1 2.5 12c.5 1.4 1.5 2.8 3 4 1.7 1.4 3.9 2.3 6.5 2.3 1.1 0 2.1-.2 3-.5"/></svg></button></div><div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn primary fixed" type="submit">Войти</button><button class="btn fixed" id="loginOpenRegister" type="button">Зарегистрироваться</button><button class="btn fixed" id="backLogin" type="button">Назад</button></div><p style="margin:12px 0 0"><button class="link-button" id="forgotPasswordButton" type="button">Забыли пароль?</button></p><p id="loginStatus" class="muted small" aria-live="polite"></p></form></div></section>
 <section id="resetPassword" class="wrap hidden" style="max-width:650px;padding-top:5vh"><div class="panel"><h2 id="resetPasswordTitle">Восстановление пароля</h2><div id="requestPasswordReset"><p class="muted">Укажи email аккаунта. Мы отправим письмо со ссылкой для восстановления пароля.</p><form id="requestPasswordResetForm"><label for="resetEmail">Email *</label><input id="resetEmail" type="email" required maxlength="254" autocomplete="email" placeholder="name@example.com"><div class="row" style="margin-top:14px"><button class="btn primary" type="submit" id="sendPasswordResetButton">Отправить ссылку</button><button class="btn" id="backResetRequest" type="button">Назад</button></div><p id="resetRequestStatus" class="muted small" aria-live="polite"></p></form></div><div id="setNewPassword" class="hidden"><p class="muted">Придумай новый пароль для своего аккаунта.</p><form id="setNewPasswordForm"><label for="newPassword">Новый пароль (не менее 8 символов) *</label><input id="newPassword" type="password" minlength="8" maxlength="128" required autocomplete="new-password"><label for="confirmNewPassword">Повтори новый пароль *</label><input id="confirmNewPassword" type="password" minlength="8" maxlength="128" required autocomplete="new-password"><div class="row" style="margin-top:14px"><button class="btn primary" type="submit">Сохранить новый пароль</button></div><p id="newPasswordStatus" class="muted small" aria-live="polite"></p></form></div></div></section>
 <section id="clientApp" class="wrap hidden" style="max-width:850px"><div class="panel"><div class="row profile-header-row"><div class="profile-identity"><img id="clientAvatar" class="profile-avatar-hero hidden" alt="Аватар профиля клиента"><div id="clientAvatarPlaceholder" class="profile-avatar-placeholder" aria-hidden="true">👤</div><div class="profile-nickname" id="clientNickname"></div><p class="profile-greeting" id="clientGreeting"></p></div><div class="header-actions"><button class="btn fixed" id="clientAccount" type="button">Аккаунт и настройки</button></div></div></div>
  <nav class="tabs client-master-tabs" aria-label="Разделы мастеров" style="margin:14px 0 16px"><button class="active" id="clientSearchTab" type="button">Найти мастера</button><button id="clientFavoritesTab" type="button">Мои мастера</button></nav>
@@ -3544,7 +3539,7 @@ function nailoraStoredRegion(){
  }catch(_){return ''}
 }
 let nailoraActiveRegion=nailoraStoredRegion();
-const NAILORA_REGION_RESOLVER_BASE=''; // Set to the HTTPS domain AFTER secure email OTP service is deployed.
+const NAILORA_UNIFIED_HANDOFF='nailora_unified_session_v1';
 const NAILORA_EMAIL_REGION_CACHE='nailora_verified_region_by_email_v899';
 function nailoraEmailKey(email){return String(email||'').trim().toLowerCase()}
 // This is a convenience cache, NOT proof of account ownership. Never route from IP address.
@@ -3616,18 +3611,6 @@ function nailoraRefreshRegionUi(){
 nailoraRefreshRegionUi();
 $('regCountry')?.addEventListener('input',nailoraRefreshRegionUi);
 
-// Email discovery requires a server-side verified one-time code. An unauthenticated
-// email->region lookup would reveal whether someone is registered. Passwords NEVER
-// travel to this service. Endpoints remain unavailable until VPS & email sender setup.
-async function nailoraDiscoveryRequest(path,payload){
- const base=String(NAILORA_REGION_RESOLVER_BASE||'').trim();
- if(!base)throw new Error('Сервис поиска аккаунта ещё не подключён');
- const url=new URL(base);
- if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/')throw new Error('Неверный HTTPS адрес сервиса');
- const response=await fetch(url.origin+path,{method:'POST',credentials:'omit',cache:'no-store',redirect:'error',mode:'cors',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)});
- if(!response.ok)throw new Error(response.status===429?'Слишком много запросов. Попробуй позже.':'Не удалось подтвердить email. Попробуй позже.');
- return response.json();
-}
 const nailoraRuCacheSuffix=nailoraActiveRegion===NAILORA_REGION_RU?'_ru_v898':'';
 const ROLE_KEY='manicureRoleProfiles_v1'+nailoraRuCacheSuffix, REQUEST_KEY='manicureClientRequests_v1'+nailoraRuCacheSuffix, SETTINGS_KEY='manicureUiSettings_v1'+nailoraRuCacheSuffix, REMINDER_SENT_KEY='nailoraReminderSent_v1'+nailoraRuCacheSuffix, ACTIVE_ROLE_KEY='nailoraActiveRole_v1'+nailoraRuCacheSuffix;
 const CURRENCY_SYMBOLS={RUB:'₽',EUR:'€',USD:'$',GBP:'£',PLN:'zł',UAH:'₴',TRY:'₺',KZT:'₸',CZK:'Kč',CHF:'CHF'};
@@ -4136,22 +4119,22 @@ async function syncRoleTimezoneToCloud(role=activeRole){
 }
 async function syncMasterTimezoneToCloud(){return syncRoleTimezoneToCloud('master')}
 async function syncClientTimezoneToCloud(){return syncRoleTimezoneToCloud('client')}
-async function loginWithSupabase(email,password,role){
+async function loginWithSupabaseSession(email,session,role){
  if(!nailoraRegionAllowed('Вход'))throw new Error('Зарубежная авторизация недоступна для выбранного региона.');
  if(!cloud)throw new Error('Библиотека Supabase не загрузилась. Проверь интернет и перезагрузи страницу.');
  try{
-  // Close any lingering prior session before using the explicitly selected login.
-  const {error:priorSignOutError}=await cloud.auth.signOut();
-  if(priorSignOutError)console.warn('Previous session sign-out:',priorSignOutError.message);
-  const {data:authData,error}=await cloud.auth.signInWithPassword({email,password});
+  const {data:authData,error}=await cloud.auth.setSession({access_token:session.access_token,refresh_token:session.refresh_token});
   if(error)throw error;
   cloudUser=authData.user;
+  if(!cloudUser||nailoraEmailKey(cloudUser.email)!==email)throw new Error('Сервер не подтвердил аккаунт.');
+  if(nailoraEmailKey(profiles[role]?.email)!==email)profiles[role]={};
   const table=role==='master'?'masters':'clients';
   let {data:row,error:rowError}=await cloud.from(table).select('*').eq('auth_user_id',cloudUser.id).maybeSingle();
   if(rowError)throw rowError;
   if(nailoraIsRussianCountry(row?.country||cloudUser.user_metadata?.country))throw new Error('Этот аккаунт относится к России. Для него потребуется перенос в российскую базу. Используй прежнюю v8.96, пока перенос не закончен.');
   if(!row){
    const meta=cloudUser.user_metadata||{};
+   if(meta.role!==role)throw new Error('Профиль для выбранной роли не найден.');
    const candidate={...profiles[role],publicPhoneConsent:role==='master'&&meta.phone_publication_consent===true,name:meta.name||profiles[role]?.name||'',phone:meta.phone||profiles[role]?.phone||'',country:meta.country||profiles[role]?.country||'',city:meta.city||profiles[role]?.city||'',area:meta.area||profiles[role]?.area||'',address:meta.address||profiles[role]?.address||'',specialty:meta.specialty||profiles[role]?.specialty||'',email:cloudUser.email};
    if(!candidate.name||!candidate.city||!candidate.country)throw new Error('Профиль для выбранной роли не найден. Проверь тип аккаунта и email.');
    await ensureCloudProfile(role,candidate,cloudUser);
@@ -4172,80 +4155,51 @@ async function loginWithSupabase(email,password,role){
   throw err;
  }
 }
-let nailoraPendingEmailDiscovery='';
-async function nailoraGlobalLogin(email,password,role,status){
- if(!nailoraChangeRegion(NAILORA_REGION_GLOBAL))return;
- await nailoraEnsureGlobalCloud();
- await loginWithSupabase(email,password,role);
- nailoraRememberEmailRegion(email,NAILORA_REGION_GLOBAL);
- status.textContent='Вход выполнен.';
-}
-// Prevent simultaneous sign-in attempts from repeated taps / duplicate submit events.
+// A single authenticated request selects the account server. Never persist a password.
 let nailoraLoginSubmitInFlight=false;
 $('loginForm').onsubmit=async e=>{
  e.preventDefault();
  if(nailoraLoginSubmitInFlight)return;
+ const status=$('loginStatus'),role=$('loginRole').value,email=nailoraEmailKey($('loginEmail').value);
+ const password=$('loginPassword').value;
+ if(!email||!password||!['master','client'].includes(role)){status.textContent='Введи email и пароль.';return;}
  nailoraLoginSubmitInFlight=true;
+ const button=$('loginForm').querySelector('button[type="submit"]');
+ if(button)button.disabled=true;
+ status.textContent='Выполняю вход…';
+ const controller=new AbortController();
+ const timeout=setTimeout(()=>controller.abort(),25000);
  try{
- const status=$('loginStatus'),role=$('loginRole').value,email=$('loginEmail').value.trim().toLowerCase(),password=$('loginPassword').value;
- chosenRole=role;
- $('nailoraLegacyLogin').classList.add('hidden');
- if(!email||!password){status.textContent='Введи email и пароль.';return;}
-  const known=nailoraKnownEmailRegion(email,role);
- // An email previously verified on a given server takes precedence over the
- // last region used on this device. Never send a known global login to RU.
- if(known===NAILORA_REGION_GLOBAL){
-  if(!nailoraChangeRegion(NAILORA_REGION_GLOBAL))return;
-  status.textContent='Выполняю вход…';
-  try{await nailoraGlobalLogin(email,password,role,status)}catch(err){status.textContent='Не удалось войти: '+(err?.message||'проверь email и пароль')}
-  return;
+   const res=await fetch(window.NAILORA_RU_API_BASE+'/v1/auth/login-unified',{
+     method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+     body:JSON.stringify({email,password}),credentials:'omit',mode:'cors',
+     cache:'no-store',redirect:'error',signal:controller.signal
+   });
+   const answer=await res.json();
+   if(!res.ok)throw new Error(res.status===401?'Неверные данные для входа':res.status===429?'Слишком много попыток. Повтори позже.':'Сервис входа временно недоступен.');
+   if(answer?.success!==true||!['ru','global'].includes(answer.region)||
+      typeof answer.access_token!=='string'||!answer.access_token||
+      (answer.region==='global'&&(typeof answer.refresh_token!=='string'||!answer.refresh_token)))
+      throw new Error('Некорректный ответ сервера входа.');
+   const handoff={region:answer.region,role,email,access_token:answer.access_token,
+     refresh_token:answer.region==='global'?answer.refresh_token:null,expires_in:answer.expires_in,until:Date.now()+90000};
+   try{
+     sessionStorage.setItem(NAILORA_UNIFIED_HANDOFF,JSON.stringify(handoff));
+     sessionStorage.removeItem('nailora_after_region_switch_v899');
+     localStorage.setItem(NAILORA_REGION_KEY,answer.region);
+     const url=new URL(location.href);url.searchParams.delete('country');url.hash='';
+     history.replaceState(null,'',url.href);
+   }catch(_){
+     try{sessionStorage.removeItem(NAILORA_UNIFIED_HANDOFF)}catch(_){}
+     throw new Error('Браузер не разрешил сохранить сессию входа.');
+   }
+   $('loginPassword').value='';
+   location.reload();
+ }catch(err){
+   status.textContent=controller.signal.aborted?'Сервис входа не ответил. Проверь соединение и повтори попытку.':'Не удалось войти: '+(err?.message||'ошибка сервера');
+ }finally{
+   clearTimeout(timeout);nailoraLoginSubmitInFlight=false;if(button)button.disabled=false;
  }
- if(known===NAILORA_REGION_RU || ruIsAccount()){
-  if(!nailoraChangeRegion(NAILORA_REGION_RU))return;
-  status.textContent='Выполняю вход…';
-  try{await ruLogin(email,password,role,status)}
-  catch(err){
-    status.textContent='Не удалось войти: '+(err?.message||'ошибка сервера');
-    // The same, pre-existing Supabase-login action remains reachable when an
-    // unrecognized email was attempted on the Russian server.
-    $('nailoraLegacyLogin').classList.remove('hidden');
-  }
-  return;
- }
- if(!NAILORA_REGION_RESOLVER_BASE){
-  status.textContent='Для этого email регион пока не определён. На новом устройстве потребуется проверка через сервер, который ещё не активирован.';
-  $('nailoraLegacyLogin').classList.remove('hidden');return;
- }
- status.textContent='Для первого входа на этом устройстве отправляем код подтверждения на email…';
- try{
-  await nailoraDiscoveryRequest('/v1/account-region/start',{email});
-  nailoraPendingEmailDiscovery=email;
-  $('nailoraDiscoverCodePanel').classList.remove('hidden');
-  status.textContent='Если адрес зарегистрирован в сервисе поиска, код отправлен на почту. Введи его ниже.';
-  $('nailoraLegacyLogin').classList.remove('hidden');
- }catch(err){status.textContent=err.message||'Ошибка определения сервера';$('nailoraLegacyLogin').classList.remove('hidden')}
- }finally{nailoraLoginSubmitInFlight=false;}
-};
-$('nailoraDiscoverFinish').onclick=async function(){
- const status=$('loginStatus'),email=nailoraPendingEmailDiscovery,code=$('nailoraDiscoverCode').value.trim();
- if(!email||!/^\d{6,8}$/.test(code)){status.textContent='Введи код из письма.';return}
- this.disabled=true;
- try{
-  const answer=await nailoraDiscoveryRequest('/v1/account-region/finish',{email,code});
-  if(![NAILORA_REGION_RU,NAILORA_REGION_GLOBAL].includes(answer?.region))throw new Error('Профиль не найден или код недействителен.');
-  nailoraRememberEmailRegion(email,answer.region);
-  $('nailoraDiscoverCodePanel').classList.add('hidden');
-  if(answer.region===NAILORA_REGION_RU){if(nailoraChangeRegion(NAILORA_REGION_RU))nailoraRegionAllowed('Вход');return}
-  await nailoraGlobalLogin(email,$('loginPassword').value,$('loginRole').value,status);
- }catch(err){status.textContent=err.message||'Не удалось подтвердить email'}
- finally{this.disabled=false}
-};
-$('nailoraDiscoverCancel').onclick=()=>{nailoraPendingEmailDiscovery='';$('nailoraDiscoverCode').value='';$('nailoraDiscoverCodePanel').classList.add('hidden');$('nailoraLegacyLogin').classList.remove('hidden');$('loginStatus').textContent='Можно повторить поиск или использовать старый аккаунт Supabase.'};
-$('nailoraLoginLegacyGlobal').onclick=async function(){
- const status=$('loginStatus');this.disabled=true;status.textContent='Проверяю существующий аккаунт Supabase…';
- try{await nailoraGlobalLogin($('loginEmail').value.trim().toLowerCase(),$('loginPassword').value,$('loginRole').value,status)}
- catch(err){status.textContent='Не удалось войти в прежний аккаунт: '+(err.message||'ошибка входа')}
- finally{this.disabled=false}
 };
 function confirmationEmailRedirectOptions(){const emailRedirectTo=getEmailRedirectUrl();return emailRedirectTo?{emailRedirectTo}:{}};
 const PENDING_VERIFICATION_KEY='nailora_pending_verification_v837';
@@ -4632,18 +4586,54 @@ function nailoraShowResumedLogin(){
   $('loginEmail').value=String(p.email||'').trim();
   $('loginStatus').textContent='Сервер входа выбран. Введи пароль ещё раз.';
 }
+// Consume the authenticated one-use handoff before any prior profile is restored.
+let nailoraUnifiedHandoff=null;
+try{
+ const raw=sessionStorage.getItem(NAILORA_UNIFIED_HANDOFF);
+ sessionStorage.removeItem(NAILORA_UNIFIED_HANDOFF);
+ if(raw){
+   const p=JSON.parse(raw);
+   if(p?.region===nailoraActiveRegion&&['ru','global'].includes(p.region)&&
+      ['client','master'].includes(p.role)&&typeof p.email==='string'&&
+      typeof p.access_token==='string'&&p.until>Date.now())nailoraUnifiedHandoff=p;
+ }
+}catch(_){}
+async function nailoraCompleteUnifiedLogin(p){
+ prepareLogin(p.role);
+ $('loginEmail').value=p.email;
+ $('loginStatus').textContent='Загружаю профиль…';
+ try{
+   if(p.region==='ru'){
+     ruSdk().adoptSession(p.access_token,p.expires_in);
+     if(p.role==='master')await ruOpenMasterAccount(p.email);else await ruOpenClientAccount(p.email);
+   }else{
+     await nailoraEnsureGlobalCloud();
+     await loginWithSupabaseSession(p.email,p,p.role);
+   }
+   nailoraRememberEmailRegion(p.email,p.region);
+   $('loginStatus').textContent='Вход выполнен.';
+ }catch(err){
+   if(p.region==='ru')ruSdk().clearSession();
+   activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);
+   prepareLogin(p.role);$('loginEmail').value=p.email;
+   $('loginStatus').textContent='Не удалось открыть профиль: '+(err?.message||'ошибка сервера');
+ }finally{document.body.classList.remove('auth-pending');}
+}
 // Fast path: render the last locally saved profile before the remote Auth SDK finishes loading.
 // bootCloudAuth validates the persisted Supabase session and switches to welcome only if needed.
 try{
  const lastRole=localStorage.getItem(ACTIVE_ROLE_KEY);
- if(nailoraActiveRegion===NAILORA_REGION_GLOBAL&&(lastRole==='master'||lastRole==='client')&&profiles[lastRole]&&!nailoraIsRussianCountry(profiles[lastRole].country)){
+ if(!nailoraUnifiedHandoff&&nailoraActiveRegion===NAILORA_REGION_GLOBAL&&(lastRole==='master'||lastRole==='client')&&profiles[lastRole]&&!nailoraIsRussianCountry(profiles[lastRole].country)){
   activeRole=lastRole;chosenRole=lastRole;
    queueMicrotask(() => openRole(lastRole).catch(err => console.warn('Cached profile restore failed:', err)));
   setCloudStatus('Восстанавливаю сохранённый профиль…');
  }
 }catch(cacheRestoreError){console.warn('Local profile fast restore failed:',cacheRestoreError)}
 // v8.97: no Supabase requests while Russia (or no region) is selected.
-if(nailoraActiveRegion===NAILORA_REGION_GLOBAL){
+if(nailoraUnifiedHandoff){
+ const p=nailoraUnifiedHandoff;nailoraUnifiedHandoff=null;
+ void nailoraCompleteUnifiedLogin(p);
+}else if(nailoraActiveRegion===NAILORA_REGION_GLOBAL){
  window.__nailoraLoadSupabase().then(ok=>{
   if(ok)startNailoraCloud();
   else{setCloudStatus('Зарубежная база временно недоступна. Проверь интернет.');showOnly('welcome');document.body.classList.remove('auth-pending');}
