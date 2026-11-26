@@ -1142,34 +1142,65 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
     const fetcher = config.fetchImpl || global.fetch.bind(global);
     const getRegion = config.getRegion;
     if (typeof getRegion !== 'function') throw new Error('Region guard is required');
-    // TEST BUILD ONLY: keep this tab's authenticated RU session through F5/reload.
-    // Session storage is scoped to this origin and tab; passwords are NEVER stored.
-    // Production should use first-party HttpOnly cookies on a single app/API origin.
-    const tokenKey = 'bm_ru_tab_session_v1_' + encodeURIComponent(base);
+    // Persistent RU session for this browser origin, never a password.
+    // The API still validates the opaque token and enforces its own expiry.
+    // A first-party HttpOnly cookie is preferable when app and API share an origin.
+    const getAccountRegion = config.getAccountRegion;
+    if(typeof getAccountRegion !== 'function') throw new Error('Account region guard is required');
+    const tokenKey = 'bm_ru_persistent_session_v1_' + encodeURIComponent(base);
+    const oldTokenKey = 'bm_ru_tab_session_v1_' + encodeURIComponent(base);
     const tokenPattern = /^[A-Za-z0-9_-]{43}$/;
-    let bearer = null;
+    let bearer = null, until = 0;
     function clearSession() {
-      bearer = null;
-      try { global.sessionStorage?.removeItem(tokenKey); } catch (_) {}
+      bearer = null; until = 0;
+      try { global.localStorage?.removeItem(tokenKey); } catch (_) {}
+      try { global.sessionStorage?.removeItem(tokenKey); global.sessionStorage?.removeItem(oldTokenKey); } catch (_) {}
+    }
+    function validSession(row) {
+      return typeof row?.token==='string' && tokenPattern.test(row.token) &&
+        Number.isFinite(row.until) && row.until>Date.now();
+    }
+    function storeSession(row) {
+      bearer=row.token; until=row.until;
+      try { global.sessionStorage?.removeItem(oldTokenKey); } catch (_) {}
+      try {
+        global.localStorage.setItem(tokenKey,JSON.stringify(row));
+        try { global.sessionStorage?.removeItem(tokenKey); } catch (_) {}
+      } catch (_) {
+        try { global.sessionStorage?.setItem(tokenKey,JSON.stringify(row)); } catch (_) {}
+      }
     }
     function persistSession(token, expiresIn) {
-      bearer = token;
-      const ttl = Math.max(60, Math.min(604800, Number(expiresIn) || 3600));
-      try {
-        global.sessionStorage?.setItem(tokenKey, JSON.stringify({token, until:Date.now()+ttl*1000}));
-      } catch (_) { /* Private browsing may block storage; memory login still works. */ }
+      const ttl=Math.min(604800,Number(expiresIn??3600));
+      if(getAccountRegion()!=='ru' || !tokenPattern.test(token) || !Number.isFinite(ttl) || ttl<=0)throw new Error('Invalid RU session response');
+      storeSession({token,until:Date.now()+ttl*1000});
     }
     function readSession() {
+      if(getAccountRegion()!=='ru')return false;
+      let raw=null;
+      try { raw=global.localStorage.getItem(tokenKey); }
+      catch (_) { try { raw=global.sessionStorage?.getItem(tokenKey); }catch (_){} }
+      // Migrate an existing tab session without extending its original expiration.
+      if(!raw){try{raw=global.sessionStorage?.getItem(tokenKey)||global.sessionStorage?.getItem(oldTokenKey)}catch(_){}}
       try {
-        const row=JSON.parse(global.sessionStorage?.getItem(tokenKey)||'null');
-        if(tokenPattern.test(row?.token||'') && Number(row?.until)>Date.now()) {
-          bearer=row.token; return true;
-        }
-        global.sessionStorage?.removeItem(tokenKey);
-      } catch (_) { /* A bad/blocked store is not authentication. */ }
-      return false;
+        const row=JSON.parse(raw||'null');
+        if(validSession(row)){storeSession(row);return true;}
+      } catch (_) {}
+      clearSession();return false;
+    }
+    function hasSession() {
+      if(getAccountRegion()!=='ru')return false;
+      if(!bearer)return false;
+      if(until<=Date.now()){clearSession();return false;}
+      return true;
     }
     readSession();
+    // Invalidate an in-memory copy if another tab logs out or replaces the session.
+    global.addEventListener?.('storage',event=>{
+      if(event.key===tokenKey||event.key===null||event.key==='nailora_region_v897'){
+        bearer=null;until=0;
+      }
+    });
     function assertRu() {
       if (getRegion() !== 'ru') throw new Error('RU API is only available for the Russia region');
     }
@@ -1182,7 +1213,7 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
       const headers = {'Accept':'application/json'};
       if (opts.body !== undefined) headers['Content-Type'] = opts.masterAction?'application/vnd.beautymaster.master+json':'application/json';
       if (opts.auth) {
-        if (!bearer) throw new Error('RU authentication required');
+        if (!hasSession()) throw new Error('RU authentication required');
         headers.Authorization = 'Bearer ' + bearer;
       }
       const controller = new AbortController();
@@ -1229,7 +1260,7 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
     }
     return Object.freeze({
       baseUrl:base,
-      isAuthenticated(){return Boolean(bearer)},
+      isAuthenticated(){return hasSession()},
       clearSession,
       health(){return request('GET','/healthz')},
       ready(){return request('GET','/readyz')},
@@ -1264,7 +1295,7 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
       me(opts){return request('GET','/v1/me',{auth:true,query:opts?.include_master?'?include_master=1':''})},
       async uploadAvatar(blob){
         assertRu();
-        if(!bearer)throw new Error('RU authentication required');
+        if(!hasSession())throw new Error('RU authentication required');
         if(!(blob instanceof Blob)||blob.type!=='image/jpeg'||blob.size<1||blob.size>2*1024*1024)throw new Error('Некорректная фотография или превышен размер 2 МБ');
         const controller=new AbortController();
         const timer=setTimeout(()=>controller.abort(),15000);
@@ -3558,7 +3589,7 @@ function nailoraChangeRegion(region){
  if(![NAILORA_REGION_RU,NAILORA_REGION_GLOBAL].includes(region))throw new Error('Неизвестный регион');
  if(nailoraActiveRegion&&nailoraActiveRegion!==region){
   if(nailoraActiveRegion===NAILORA_REGION_RU && region===NAILORA_REGION_GLOBAL){
-   try{ruApiClient?.clearSession()}catch(_){}
+   try{ruSdk().clearSession()}catch(_){}
   }
   // Avoid reusing already loaded caches, sessions and SDK clients across regions.
   try{
@@ -3701,6 +3732,7 @@ function ruSdk(){
   if(!ruApiClient){
     ruApiClient=window.NailoraRuSDK.createClient({
       baseUrl:window.NAILORA_RU_API_BASE,
+      getAccountRegion:()=>nailoraActiveRegion,
       getRegion:()=>nailoraActiveRegion===NAILORA_REGION_RU||nailoraIsRussianCountry($('searchCountry')?.value)||!!ruSelectedMasterId?'ru':'global'
     });
   }
@@ -4186,6 +4218,7 @@ $('loginForm').onsubmit=async e=>{
    try{
      sessionStorage.setItem(NAILORA_UNIFIED_HANDOFF,JSON.stringify(handoff));
      sessionStorage.removeItem('nailora_after_region_switch_v899');
+     if(answer.region==='global')ruSdk().clearSession();
      localStorage.setItem(NAILORA_REGION_KEY,answer.region);
      const url=new URL(location.href);url.searchParams.delete('country');url.hash='';
      history.replaceState(null,'',url.href);
@@ -4606,6 +4639,7 @@ async function nailoraCompleteUnifiedLogin(p){
    if(p.region==='ru'){
      ruSdk().adoptSession(p.access_token,p.expires_in);
      if(p.role==='master')await ruOpenMasterAccount(p.email);else await ruOpenClientAccount(p.email);
+     clearPendingVerification();
    }else{
      await nailoraEnsureGlobalCloud();
      await loginWithSupabaseSession(p.email,p,p.role);
@@ -4652,7 +4686,7 @@ if(nailoraUnifiedHandoff){
   }else {showOnly('welcome');nailoraShowResumedLogin();}
   document.body.classList.remove('auth-pending');
   setCloudStatus('Выбери «Я мастер» или «Я клиент», затем войди или создай профиль.');
-  // On F5, verify a saved tab session with the server before opening the RU profile.
+  // At launch, verify a persisted session with the server before opening the RU profile.
   // Never trust local profile cache as proof of authentication.
   if(nailoraActiveRegion===NAILORA_REGION_RU && !pending && ruSdk().isAuthenticated()){
     void (async()=>{
@@ -4672,7 +4706,7 @@ if(nailoraUnifiedHandoff){
           const lastEmail=String(profiles[chosenRole]?.email||'').trim();
           if(lastEmail)$('loginEmail').value=lastEmail;
           $('loginStatus').textContent=err?.code==='RU_TIMEOUT'
-            ?'Не удалось восстановить соединение с российским сервером. Нажми «Войти», чтобы повторить попытку.'
+            ?'Не удалось восстановить соединение с российским сервером. Закрой и снова открой приложение, чтобы повторить проверку сохранённой сессии.'
             :'Сессия не восстановилась. Введи пароль для входа.';
         }
       }
