@@ -1,3 +1,4 @@
+<!-- RU master session read-only test: all master data loaded from verified AdminVPS session. -->
 <!doctype html>
 <html lang="ru">
 <!-- Nailora v8.98.3 PRIVACY POLICY UI PREVIEW: demo policy, links on welcome, registration and settings. NOT a finalized legal notice. -->
@@ -1122,7 +1123,7 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
  */
 (function (global) {
   'use strict';
-  const allowed = new Set(['GET','POST','PATCH','PUT']);
+  const allowed = new Set(['GET','POST','PATCH','PUT','DELETE']);
   function normalizeBase(raw) {
     if (typeof raw !== 'string' || !raw.trim()) throw new Error('RU API address is not configured');
     let url;
@@ -1141,7 +1142,34 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
     const fetcher = config.fetchImpl || global.fetch.bind(global);
     const getRegion = config.getRegion;
     if (typeof getRegion !== 'function') throw new Error('Region guard is required');
-    let bearer = null; // in memory only: never localStorage/sessionStorage
+    // TEST BUILD ONLY: keep this tab's authenticated RU session through F5/reload.
+    // Session storage is scoped to this origin and tab; passwords are NEVER stored.
+    // Production should use first-party HttpOnly cookies on a single app/API origin.
+    const tokenKey = 'bm_ru_tab_session_v1_' + encodeURIComponent(base);
+    const tokenPattern = /^[A-Za-z0-9_-]{43}$/;
+    let bearer = null;
+    function clearSession() {
+      bearer = null;
+      try { global.sessionStorage?.removeItem(tokenKey); } catch (_) {}
+    }
+    function persistSession(token, expiresIn) {
+      bearer = token;
+      const ttl = Math.max(60, Math.min(604800, Number(expiresIn) || 3600));
+      try {
+        global.sessionStorage?.setItem(tokenKey, JSON.stringify({token, until:Date.now()+ttl*1000}));
+      } catch (_) { /* Private browsing may block storage; memory login still works. */ }
+    }
+    function readSession() {
+      try {
+        const row=JSON.parse(global.sessionStorage?.getItem(tokenKey)||'null');
+        if(tokenPattern.test(row?.token||'') && Number(row?.until)>Date.now()) {
+          bearer=row.token; return true;
+        }
+        global.sessionStorage?.removeItem(tokenKey);
+      } catch (_) { /* A bad/blocked store is not authentication. */ }
+      return false;
+    }
+    readSession();
     function assertRu() {
       if (getRegion() !== 'ru') throw new Error('RU API is only available for the Russia region');
     }
@@ -1152,13 +1180,15 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
       }
       const opts = options || {};
       const headers = {'Accept':'application/json'};
-      if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+      if (opts.body !== undefined) headers['Content-Type'] = opts.masterAction?'application/vnd.beautymaster.master+json':'application/json';
       if (opts.auth) {
         if (!bearer) throw new Error('RU authentication required');
         headers.Authorization = 'Bearer ' + bearer;
       }
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 9000);
+      // Authentication may be slower on mobile networks; never retry login POST automatically.
+      const timeoutMs = (path === '/v1/auth/login' || path === '/v1/me' || path.endsWith('/master-edit')) ? 25000 : 9000;
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const resp = await fetcher(base + path + (opts.query || ''), {
           method, headers, credentials:'omit', redirect:'error', mode:'cors', cache:'no-store',
@@ -1176,6 +1206,14 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
           e.status = resp.status; throw e;
         }
         return body;
+      } catch (error) {
+        if(controller.signal.aborted) {
+          const timeoutError=new Error('Российский сервер не ответил за '+Math.round(timeoutMs/1000)+' секунд. Запрос: '+method+' '+path+'. Проверь соединение и повтори попытку.');
+          timeoutError.code='RU_TIMEOUT';
+          throw timeoutError;
+        }
+        console.warn('[RU API request failed]', method, path, error?.name || 'Error', error?.message || 'Unknown error');
+        throw error;
       } finally { clearTimeout(timer); }
     }
     function qs(input) {
@@ -1192,7 +1230,7 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
     return Object.freeze({
       baseUrl:base,
       isAuthenticated(){return Boolean(bearer)},
-      clearSession(){bearer=null},
+      clearSession,
       health(){return request('GET','/healthz')},
       ready(){return request('GET','/readyz')},
       directory(filters){return request('GET','/v1/directory',{query:qs(filters)})},
@@ -1210,15 +1248,20 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
         if (!/^\d{8}$/.test(String(code||''))) throw new Error('Нужен восьмизначный код');
         const r=await request('POST','/v1/auth/verify',{body:{email,code}});
         if (!r?.success || typeof r.access_token !== 'string' || !r.access_token) throw new Error('Invalid RU verification response');
-        bearer=r.access_token; return {success:true,expires_in:r.expires_in};
+        persistSession(r.access_token,r.expires_in); return {success:true,expires_in:r.expires_in};
+      },
+      adoptSession(token,expiresIn){
+        assertRu();
+        if(typeof token!=='string'||!tokenPattern.test(token))throw new Error('Invalid RU session response');
+        persistSession(token,expiresIn);
       },
       async login(email,password){
         const r=await request('POST','/v1/auth/login',{body:{email,password}});
         if (!r?.success || typeof r.access_token !== 'string' || !r.access_token) throw new Error('Invalid RU session response');
-        bearer=r.access_token; return {success:true,expires_in:r.expires_in};
+        persistSession(r.access_token,r.expires_in); return {success:true,expires_in:r.expires_in};
       },
-      async logout(){try{if(bearer)await request('POST','/v1/auth/logout',{auth:true});}finally{bearer=null}},
-      me(){return request('GET','/v1/me',{auth:true})},
+      async logout(){try{if(bearer)await request('POST','/v1/auth/logout',{auth:true});}finally{clearSession()}},
+      me(opts){return request('GET','/v1/me',{auth:true,query:opts?.include_master?'?include_master=1':''})},
       async uploadAvatar(blob){
         assertRu();
         if(!bearer)throw new Error('RU authentication required');
@@ -1247,9 +1290,38 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
         }});
       },
       updateMe(fields){return request('PATCH','/v1/me',{body:fields,auth:true})},
+      reminderPreferences(){return request('GET','/v1/me/reminders/preferences',{auth:true})},
+      saveReminderPreferences(prefs){return request('PUT','/v1/me/reminders/preferences',{auth:true,body:prefs})},
       schedule(){return request('GET','/v1/me/schedule',{auth:true})},
       saveSchedule(scheduleData){return request('PUT','/v1/me/schedule',{body:scheduleData,auth:true})},
+      saveCurrency(currency){return request('PUT','/v1/me/currency',{auth:true,body:{currency}})},
       appointments(params){return request('GET','/v1/appointments',{auth:true,query:qs(params)})},
+      // Master expenses: server resolves ownership from the authenticated session.
+      listExpenses(){return request('GET','/v1/expenses',{auth:true})},
+      createExpense(fields){return request('POST','/v1/expenses',{auth:true,body:fields})},
+      deleteExpense(id){return request('DELETE','/v1/expenses/'+uuid(id),{auth:true})},
+      // RU master only: authenticated server update, never a local-only change.
+      setMasterAppointmentState(id,field,value){
+        if(!['paid','completed'].includes(field)||typeof value!=='boolean')
+          throw new Error('Invalid master appointment state');
+        return request('POST','/v1/appointments/'+uuid(id)+'/master-state',{
+          auth:true,body:{field,value}
+        });
+      },
+      editMasterAppointment(id,fields){
+        if(!fields||typeof fields!=='object'||Array.isArray(fields))
+          throw new Error('Invalid master appointment fields');
+        return request('PATCH','/v1/appointments/'+uuid(id)+'/master-edit',{
+          auth:true,body:fields
+        });
+      },
+      // Existing buttons use server-authorized master operations, not localStorage.
+      createMasterAppointment(fields){return request('POST','/v1/appointments',{
+        auth:true, masterAction:true, body:{...fields,master_manual:true}
+      })},
+      cancelMasterAppointment(id){return request('POST','/v1/appointments/'+uuid(id)+'/cancel',{
+        auth:true, masterAction:true, body:{master_cancel:true}
+      })},
       // By design NEVER accepts client-supplied price, paid, owner, or status.
       // request_id MUST stay the same when retrying the same booking intent.
       // No price, paid status, phone, photos, or notes sent until server support is verified.
@@ -1291,7 +1363,13 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
         return request('PATCH','/v1/appointments/'+uuid(id),{auth:true,body});
       },
       // Master-only operation; rights enforced on server.
-      finance(id,changes){return request('PATCH','/v1/appointments/'+uuid(id)+'/finance',{auth:true,body:changes})}
+      finance(id,changes){return request('PATCH','/v1/appointments/'+uuid(id)+'/finance',{auth:true,body:changes})},
+      // RU Push transport: follows existing in-memory Bearer session.
+      pushConfig(){return request('GET','/v1/push/config')},
+      pushDeviceStatus(endpoint){return request('POST','/v1/push/device-status',{auth:true,body:{endpoint}})},
+      pushSubscribe(subscription){return request('POST','/v1/push/subscribe',{auth:true,body:{subscription}})},
+      pushUnsubscribe(endpoint){return request('POST','/v1/push/unsubscribe',{auth:true,body:{endpoint}})},
+      pushTest(){return request('POST','/v1/push/test',{auth:true})}
     });
   }
   global.NailoraRuSDK = Object.freeze({normalizeBase,createClient});
@@ -1358,17 +1436,7 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
  </div></section>
 <section id="verifyEmail" class="wrap hidden" style="max-width:720px;padding-top:6vh"><div class="panel verify-panel"><div class="verify-mark" aria-hidden="true">✉</div><h2 class="verify-title">Подтверди электронную почту</h2><p class="verify-subtitle">Остался всего один небольшой шаг, и можно будет пользоваться приложением.</p><p id="verifyEmailMessage" class="verify-intro" aria-live="polite">Мы отправили письмо со ссылкой для подтверждения. Открой его, чтобы подтвердить адрес.</p><div id="ruVerifyCodeArea" class="hidden"><label for="ruVerifyCode">Восьмизначный код из письма</label><input id="ruVerifyCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{8}" placeholder="00000000"><p id="ruVerifyStatus" class="muted small" aria-live="polite"></p></div><ol class="verify-steps" id="verifyEmailSteps"><li><strong>Зайди в свою электронную почту</strong><span>Открой почтовый ящик, который указал при регистрации.</span></li><li><strong>Найди письмо с кодом подтверждения</strong><span>Если его не видно во входящих, загляни в папку «Спам».</span></li><li><strong>Открой письмо и перейди по ссылке</strong><span>Это подтвердит адрес электронной почты.</span></li></ol><p class="verify-note" id="verifyEmailNote">После подтверждения вернись в приложение. Если сессия восстановится успешно, приложение откроет твой профиль автоматически.</p><div class="verify-help small" style="margin-top:16px"><button type="button" id="verifyNoEmailToggle" class="link-button" aria-expanded="false" aria-controls="verifyNoEmailDetails">Письмо не пришло?</button><div id="verifyNoEmailDetails" class="hidden" style="margin-top:10px;padding:14px;border:1px solid #e9dff3;background:#faf7fc;border-radius:12px;text-align:left"><p style="margin:0 0 10px;color:#62566e">Проверь папку «Спам». Если письма там нет, можно отправить ссылку ещё раз здесь. Если аккаунт уже создан, не создавай его повторно.</p><div class="row" style="flex-wrap:wrap"><button type="button" id="resendVerifyEmail" class="btn primary">Отправить письмо ещё раз</button><button type="button" id="verifyBackToRegister" class="btn">Вернуться к регистрации</button></div><p id="verifyHelpStatus" class="muted small" aria-live="polite" style="margin:10px 0 0"></p></div></div></div></section>
 <section id="login" class="wrap hidden" style="max-width:650px;padding-top:5vh"><div class="panel"><h2>Вход в профиль</h2><form id="loginForm">
- <div id="nailoraDiscoverCodePanel" class="hidden" style="border:1px solid var(--border, #ddd);padding:12px;border-radius:12px;margin-bottom:14px">
-  <label for="nailoraDiscoverCode">Код подтверждения из письма</label>
-  <input id="nailoraDiscoverCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Код из письма">
-  <p class="muted small">На новом устройстве сначала подтверждаем email и автоматически находим сервер аккаунта. Пароль в сервис поиска не передаётся.</p>
-  <button type="button" id="nailoraDiscoverFinish" class="btn fixed">Подтвердить email</button>
-  <button type="button" id="nailoraDiscoverCancel" class="btn fixed">Отмена</button>
- </div>
- <div id="nailoraLegacyLogin" class="hidden" style="margin-bottom:12px">
-  <p class="muted small">Сервис автоматического поиска аккаунтов пока не запущен. Если профиль уже был создан в старой версии Nailora на Supabase, можно войти в него напрямую один раз.</p>
-  <button type="button" id="nailoraLoginLegacyGlobal" class="btn fixed">Войти в ранее созданный аккаунт Supabase</button>
- </div><div id="loginRoleRow" class="hidden"><label for="loginRole">Тип аккаунта</label><select id="loginRole"><option value="master">Мастер</option><option value="client">Клиент</option></select></div><label for="loginEmail">Email *</label><input id="loginEmail" type="email" required autocomplete="username" maxlength="254"><label for="loginPassword">Пароль *</label><div class="password-field"><input id="loginPassword" type="password" required autocomplete="current-password" maxlength="128"><button class="password-toggle" type="button" data-password-target="loginPassword" aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 7-.4 1.1-1.2 2.3-2.4 3.4"/><path d="M6.6 6.6C4.5 8 3.1 10.1 2.5 12c.5 1.4 1.5 2.8 3 4 1.7 1.4 3.9 2.3 6.5 2.3 1.1 0 2.1-.2 3-.5"/></svg></button></div><div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn primary fixed" type="submit">Войти</button><button class="btn fixed" id="loginOpenRegister" type="button">Зарегистрироваться</button><button class="btn fixed" id="backLogin" type="button">Назад</button></div><p style="margin:12px 0 0"><button class="link-button" id="forgotPasswordButton" type="button">Забыли пароль?</button></p><p id="loginStatus" class="muted small" aria-live="polite"></p></form></div></section>
+ <div id="loginRoleRow" class="hidden"><label for="loginRole">Тип аккаунта</label><select id="loginRole"><option value="master">Мастер</option><option value="client">Клиент</option></select></div><label for="loginEmail">Email *</label><input id="loginEmail" type="email" required autocomplete="username" maxlength="254"><label for="loginPassword">Пароль *</label><div class="password-field"><input id="loginPassword" type="password" required autocomplete="current-password" maxlength="128"><button class="password-toggle" type="button" data-password-target="loginPassword" aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 7-.4 1.1-1.2 2.3-2.4 3.4"/><path d="M6.6 6.6C4.5 8 3.1 10.1 2.5 12c.5 1.4 1.5 2.8 3 4 1.7 1.4 3.9 2.3 6.5 2.3 1.1 0 2.1-.2 3-.5"/></svg></button></div><div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn primary fixed" type="submit">Войти</button><button class="btn fixed" id="loginOpenRegister" type="button">Зарегистрироваться</button><button class="btn fixed" id="backLogin" type="button">Назад</button></div><p style="margin:12px 0 0"><button class="link-button" id="forgotPasswordButton" type="button">Забыли пароль?</button></p><p id="loginStatus" class="muted small" aria-live="polite"></p></form></div></section>
 <section id="resetPassword" class="wrap hidden" style="max-width:650px;padding-top:5vh"><div class="panel"><h2 id="resetPasswordTitle">Восстановление пароля</h2><div id="requestPasswordReset"><p class="muted">Укажи email аккаунта. Мы отправим письмо со ссылкой для восстановления пароля.</p><form id="requestPasswordResetForm"><label for="resetEmail">Email *</label><input id="resetEmail" type="email" required maxlength="254" autocomplete="email" placeholder="name@example.com"><div class="row" style="margin-top:14px"><button class="btn primary" type="submit" id="sendPasswordResetButton">Отправить ссылку</button><button class="btn" id="backResetRequest" type="button">Назад</button></div><p id="resetRequestStatus" class="muted small" aria-live="polite"></p></form></div><div id="setNewPassword" class="hidden"><p class="muted">Придумай новый пароль для своего аккаунта.</p><form id="setNewPasswordForm"><label for="newPassword">Новый пароль (не менее 8 символов) *</label><input id="newPassword" type="password" minlength="8" maxlength="128" required autocomplete="new-password"><label for="confirmNewPassword">Повтори новый пароль *</label><input id="confirmNewPassword" type="password" minlength="8" maxlength="128" required autocomplete="new-password"><div class="row" style="margin-top:14px"><button class="btn primary" type="submit">Сохранить новый пароль</button></div><p id="newPasswordStatus" class="muted small" aria-live="polite"></p></form></div></div></section>
 <section id="clientApp" class="wrap hidden" style="max-width:850px"><div class="panel"><div class="row profile-header-row"><div class="profile-identity"><img id="clientAvatar" class="profile-avatar-hero hidden" alt="Аватар профиля клиента"><div id="clientAvatarPlaceholder" class="profile-avatar-placeholder" aria-hidden="true">👤</div><div class="profile-nickname" id="clientNickname"></div><p class="profile-greeting" id="clientGreeting"></p></div><div class="header-actions"><button class="btn fixed" id="clientAccount" type="button">Аккаунт и настройки</button></div></div></div>
  <nav class="tabs client-master-tabs" aria-label="Разделы мастеров" style="margin:14px 0 16px"><button class="active" id="clientSearchTab" type="button">Найти мастера</button><button id="clientFavoritesTab" type="button">Мои мастера</button></nav>
@@ -3458,10 +3526,20 @@ const NAILORA_REGION_GLOBAL='global', NAILORA_REGION_RU='ru';
 function nailoraNormalizeCountry(value){return String(value||'').normalize('NFKC').trim().toLocaleLowerCase('ru').replace(/\s+/g,' ')}
 function nailoraIsRussianCountry(value){return ['россия','россии','рф','российская федерация','russia','russian federation','ru','rus'].includes(nailoraNormalizeCountry(value))}
 function nailoraStoredRegion(){
- try{const value=localStorage.getItem(NAILORA_REGION_KEY);return value===NAILORA_REGION_RU||value===NAILORA_REGION_GLOBAL?value:''}catch(_){return ''}
+ try{
+  // An explicit country hint in this test link wins over a stale device cache.
+  // No guessed region, email enumeration or unauthenticated account discovery.
+  const requestedCountry=new URLSearchParams(window.location.search).get('country');
+  if(nailoraIsRussianCountry(requestedCountry)){
+   localStorage.setItem(NAILORA_REGION_KEY,NAILORA_REGION_RU);
+   return NAILORA_REGION_RU;
+  }
+  const value=localStorage.getItem(NAILORA_REGION_KEY);
+  return value===NAILORA_REGION_RU||value===NAILORA_REGION_GLOBAL?value:'';
+ }catch(_){return ''}
 }
 let nailoraActiveRegion=nailoraStoredRegion();
-const NAILORA_REGION_RESOLVER_BASE=''; // Set to the HTTPS domain AFTER secure email OTP service is deployed.
+const NAILORA_UNIFIED_HANDOFF='nailora_unified_session_v1';
 const NAILORA_EMAIL_REGION_CACHE='nailora_verified_region_by_email_v899';
 function nailoraEmailKey(email){return String(email||'').trim().toLowerCase()}
 // This is a convenience cache, NOT proof of account ownership. Never route from IP address.
@@ -3479,6 +3557,9 @@ function nailoraKnownEmailRegion(email,role){
 function nailoraChangeRegion(region){
  if(![NAILORA_REGION_RU,NAILORA_REGION_GLOBAL].includes(region))throw new Error('Неизвестный регион');
  if(nailoraActiveRegion&&nailoraActiveRegion!==region){
+  if(nailoraActiveRegion===NAILORA_REGION_RU && region===NAILORA_REGION_GLOBAL){
+   try{ruApiClient?.clearSession()}catch(_){}
+  }
   // Avoid reusing already loaded caches, sessions and SDK clients across regions.
   try{
    const isRegister=currentScreen==='register';
@@ -3530,18 +3611,6 @@ function nailoraRefreshRegionUi(){
 nailoraRefreshRegionUi();
 $('regCountry')?.addEventListener('input',nailoraRefreshRegionUi);
 
-// Email discovery requires a server-side verified one-time code. An unauthenticated
-// email->region lookup would reveal whether someone is registered. Passwords NEVER
-// travel to this service. Endpoints remain unavailable until VPS & email sender setup.
-async function nailoraDiscoveryRequest(path,payload){
- const base=String(NAILORA_REGION_RESOLVER_BASE||'').trim();
- if(!base)throw new Error('Сервис поиска аккаунта ещё не подключён');
- const url=new URL(base);
- if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/')throw new Error('Неверный HTTPS адрес сервиса');
- const response=await fetch(url.origin+path,{method:'POST',credentials:'omit',cache:'no-store',redirect:'error',mode:'cors',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)});
- if(!response.ok)throw new Error(response.status===429?'Слишком много запросов. Попробуй позже.':'Не удалось подтвердить email. Попробуй позже.');
- return response.json();
-}
 const nailoraRuCacheSuffix=nailoraActiveRegion===NAILORA_REGION_RU?'_ru_v898':'';
 const ROLE_KEY='manicureRoleProfiles_v1'+nailoraRuCacheSuffix, REQUEST_KEY='manicureClientRequests_v1'+nailoraRuCacheSuffix, SETTINGS_KEY='manicureUiSettings_v1'+nailoraRuCacheSuffix, REMINDER_SENT_KEY='nailoraReminderSent_v1'+nailoraRuCacheSuffix, ACTIVE_ROLE_KEY='nailoraActiveRole_v1'+nailoraRuCacheSuffix;
 const CURRENCY_SYMBOLS={RUB:'₽',EUR:'€',USD:'$',GBP:'£',PLN:'zł',UAH:'₴',TRY:'₺',KZT:'₸',CZK:'Kč',CHF:'CHF'};
@@ -3627,7 +3696,7 @@ let cloud=null,cloudUser=null,cloudMasterDirectory=[],cloudFavoriteMasters=[],se
 // RU client integration (staging). The account server stays separate from the service-location server.
 const RU_STAGE_LIVE_BOOKINGS=true; // Step 05: live RU appointments via authenticated POST /v1/appointments.
 const RU_CLIENT_PROFILE_CACHE='manicureRoleProfiles_v1_ru_v898';
-let ruApiClient=null,ruSelectedMasterId='',ruServices=[],ruSelectedServiceId='',ruDaySequence=0,ruAvailableStarts=[],ruAvailableContext='',ruBookingRequest=null;
+let ruApiClient=null,ruSelectedMasterId='',ruServices=[],ruMasterCurrency='RUB',ruSelectedServiceId='',ruDaySequence=0,ruAvailableStarts=[],ruAvailableContext='',ruBookingRequest=null;
 function ruSdk(){
   if(!ruApiClient){
     ruApiClient=window.NailoraRuSDK.createClient({
@@ -3670,10 +3739,170 @@ async function ruOpenClientAccount(email){
   void ruLoadMyBookings();
   setCloudStatus('Профиль клиента открыт');
 }
+// RU MASTER READ-ONLY TEST. Only server-authenticated, linked master data is shown.
+// No fallback to local cache or Supabase; never write a server snapshot to localStorage.
+function ruMasterReadOnly(){return ruIsAccount()&&activeRole==='master';}
+function ruMasterReadOnlyNotice(){showAppToast('Российский кабинет мастера пока только для просмотра. Изменения не сохранены.');}
+function ruRequireArray(value,label){if(!Array.isArray(value))throw new Error('Неполные данные российского сервера: '+label);return value;}
+async function ruOpenMasterAccount(email,verifiedMe){
+  const me=verifiedMe?.master_data ? verifiedMe : await ruSdk().me({include_master:true});
+  const p=ruProfileData(me,'master');
+  if(!p||!p.profile_id)throw new Error('Профиль мастера не привязан к этой учётной записи. Данные не изменены.');
+  const snap=me?.master_data;
+  if(!snap?.profile || String(snap.profile.id)!==String(p.profile_id))
+    throw new Error('Сервер не подтвердил принадлежность профиля мастера. Данные не изменены.');
+  const schedule=snap.schedule_data;
+  if(!schedule || typeof schedule!=='object' || Array.isArray(schedule))
+    throw new Error('Сервер не вернул расписание мастера. Локальный календарь не подставляем.');
+  const remoteAppointments=ruRequireArray(snap.appointments,'записи');
+  const remoteServices=ruRequireArray(snap.services,'услуги');
+  // Fail closed: the finance screen must never present empty/local expenses
+  // as confirmed server data if fetching the real expense list failed.
+  const expenseResponse=await ruSdk().listExpenses();
+  const remoteExpenses=ruRequireArray(expenseResponse?.items,'расходы').map(x=>{
+    if(!/^[0-9a-f-]{36}$/i.test(String(x?.id||''))||
+       !/^\d{4}-\d{2}-\d{2}$/.test(String(x?.date||''))||
+       !Number.isFinite(Number(x?.amount))||Number(x.amount)<=0)
+      throw new Error('Сервер вернул некорректный расход.');
+    return {id:String(x.id),date:x.date,category:String(x.category||''),
+            amount:Number(x.amount),note:String(x.note||'')};
+  });
+  // Convert only authoritative server fields; local_date/local_time come from the master's time zone.
+  const appointments=remoteAppointments.map(a=>{
+    if(!a||typeof a.id!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(a.local_date||'')||
+       !/^([01]\d|2[0-3]):[0-5]\d$/.test(a.local_time||''))
+      throw new Error('Сервер вернул запись с некорректной датой или временем.');
+    return {
+      id:String(a.id), cloudId:'', _ruServer:true, source:'client-booking',
+      name:String(a.client_name||'Клиент'),phone:String(a.client_phone||''),
+      service:String(a.service_name||''),date:a.local_date,time:a.local_time,
+      durationMinutes:Number(a.duration_minutes)||60,price:Number(a.price)||0,
+      paid:a.paid===true,notes:String(a.notes||''),
+      status:normalizeAppointmentStatus(a.status),
+      photos:Array.isArray(a.photos)?a.photos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS):[]
+    };
+  });
+  const services=remoteServices.map(x=>({
+    id:String(x.id),name:String(x.name||''),durationMinutes:Number(x.duration_minutes)||60,
+    price:Number(x.price)||0
+  }));
+  const owner=snap.profile;
+  const accountEmail=String(email||me.email||'').trim().toLowerCase();
+  profiles.master={
+    name:String(owner.name||''),phone:String(owner.phone||''),
+    city:String(owner.city||''),country:'Россия',area:String(owner.area||''),
+    address:String(owner.address||''),specialty:String(owner.specialty||''),
+    activityDirection:String(owner.activity_direction||''),
+    avatar:String(owner.avatar_url||''),avatarUrl:String(owner.avatar_url||''),
+    publicPhoneConsent:owner.phone_publication_consent===true,
+    email:accountEmail,profileId:p.profile_id,cloudId:'',currency:(CURRENCY_CODES.includes(String(schedule.currency||'RUB').toUpperCase())?String(schedule.currency||'RUB').toUpperCase():'RUB'),language:currentLanguage
+  };
+  // Do not merge yesterday's browser data with a real server calendar.
+  data={
+    clients:[],appointments,expenses:remoteExpenses,
+    daysOff:Array.isArray(schedule.daysOff)?[...schedule.daysOff]:[],
+    monthlyHours:schedule.monthlyHours&&typeof schedule.monthlyHours==='object'&&!Array.isArray(schedule.monthlyHours)?structuredClone(schedule.monthlyHours):{},
+    availabilityByDate:schedule.availabilityByDate&&typeof schedule.availabilityByDate==='object'&&!Array.isArray(schedule.availabilityByDate)?structuredClone(schedule.availabilityByDate):{},
+    blockedSlots:Array.isArray(schedule.blockedSlots)?structuredClone(schedule.blockedSlots):[],
+    services
+  };
+  nailoraRememberEmailRegion(accountEmail,NAILORA_REGION_RU);
+  await openRole('master');
+  renderAll();
+  setCloudStatus('Профиль мастера открыт · российские записи и расходы загружены');
+}
+// Intercept all master edit controls at the capturing phase. Allow navigation, day selection and logout.
+document.addEventListener('click',event=>{
+  if(!ruMasterReadOnly())return;
+  const button=event.target?.closest?.('#masterApp button');
+  if(!button)return;
+  if(button.matches('[data-tab],#prev,#next,#todayBtn,#masterAccount,#saveMonthHours'))return;
+  // Разрешаем только существующие кнопки окна ручного напоминания.
+  if(button.closest('#clientReminderDialog') &&
+     ['clientReminderOpenSms','clientReminderCopy',
+      'closeClientReminder','clientReminderCloseBottom'].includes(button.id))return;
+
+  if(button.closest('#daySchedule') && /^unblockSlot\('[0-9a-fA-F-]{36}'\)$/.test(button.getAttribute('onclick')||''))return;
+  // Разрешаем напоминание только для подтверждённой серверной записи.
+  const reminderMatch=(button.getAttribute('onclick')||'').match(/^remindAppointment\('([0-9a-fA-F-]{36})'\)$/);
+  if(reminderMatch){
+    const appointment=data.appointments.find(x=>String(x.id)===reminderMatch[1]);
+    if(appointment?._ruServer===true &&
+       ['booked','completed'].includes(normalizeAppointmentStatus(appointment.status)) &&
+       String(appointment.phone||'').trim())return;
+  }
+  // Financial writes are routed to PostgreSQL; all other master writes remain blocked.
+  if(button.closest('#expenseForm')&&button.type==='submit')return;
+  if(button.closest('#finance')&&button.getAttribute('onclick')?.startsWith('deleteExpense('))return;
+  // Authorize only cancelling a real server-owned, still booked appointment.
+  const cancelMatch=(button.getAttribute('onclick')||'').match(/^cancelMasterAppointment\('([0-9a-fA-F-]{36})'\)$/);
+  if(cancelMatch){
+    const a=data.appointments.find(x=>String(x.id)===cancelMatch[1]);
+    if(a?._ruServer===true && normalizeAppointmentStatus(a.status)==='booked')return;
+  }
+  const editMatch=(button.getAttribute('onclick')||'').match(/^editAppointment\('([0-9a-fA-F-]{36})'\)$/);
+  if(editMatch){
+    const appointment=data.appointments.find(x=>String(x.id)===editMatch[1]);
+    if(appointment?._ruServer===true &&
+       ['booked','completed'].includes(normalizeAppointmentStatus(appointment.status)))return;
+  }
+  if(button.closest('#appointmentForm')){
+    const id=String($('appointmentId').value||'');
+    if(!id)return; // Existing form: allow creation, keep editing permission guard
+    const appointment=data.appointments.find(x=>String(x.id)===id);
+    if(appointment?._ruServer===true &&
+       ['booked','completed'].includes(normalizeAppointmentStatus(appointment.status)))return;
+  }
+  if(button.closest('#daySchedule') &&
+     /^(?:togglePaid|toggleAppointmentCompleted)\('[0-9a-fA-F-]{36}'\)$/.test(button.getAttribute('onclick')||''))return;
+  if(button.closest('#calendarGrid')&&button.classList.contains('day'))return;
+  event.preventDefault();event.stopImmediatePropagation();ruMasterReadOnlyNotice();
+},true);
+document.addEventListener('submit',event=>{
+  if(!ruMasterReadOnly())return;
+  if(event.target?.id==='expenseForm')return;
+  if(event.target?.id==='appointmentForm'){
+    const id=String(event.target.querySelector('#appointmentId')?.value||'');
+    if(!id)return; // Existing form submits to the new verified master endpoint
+    const appointment=data.appointments.find(x=>String(x.id)===id);
+    if(appointment?._ruServer===true &&
+       ['booked','completed'].includes(normalizeAppointmentStatus(appointment.status)))return;
+  }
+  if(event.target?.closest?.('#masterApp,#availabilityDialog')){
+    event.preventDefault();event.stopImmediatePropagation();ruMasterReadOnlyNotice();
+  }
+},true);
+
 // RU read-only booking list lives in memory and feeds the EXISTING calendar.
 // Never reuse Supabase/local browser bookings as evidence of a Russian booking.
 let ruOwnBookings=[],ruBookingsLoadSequence=0,ruMasterTimeZone='',ruEditBookingId='',ruBookingEditingNoteId='',ruNoteSaving=false,ruCancelPendingIds=new Set(),ruAvailableByService=new Map();
 const ruDaySummary=new Map();
+// Share only pending availability GET requests; never cache booking or completed responses.
+const ruAvailabilityInFlight=new Map();
+function ruSharedAvailability(masterId,date,serviceId){
+ const key=masterId+'|'+date+'|'+serviceId;
+ let pending=ruAvailabilityInFlight.get(key);
+ if(!pending){
+  pending=ruSdk().availability(masterId,date,serviceId)
+   .finally(()=>{if(ruAvailabilityInFlight.get(key)===pending)ruAvailabilityInFlight.delete(key);});
+  ruAvailabilityInFlight.set(key,pending);
+ }
+ return pending;
+}
+// Avoid flooding the mobile browser with availability requests for all services.
+async function ruSelectedDayAvailability(masterId,date,services){
+ const responses=new Array(services.length);
+ let next=0;
+ async function worker(){
+  while(next<services.length){
+   const i=next++;
+   try{responses[i]={status:'fulfilled',value:await ruSharedAvailability(masterId,date,services[i].id)};}
+   catch(reason){responses[i]={status:'rejected',reason};}
+  }
+ }
+ await Promise.all(Array.from({length:Math.min(3,services.length)},()=>worker()));
+ return responses;
+}
 let ruOverviewSequence=0;
 const RU_OVERVIEW_CACHE_MS=90*1000;
 function ruSafeIntervals(list){
@@ -3690,7 +3919,7 @@ async function ruReadCalendarOverview(masterId,date,services){
  let work=[],tz='',allOff=true,seen=0,anyFree=false,allChecked=true,explicitBusy=false;
  for(const service of services){
   let data;
-  try{data=await ruSdk().availability(masterId,date,service.id);}catch(_){allChecked=false;continue;}
+  try{data=await ruSharedAvailability(masterId,date,service.id);}catch(_){allChecked=false;continue;}
   if(!data||!Array.isArray(data.available_starts)){allChecked=false;continue;}
   seen++;
   const starts=ruStartList(data.available_starts);
@@ -3708,6 +3937,7 @@ async function ruReadCalendarOverview(masterId,date,services){
 async function ruLoadCalendarOverview(dates,masterId,sequence){
  if(!dates.length||!masterId||!ruServices.length)return;
  const now=Date.now(),due=dates.filter(date=>{
+  if(date===clientSelectedDate)return false; // Selected date is loaded separately with all services.
   const summary=ruDaySummary.get(masterId+'|'+date);
   return !summary?.loaded_at||now-summary.loaded_at>RU_OVERVIEW_CACHE_MS;
  });
@@ -3729,7 +3959,7 @@ async function ruLoadCalendarOverview(dates,masterId,sequence){
    ruPaintCalendarDays();
   }
  }
- await Promise.all(Array.from({length:Math.min(4,due.length)},()=>worker()));
+ await Promise.all(Array.from({length:Math.min(2,due.length)},()=>worker()));
 }
 function ruMasterLocalTime(value){
   if(!ruMasterTimeZone||!value)return null;
@@ -3806,9 +4036,13 @@ async function ruLoadMyBookings(){
 }
 
 async function ruLogin(email,password,role,status){
-  if(role!=='client')throw new Error('Вход мастера ещё не подключён к серверному календарю. Данные мастера не изменены.');
+  if(role!=='master'&&role!=='client')throw new Error('Некорректная роль профиля.');
   await ruSdk().login(email,password);
-  try{await ruOpenClientAccount(email)}catch(err){ruSdk().clearSession();throw err}
+  try{if(role==='master')await ruOpenMasterAccount(email);else await ruOpenClientAccount(email)}catch(err){
+    // Keep a valid server session if a transient network timeout interrupted /v1/me.
+    if(err?.status===401 || err?.status===403)ruSdk().clearSession();
+    throw err;
+  }
   $('loginPassword').value='';
   if(status)status.textContent='Вход выполнен';
 }
@@ -3885,22 +4119,22 @@ async function syncRoleTimezoneToCloud(role=activeRole){
 }
 async function syncMasterTimezoneToCloud(){return syncRoleTimezoneToCloud('master')}
 async function syncClientTimezoneToCloud(){return syncRoleTimezoneToCloud('client')}
-async function loginWithSupabase(email,password,role){
+async function loginWithSupabaseSession(email,session,role){
  if(!nailoraRegionAllowed('Вход'))throw new Error('Зарубежная авторизация недоступна для выбранного региона.');
  if(!cloud)throw new Error('Библиотека Supabase не загрузилась. Проверь интернет и перезагрузи страницу.');
  try{
-  // Close any lingering prior session before using the explicitly selected login.
-  const {error:priorSignOutError}=await cloud.auth.signOut();
-  if(priorSignOutError)console.warn('Previous session sign-out:',priorSignOutError.message);
-  const {data:authData,error}=await cloud.auth.signInWithPassword({email,password});
+  const {data:authData,error}=await cloud.auth.setSession({access_token:session.access_token,refresh_token:session.refresh_token});
   if(error)throw error;
   cloudUser=authData.user;
+  if(!cloudUser||nailoraEmailKey(cloudUser.email)!==email)throw new Error('Сервер не подтвердил аккаунт.');
+  if(nailoraEmailKey(profiles[role]?.email)!==email)profiles[role]={};
   const table=role==='master'?'masters':'clients';
   let {data:row,error:rowError}=await cloud.from(table).select('*').eq('auth_user_id',cloudUser.id).maybeSingle();
   if(rowError)throw rowError;
   if(nailoraIsRussianCountry(row?.country||cloudUser.user_metadata?.country))throw new Error('Этот аккаунт относится к России. Для него потребуется перенос в российскую базу. Используй прежнюю v8.96, пока перенос не закончен.');
   if(!row){
    const meta=cloudUser.user_metadata||{};
+   if(meta.role!==role)throw new Error('Профиль для выбранной роли не найден.');
    const candidate={...profiles[role],publicPhoneConsent:role==='master'&&meta.phone_publication_consent===true,name:meta.name||profiles[role]?.name||'',phone:meta.phone||profiles[role]?.phone||'',country:meta.country||profiles[role]?.country||'',city:meta.city||profiles[role]?.city||'',area:meta.area||profiles[role]?.area||'',address:meta.address||profiles[role]?.address||'',specialty:meta.specialty||profiles[role]?.specialty||'',email:cloudUser.email};
    if(!candidate.name||!candidate.city||!candidate.country)throw new Error('Профиль для выбранной роли не найден. Проверь тип аккаунта и email.');
    await ensureCloudProfile(role,candidate,cloudUser);
@@ -3921,74 +4155,51 @@ async function loginWithSupabase(email,password,role){
   throw err;
  }
 }
-let nailoraPendingEmailDiscovery='';
-async function nailoraGlobalLogin(email,password,role,status){
- if(!nailoraChangeRegion(NAILORA_REGION_GLOBAL))return;
- await nailoraEnsureGlobalCloud();
- await loginWithSupabase(email,password,role);
- nailoraRememberEmailRegion(email,NAILORA_REGION_GLOBAL);
- status.textContent='Вход выполнен.';
-}
+// A single authenticated request selects the account server. Never persist a password.
+let nailoraLoginSubmitInFlight=false;
 $('loginForm').onsubmit=async e=>{
  e.preventDefault();
- const status=$('loginStatus'),role=$('loginRole').value,email=$('loginEmail').value.trim().toLowerCase(),password=$('loginPassword').value;
- chosenRole=role;
- $('nailoraLegacyLogin').classList.add('hidden');
- if(!email||!password){status.textContent='Введи email и пароль.';return;}
-  const known=nailoraKnownEmailRegion(email,role);
- // An email previously verified on a given server takes precedence over the
- // last region used on this device. Never send a known global login to RU.
- if(known===NAILORA_REGION_GLOBAL){
-  if(!nailoraChangeRegion(NAILORA_REGION_GLOBAL))return;
-  status.textContent='Выполняю вход…';
-  try{await nailoraGlobalLogin(email,password,role,status)}catch(err){status.textContent='Не удалось войти: '+(err?.message||'проверь email и пароль')}
-  return;
- }
- if(known===NAILORA_REGION_RU || ruIsAccount()){
-  if(!nailoraChangeRegion(NAILORA_REGION_RU))return;
-  status.textContent='Выполняю вход…';
-  try{await ruLogin(email,password,role,status)}
-  catch(err){
-    status.textContent='Не удалось войти: '+(err?.message||'ошибка сервера');
-    // The same, pre-existing Supabase-login action remains reachable when an
-    // unrecognized email was attempted on the Russian server.
-    $('nailoraLegacyLogin').classList.remove('hidden');
-  }
-  return;
- }
- if(!NAILORA_REGION_RESOLVER_BASE){
-  status.textContent='Для этого email регион пока не определён. На новом устройстве потребуется проверка через сервер, который ещё не активирован.';
-  $('nailoraLegacyLogin').classList.remove('hidden');return;
- }
- status.textContent='Для первого входа на этом устройстве отправляем код подтверждения на email…';
+ if(nailoraLoginSubmitInFlight)return;
+ const status=$('loginStatus'),role=$('loginRole').value,email=nailoraEmailKey($('loginEmail').value);
+ const password=$('loginPassword').value;
+ if(!email||!password||!['master','client'].includes(role)){status.textContent='Введи email и пароль.';return;}
+ nailoraLoginSubmitInFlight=true;
+ const button=$('loginForm').querySelector('button[type="submit"]');
+ if(button)button.disabled=true;
+ status.textContent='Выполняю вход…';
+ const controller=new AbortController();
+ const timeout=setTimeout(()=>controller.abort(),25000);
  try{
-  await nailoraDiscoveryRequest('/v1/account-region/start',{email});
-  nailoraPendingEmailDiscovery=email;
-  $('nailoraDiscoverCodePanel').classList.remove('hidden');
-  status.textContent='Если адрес зарегистрирован в сервисе поиска, код отправлен на почту. Введи его ниже.';
-  $('nailoraLegacyLogin').classList.remove('hidden');
- }catch(err){status.textContent=err.message||'Ошибка определения сервера';$('nailoraLegacyLogin').classList.remove('hidden')}
-};
-$('nailoraDiscoverFinish').onclick=async function(){
- const status=$('loginStatus'),email=nailoraPendingEmailDiscovery,code=$('nailoraDiscoverCode').value.trim();
- if(!email||!/^\d{6,8}$/.test(code)){status.textContent='Введи код из письма.';return}
- this.disabled=true;
- try{
-  const answer=await nailoraDiscoveryRequest('/v1/account-region/finish',{email,code});
-  if(![NAILORA_REGION_RU,NAILORA_REGION_GLOBAL].includes(answer?.region))throw new Error('Профиль не найден или код недействителен.');
-  nailoraRememberEmailRegion(email,answer.region);
-  $('nailoraDiscoverCodePanel').classList.add('hidden');
-  if(answer.region===NAILORA_REGION_RU){if(nailoraChangeRegion(NAILORA_REGION_RU))nailoraRegionAllowed('Вход');return}
-  await nailoraGlobalLogin(email,$('loginPassword').value,$('loginRole').value,status);
- }catch(err){status.textContent=err.message||'Не удалось подтвердить email'}
- finally{this.disabled=false}
-};
-$('nailoraDiscoverCancel').onclick=()=>{nailoraPendingEmailDiscovery='';$('nailoraDiscoverCode').value='';$('nailoraDiscoverCodePanel').classList.add('hidden');$('nailoraLegacyLogin').classList.remove('hidden');$('loginStatus').textContent='Можно повторить поиск или использовать старый аккаунт Supabase.'};
-$('nailoraLoginLegacyGlobal').onclick=async function(){
- const status=$('loginStatus');this.disabled=true;status.textContent='Проверяю существующий аккаунт Supabase…';
- try{await nailoraGlobalLogin($('loginEmail').value.trim().toLowerCase(),$('loginPassword').value,$('loginRole').value,status)}
- catch(err){status.textContent='Не удалось войти в прежний аккаунт: '+(err.message||'ошибка входа')}
- finally{this.disabled=false}
+   const res=await fetch(window.NAILORA_RU_API_BASE+'/v1/auth/login-unified',{
+     method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+     body:JSON.stringify({email,password}),credentials:'omit',mode:'cors',
+     cache:'no-store',redirect:'error',signal:controller.signal
+   });
+   const answer=await res.json();
+   if(!res.ok)throw new Error(res.status===401?'Неверные данные для входа':res.status===429?'Слишком много попыток. Повтори позже.':'Сервис входа временно недоступен.');
+   if(answer?.success!==true||!['ru','global'].includes(answer.region)||
+      typeof answer.access_token!=='string'||!answer.access_token||
+      (answer.region==='global'&&(typeof answer.refresh_token!=='string'||!answer.refresh_token)))
+      throw new Error('Некорректный ответ сервера входа.');
+   const handoff={region:answer.region,role,email,access_token:answer.access_token,
+     refresh_token:answer.region==='global'?answer.refresh_token:null,expires_in:answer.expires_in,until:Date.now()+90000};
+   try{
+     sessionStorage.setItem(NAILORA_UNIFIED_HANDOFF,JSON.stringify(handoff));
+     sessionStorage.removeItem('nailora_after_region_switch_v899');
+     localStorage.setItem(NAILORA_REGION_KEY,answer.region);
+     const url=new URL(location.href);url.searchParams.delete('country');url.hash='';
+     history.replaceState(null,'',url.href);
+   }catch(_){
+     try{sessionStorage.removeItem(NAILORA_UNIFIED_HANDOFF)}catch(_){}
+     throw new Error('Браузер не разрешил сохранить сессию входа.');
+   }
+   $('loginPassword').value='';
+   location.reload();
+ }catch(err){
+   status.textContent=controller.signal.aborted?'Сервис входа не ответил. Проверь соединение и повтори попытку.':'Не удалось войти: '+(err?.message||'ошибка сервера');
+ }finally{
+   clearTimeout(timeout);nailoraLoginSubmitInFlight=false;if(button)button.disabled=false;
+ }
 };
 function confirmationEmailRedirectOptions(){const emailRedirectTo=getEmailRedirectUrl();return emailRedirectTo?{emailRedirectTo}:{}};
 const PENDING_VERIFICATION_KEY='nailora_pending_verification_v837';
@@ -4375,18 +4586,54 @@ function nailoraShowResumedLogin(){
   $('loginEmail').value=String(p.email||'').trim();
   $('loginStatus').textContent='Сервер входа выбран. Введи пароль ещё раз.';
 }
+// Consume the authenticated one-use handoff before any prior profile is restored.
+let nailoraUnifiedHandoff=null;
+try{
+ const raw=sessionStorage.getItem(NAILORA_UNIFIED_HANDOFF);
+ sessionStorage.removeItem(NAILORA_UNIFIED_HANDOFF);
+ if(raw){
+   const p=JSON.parse(raw);
+   if(p?.region===nailoraActiveRegion&&['ru','global'].includes(p.region)&&
+      ['client','master'].includes(p.role)&&typeof p.email==='string'&&
+      typeof p.access_token==='string'&&p.until>Date.now())nailoraUnifiedHandoff=p;
+ }
+}catch(_){}
+async function nailoraCompleteUnifiedLogin(p){
+ prepareLogin(p.role);
+ $('loginEmail').value=p.email;
+ $('loginStatus').textContent='Загружаю профиль…';
+ try{
+   if(p.region==='ru'){
+     ruSdk().adoptSession(p.access_token,p.expires_in);
+     if(p.role==='master')await ruOpenMasterAccount(p.email);else await ruOpenClientAccount(p.email);
+   }else{
+     await nailoraEnsureGlobalCloud();
+     await loginWithSupabaseSession(p.email,p,p.role);
+   }
+   nailoraRememberEmailRegion(p.email,p.region);
+   $('loginStatus').textContent='Вход выполнен.';
+ }catch(err){
+   if(p.region==='ru')ruSdk().clearSession();
+   activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);
+   prepareLogin(p.role);$('loginEmail').value=p.email;
+   $('loginStatus').textContent='Не удалось открыть профиль: '+(err?.message||'ошибка сервера');
+ }finally{document.body.classList.remove('auth-pending');}
+}
 // Fast path: render the last locally saved profile before the remote Auth SDK finishes loading.
 // bootCloudAuth validates the persisted Supabase session and switches to welcome only if needed.
 try{
  const lastRole=localStorage.getItem(ACTIVE_ROLE_KEY);
- if(nailoraActiveRegion===NAILORA_REGION_GLOBAL&&(lastRole==='master'||lastRole==='client')&&profiles[lastRole]&&!nailoraIsRussianCountry(profiles[lastRole].country)){
+ if(!nailoraUnifiedHandoff&&nailoraActiveRegion===NAILORA_REGION_GLOBAL&&(lastRole==='master'||lastRole==='client')&&profiles[lastRole]&&!nailoraIsRussianCountry(profiles[lastRole].country)){
   activeRole=lastRole;chosenRole=lastRole;
    queueMicrotask(() => openRole(lastRole).catch(err => console.warn('Cached profile restore failed:', err)));
   setCloudStatus('Восстанавливаю сохранённый профиль…');
  }
 }catch(cacheRestoreError){console.warn('Local profile fast restore failed:',cacheRestoreError)}
 // v8.97: no Supabase requests while Russia (or no region) is selected.
-if(nailoraActiveRegion===NAILORA_REGION_GLOBAL){
+if(nailoraUnifiedHandoff){
+ const p=nailoraUnifiedHandoff;nailoraUnifiedHandoff=null;
+ void nailoraCompleteUnifiedLogin(p);
+}else if(nailoraActiveRegion===NAILORA_REGION_GLOBAL){
  window.__nailoraLoadSupabase().then(ok=>{
   if(ok)startNailoraCloud();
   else{setCloudStatus('Зарубежная база временно недоступна. Проверь интернет.');showOnly('welcome');document.body.classList.remove('auth-pending');}
@@ -4405,6 +4652,32 @@ if(nailoraActiveRegion===NAILORA_REGION_GLOBAL){
   }else {showOnly('welcome');nailoraShowResumedLogin();}
   document.body.classList.remove('auth-pending');
   setCloudStatus('Выбери «Я мастер» или «Я клиент», затем войди или создай профиль.');
+  // On F5, verify a saved tab session with the server before opening the RU profile.
+  // Never trust local profile cache as proof of authentication.
+  if(nailoraActiveRegion===NAILORA_REGION_RU && !pending && ruSdk().isAuthenticated()){
+    void (async()=>{
+      try{
+        setCloudStatus('Восстанавливаю российский профиль…');
+        const basic=await ruSdk().me();
+        const last=localStorage.getItem(ACTIVE_ROLE_KEY);
+        if(last==='master'&&ruProfileData(basic,'master'))await ruOpenMasterAccount('');
+        else if(ruProfileData(basic,'client'))await ruOpenClientAccount('');
+        else if(ruProfileData(basic,'master'))await ruOpenMasterAccount('');
+        else throw new Error('У российской учётной записи нет связанного профиля.');
+      }catch(err){
+        if(err?.status===401||err?.status===403)ruSdk().clearSession();
+        console.warn('Russian session restore failed:',err?.message||'unknown');
+        if(!activeRole){
+          prepareLogin(localStorage.getItem(ACTIVE_ROLE_KEY)==='master'?'master':'client');
+          const lastEmail=String(profiles[chosenRole]?.email||'').trim();
+          if(lastEmail)$('loginEmail').value=lastEmail;
+          $('loginStatus').textContent=err?.code==='RU_TIMEOUT'
+            ?'Не удалось восстановить соединение с российским сервером. Нажми «Войти», чтобы повторить попытку.'
+            :'Сессия не восстановилась. Введи пароль для входа.';
+        }
+      }
+    })();
+  }
 }
 async function openRole(role){
  activeRole=role;chosenRole=role;
@@ -4413,7 +4686,7 @@ async function openRole(role){
   selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;
   cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';
   // Never reuse a previous account's selected master, availability or bookings.
-  ++ruDaySequence;ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';
+  ++ruDaySequence;ruSelectedMasterId='';ruServices=[];ruMasterCurrency='RUB';ruSelectedServiceId='';
   ruAvailableStarts=[];ruAvailableContext='';ruBookingRequest=null;ruEditBookingId='';
  }
  setLanguage(profiles[role]?.language||currentLanguage);
@@ -4440,7 +4713,7 @@ async function openRole(role){
  }
 }
 async function logout(){
- if(ruIsAccount()){++ruBookingsLoadSequence;++ruDaySequence;ruOwnBookings=[];ruDaySummary.clear();ruMasterTimeZone='';ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';ruAvailableStarts=[];ruAvailableContext='';ruBookingRequest=null;ruEditBookingId='';ruBookingEditingNoteId='';selectedClientMasterKey='';if($('settingsDialog').open)$('settingsDialog').close();try{await ruSdk().logout()}catch(_){}activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);showOnly('welcome');setCloudStatus('Выход выполнен');return;}
+ if(ruIsAccount()){++ruBookingsLoadSequence;++ruDaySequence;ruOwnBookings=[];ruDaySummary.clear();ruMasterTimeZone='';ruSelectedMasterId='';ruServices=[];ruMasterCurrency='RUB';ruSelectedServiceId='';ruAvailableStarts=[];ruAvailableContext='';ruBookingRequest=null;ruEditBookingId='';ruBookingEditingNoteId='';selectedClientMasterKey='';if($('settingsDialog').open)$('settingsDialog').close();try{await ruSdk().logout()}catch(_){}activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);showOnly('welcome');setCloudStatus('Выход выполнен');return;}
  if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=null;
  if($('settingsDialog').open)$('settingsDialog').close();
  setCloudStatus('Выхожу из аккаунта…');
@@ -4456,7 +4729,7 @@ async function logout(){
  }
 }
 
-function openSettings(){if(!activeRole)return;const p=profiles[activeRole]||{};renderProfileAvatar(activeRole);$('settingsLanguageChoice').value=p.language||currentLanguage;$('settingsRoleLabel').textContent=t(activeRole==='master'?'Тип аккаунта: Мастер':'Тип аккаунта: Клиент');$('settingsName').value=p.name||'';$('settingsPhone').value=p.phone||'';$('settingsPublicPhoneConsent').checked=activeRole==='master'&&p.publicPhoneConsent===true;updateNailoraPhoneConsentStatus();$('settingsCountry').value=p.country||'';$('settingsCity').value=p.city||p.area||'';$('settingsMasterFields').classList.toggle('hidden',activeRole!=='master');$('masterReminderSettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencySettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencyChoice').value=CURRENCY_CODES.includes(String((profiles.master||{}).currency||'RUB').toUpperCase())?String((profiles.master||{}).currency||'RUB').toUpperCase():'RUB';$('settingsAddress').required=activeRole==='master';$('settingsArea').value=p.area||'';$('settingsAddress').value=p.address||'';$('settingsSpecialty').value=p.specialty||'';$('settingsActivityDirection').value=p.activityDirection||'Маникюр и педикюр';const reminderPrefs=getMasterReminderPrefs();$('masterRemindersEnabled').checked=!!reminderPrefs.enabled;$('masterReminderLeadTime').value=String(reminderPrefs.minutes||60);$('masterReminderLeadTime').disabled=!reminderPrefs.enabled;refreshNotificationPermissionStatus();applyUiSettings();if(typeof $('settingsDialog').showModal==='function')$('settingsDialog').showModal();else $('settingsDialog').setAttribute('open','');refreshPushSettingsStatus()}
+function openSettings(){if(!activeRole)return;if(ruIsAccount()&&activeRole==='master')ruReminderState=null;const p=profiles[activeRole]||{};renderProfileAvatar(activeRole);$('settingsLanguageChoice').value=p.language||currentLanguage;$('settingsRoleLabel').textContent=t(activeRole==='master'?'Тип аккаунта: Мастер':'Тип аккаунта: Клиент');$('settingsName').value=p.name||'';$('settingsPhone').value=p.phone||'';$('settingsPublicPhoneConsent').checked=activeRole==='master'&&p.publicPhoneConsent===true;updateNailoraPhoneConsentStatus();$('settingsCountry').value=p.country||'';$('settingsCity').value=p.city||p.area||'';$('settingsMasterFields').classList.toggle('hidden',activeRole!=='master');$('masterReminderSettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencySettings').classList.toggle('hidden',activeRole!=='master');$('masterCurrencyChoice').value=CURRENCY_CODES.includes(String((profiles.master||{}).currency||'RUB').toUpperCase())?String((profiles.master||{}).currency||'RUB').toUpperCase():'RUB';$('settingsAddress').required=activeRole==='master';$('settingsArea').value=p.area||'';$('settingsAddress').value=p.address||'';$('settingsSpecialty').value=p.specialty||'';$('settingsActivityDirection').value=p.activityDirection||'Маникюр и педикюр';const reminderPrefs=getMasterReminderPrefs();$('masterRemindersEnabled').checked=!!reminderPrefs.enabled;$('masterReminderLeadTime').value=String(reminderPrefs.minutes||60);$('masterReminderLeadTime').disabled=!reminderPrefs.enabled;refreshNotificationPermissionStatus();applyUiSettings();if(typeof $('settingsDialog').showModal==='function')$('settingsDialog').showModal();else $('settingsDialog').setAttribute('open','');refreshPushSettingsStatus();if(ruIsAccount()&&activeRole==='master')void loadRuMasterReminderPrefs()}
 function updateNailoraPhoneConsentStatus(){
  const el=$('settingsPhoneConsentStatus');if(!el)return;
  const allowed=$('settingsPublicPhoneConsent').checked;
@@ -4669,8 +4942,79 @@ $('settingsDeleteAccount').onclick=async()=>{
  finally{button.disabled=false}
 };
 $('settingsDialog').addEventListener('click',e=>{if(e.target===$('settingsDialog'))$('settingsDialog').close()});
-function getMasterReminderPrefs(){return {enabled:false,minutes:60,...(profiles.master?.reminders||{})}}
-function saveMasterReminderPrefs(){if(!profiles.master)return;profiles.master={...profiles.master,reminders:{enabled:$('masterRemindersEnabled').checked,minutes:Number($('masterReminderLeadTime').value)||60}};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));$('masterReminderLeadTime').disabled=!profiles.master.reminders.enabled;if(profiles.master.reminders.enabled)checkMasterReminders()}
+let ruReminderState = null;
+let ruReminderLoading = 0;
+let ruReminderSaving = false;
+
+function applyRuReminderState(prefs){
+  $('masterRemindersEnabled').checked = prefs.enabled;
+  $('masterReminderLeadTime').value = String(prefs.minutes);
+  $('masterRemindersEnabled').disabled = false;
+  $('masterReminderLeadTime').disabled = !prefs.enabled;
+}
+
+async function loadRuMasterReminderPrefs(){
+  const seq = ++ruReminderLoading;
+  ruReminderState = null;
+  $('masterRemindersEnabled').disabled = true;
+  $('masterReminderLeadTime').disabled = true;
+  try{
+    const result = await ruSdk().reminderPreferences();
+    if(seq !== ruReminderLoading || !ruIsAccount() || activeRole !== 'master')return;
+    const prefs = result?.reminders;
+    if(typeof prefs?.enabled !== 'boolean' ||
+       ![15,30,60,120,1440].includes(prefs.minutes))
+      throw new Error('Некорректный ответ сервера');
+    ruReminderState = {enabled:prefs.enabled,minutes:prefs.minutes};
+    applyRuReminderState(ruReminderState);
+  }catch(err){
+    if(seq !== ruReminderLoading)return;
+    showAppToast('Не удалось загрузить настройки напоминаний: '+err.message);
+  }
+}
+
+async function saveRuMasterReminderPrefs(){
+  if(!ruReminderState || ruReminderSaving)return;
+  const seq = ruReminderLoading;
+  const previous = {...ruReminderState};
+  const prefs = {
+    enabled:$('masterRemindersEnabled').checked,
+    minutes:Number($('masterReminderLeadTime').value)
+  };
+  ruReminderSaving = true;
+  $('masterRemindersEnabled').disabled = true;
+  $('masterReminderLeadTime').disabled = true;
+  try{
+    const result = await ruSdk().saveReminderPreferences(prefs);
+    if(seq !== ruReminderLoading || !ruIsAccount() || activeRole !== 'master')return;
+    const saved = result?.reminders;
+    if(typeof saved?.enabled !== 'boolean' ||
+       ![15,30,60,120,1440].includes(saved.minutes))
+      throw new Error('Некорректный ответ сервера');
+    ruReminderState = {enabled:saved.enabled,minutes:saved.minutes};
+  }catch(err){
+    if(seq === ruReminderLoading){
+      ruReminderState = previous;
+      showAppToast('Настройки не сохранены: '+err.message);
+    }
+  }finally{
+    ruReminderSaving = false;
+    if(seq === ruReminderLoading && ruReminderState)
+      applyRuReminderState(ruReminderState);
+  }
+}
+
+function getMasterReminderPrefs(){
+  if(ruIsAccount() && activeRole==='master')
+    return ruReminderState || {enabled:false,minutes:60};
+  return {enabled:false,minutes:60,...(profiles.master?.reminders||{})};
+}
+function saveMasterReminderPrefs(){
+if(ruIsAccount() && activeRole==='master'){
+  void saveRuMasterReminderPrefs();
+  return;
+}
+if(ruMasterReadOnly()){ruMasterReadOnlyNotice();return;}if(!profiles.master)return;profiles.master={...profiles.master,reminders:{enabled:$('masterRemindersEnabled').checked,minutes:Number($('masterReminderLeadTime').value)||60}};localStorage.setItem(ROLE_KEY,JSON.stringify(profiles));$('masterReminderLeadTime').disabled=!profiles.master.reminders.enabled;if(profiles.master.reminders.enabled)checkMasterReminders()}
 function refreshNotificationPermissionStatus(){const el=$('notificationPermissionStatus');if(!el)return;if(!('Notification' in window)){el.textContent='Этот браузер не поддерживает системные уведомления. Напоминания останутся внутри открытого приложения.';return}if(Notification.permission==='granted')el.textContent='Системные уведомления разрешены.';else if(Notification.permission==='denied')el.textContent='Системные уведомления запрещены настройками браузера. Внутренние напоминания продолжат работать.';else el.textContent=t('Без системного разрешения напоминание появится внутри открытого приложения.')}
 $('masterRemindersEnabled').onchange=saveMasterReminderPrefs;$('masterReminderLeadTime').onchange=saveMasterReminderPrefs;
 $('allowBrowserNotifications').onclick=async()=>{if(!('Notification' in window)){refreshNotificationPermissionStatus();return}try{await Notification.requestPermission()}catch(e){}refreshNotificationPermissionStatus();if(Notification.permission==='granted')checkMasterReminders()};
@@ -4684,11 +5028,151 @@ async function registerNailoraServiceWorker(){
  if(location.protocol!=='https:')throw new Error('Push работает только на опубликованном HTTPS-сайте.');
  return await navigator.serviceWorker.register('/Nailora/sw.js',{scope:'/Nailora/'});
 }
+/* Russian-account Push adapter. Existing foreign Push flow remains unchanged. */
+let ruPushConfigPromise = null;
+async function ruGetPushConfig(){
+  if(!ruPushConfigPromise){
+    ruPushConfigPromise = ruSdk().pushConfig().then(config=>{
+      if(config?.enabled!==true || typeof config.publicKey!=='string' || config.publicKey.length!==87)
+        throw new Error('Российский Push-сервис не настроен.');
+      return config;
+    }).catch(err=>{ruPushConfigPromise=null;throw err;});
+  }
+  return ruPushConfigPromise;
+}
+function ruPushSubscriptionHasKey(subscription, publicKey){
+  const actual=subscription?.options?.applicationServerKey;
+  if(!actual)return false;
+  const expected=urlBase64ToUint8Array(publicKey);
+  const bytes=new Uint8Array(actual);
+  return bytes.length===expected.length && bytes.every((b,i)=>b===expected[i]);
+}
+function ruPushCanUseDevice(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))
+    throw new Error(t('Это устройство не поддерживает Web Push. Открой Nailora в актуальном браузере.'));
+  if(isNailoraIOS()&&!isNailoraInstalled())
+    throw new Error(t('На iPhone сначала добавь Nailora на экран «Домой» через Safari, затем открой его с иконки и включи push-уведомления.'));
+}
+async function ruRefreshPushStatus(){
+  const status=$('pushNotificationsStatus'),enable=$('enablePushNotifications'),test=$('testPushNotifications'),disable=$('disablePushNotifications');
+  if(!status||!enable)return;
+  test.classList.add('hidden');disable.classList.add('hidden');
+  enable.disabled=false;
+  if(!ruSdk().isAuthenticated()){
+    enable.disabled=true;
+    status.textContent=t('Сначала войди в аккаунт Nailora.');
+    return;
+  }
+  try{
+    ruPushCanUseDevice();
+    if(Notification.permission==='denied'){
+      status.textContent=t('Разрешение на уведомления заблокировано в браузере. Разреши их в настройках сайта.');
+      return;
+    }
+    // Compare the key before asserting ownership: a foreign Push subscription
+    // cannot be used with Russian VAPID, even on the same GitHub Pages origin.
+    const config=await ruGetPushConfig();
+    if(!ruIsAccount())return;
+    const reg=await registerNailoraServiceWorker();
+    const sub=await reg.pushManager.getSubscription();
+    if(!sub||!ruPushSubscriptionHasKey(sub,config.publicKey)){
+      status.textContent=t('Push-уведомления пока не включены на этом устройстве.');
+      return;
+    }
+    const result=await ruSdk().pushDeviceStatus(sub.endpoint);
+    if(!ruIsAccount())return;
+    if(result?.success!==true)throw new Error('Не удалось проверить подписку устройства.');
+    if(result.enabled===true){
+      status.textContent=t('Push-уведомления включены на этом устройстве.');
+      test.classList.remove('hidden');disable.classList.remove('hidden');
+    }else{
+      status.textContent=t('Push включён в браузере, но ещё не привязан к текущему аккаунту. Нажми «Включить push-уведомления».');
+    }
+  }catch(err){
+    status.textContent=t('Не удалось включить push-уведомления.')+' '+(err?.message||'');
+    console.warn('RU Push status check failed:',err);
+  }
+}
+async function ruEnablePushNotifications(){
+  const button=$('enablePushNotifications'),status=$('pushNotificationsStatus');
+  button.disabled=true;status.textContent='';
+  try{
+    if(!ruSdk().isAuthenticated())throw new Error(t('Сначала войди в аккаунт Nailora.'));
+    ruPushCanUseDevice();
+    // The permission prompt must be initiated by the existing button click.
+    const permission=await Notification.requestPermission();
+    if(permission!=='granted')throw new Error(t('Чтобы включить push, разреши уведомления в окне браузера.'));
+    const config=await ruGetPushConfig();
+    const reg=await registerNailoraServiceWorker();
+    let sub=await reg.pushManager.getSubscription();
+    if(sub&&!ruPushSubscriptionHasKey(sub,config.publicKey)){
+      // One service-worker registration can have only one VAPID subscription.
+      // Explicit confirmation avoids silently disabling a foreign account's push.
+      const ok=window.confirm('На этом устройстве уже есть Push-подписка с другим ключом. Для включения российских уведомлений прежняя подписка на этом устройстве будет отключена. Продолжить?');
+      if(!ok)throw new Error('Переключение Push отменено.');
+      const unsubscribed=await sub.unsubscribe();
+      if(!unsubscribed)throw new Error('Не удалось отключить прежнюю подписку устройства.');
+      sub=null;
+    }
+    if(!sub)sub=await reg.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:urlBase64ToUint8Array(config.publicKey)
+    });
+    const result=await ruSdk().pushSubscribe(sub.toJSON());
+    if(result?.success!==true)throw new Error('Сервер не подтвердил регистрацию Push.');
+    status.textContent=t('Push-уведомления включены на этом устройстве.');
+    await ruRefreshPushStatus();
+  }catch(err){
+    status.textContent=t('Не удалось включить push-уведомления.')+' '+(err?.message||'');
+    console.warn('RU Push enable failed:',err);
+  }finally{button.disabled=false;}
+}
+async function ruTestPushNotifications(){
+  const button=$('testPushNotifications'),status=$('pushNotificationsStatus');
+  button.disabled=true;
+  try{
+    if(!ruSdk().isAuthenticated())throw new Error(t('Сначала войди в аккаунт Nailora.'));
+    const result=await ruSdk().pushTest();
+    if(result?.success!==true||!(result.sent>0))
+      throw new Error(t('Тестовое push-уведомление не отправлено.'));
+    status.textContent=t('Тестовое push-уведомление отправлено. Проверь уведомления устройства.');
+  }catch(err){
+    status.textContent=t('Тестовое push-уведомление не отправлено.')+' '+(err?.message||'');
+    console.warn('RU Push test failed:',err);
+  }finally{button.disabled=false;}
+}
+async function ruDisablePushNotifications(){
+  const button=$('disablePushNotifications'),status=$('pushNotificationsStatus');
+  button.disabled=true;
+  try{
+    if(!ruSdk().isAuthenticated())throw new Error(t('Сначала войди в аккаунт Nailora.'));
+    const reg=await navigator.serviceWorker.getRegistration('/Nailora/');
+    const sub=await reg?.pushManager?.getSubscription();
+    if(sub){
+      const config=await ruGetPushConfig();
+      if(!ruPushSubscriptionHasKey(sub,config.publicKey))
+        throw new Error('Подписка устройства относится к другой системе Push.');
+      const result=await ruSdk().pushUnsubscribe(sub.endpoint);
+      if(result?.success!==true)throw new Error('Сервер не подтвердил отключение Push.');
+      // Unsubscribe browser-side only when the current user actually owned it.
+      if(result.removed===true){
+        const ok=await sub.unsubscribe();
+        if(!ok)throw new Error('Не удалось отключить подписку браузера.');
+      }
+    }
+    status.textContent=t('Push-уведомления отключены на этом устройстве.');
+    $('testPushNotifications').classList.add('hidden');
+    await ruRefreshPushStatus();
+  }catch(err){
+    status.textContent=t('Не удалось отключить push-уведомления.')+' '+(err?.message||'');
+    console.warn('RU Push disable failed:',err);
+  }finally{button.disabled=false;}
+}
 async function refreshPushSettingsStatus(){
+ if(ruIsAccount())return await ruRefreshPushStatus();
  const status=$('pushNotificationsStatus'),enable=$('enablePushNotifications'),test=$('testPushNotifications'),disable=$('disablePushNotifications');
  if(!status||!enable)return;
  test.classList.add('hidden');disable.classList.add('hidden');
- if(ruIsAccount()){enable.disabled=true;status.textContent='Push-уведомления для российских аккаунтов пока не подключены.';return}
  enable.disabled=false;
  if(!cloudReady()){status.textContent=t('Сначала войди в аккаунт Nailora.');return}
  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)){
@@ -4711,7 +5195,7 @@ async function refreshPushSettingsStatus(){
  }catch(err){status.textContent=t('Не удалось включить push-уведомления.')+' '+(err?.message||'');console.warn('Push status check failed:',err)}
 }
 $('enablePushNotifications').onclick=async()=>{
- if(ruIsAccount()){$('pushNotificationsStatus').textContent='Push-уведомления для российских аккаунтов пока не подключены.';return}
+ if(ruIsAccount())return await ruEnablePushNotifications();
  const button=$('enablePushNotifications'),status=$('pushNotificationsStatus');button.disabled=true;status.textContent='';
  try{
   if(!cloudReady())throw new Error(t('Сначала войди в аккаунт Nailora.'));
@@ -4733,6 +5217,7 @@ $('enablePushNotifications').onclick=async()=>{
  finally{button.disabled=false}
 };
 $('testPushNotifications').onclick=async()=>{
+ if(ruIsAccount())return await ruTestPushNotifications();
  const button=$('testPushNotifications'),status=$('pushNotificationsStatus');button.disabled=true;
  try{
   if(!cloudReady())throw new Error(t('Сначала войди в аккаунт Nailora.'));
@@ -4744,6 +5229,7 @@ $('testPushNotifications').onclick=async()=>{
  finally{button.disabled=false}
 };
 $('disablePushNotifications').onclick=async()=>{
+ if(ruIsAccount())return await ruDisablePushNotifications();
  const button=$('disablePushNotifications'),status=$('pushNotificationsStatus');button.disabled=true;
  try{
   if(!cloudReady())throw new Error(t('Сначала войди в аккаунт Nailora.'));
@@ -4761,7 +5247,44 @@ window.addEventListener('load',()=>{registerNailoraServiceWorker().catch(err=>co
 
 // Theme buttons use data-theme-choice; the old themeChoice select no longer exists.
 const backgroundChoice=$('backgroundChoice');if(backgroundChoice)backgroundChoice.onchange=()=>{uiSettings.background=backgroundChoice.value;persistUiSettings()};
-$('masterCurrencyChoice').onchange=async()=>{if(activeRole!=='master')return;const currency=String($('masterCurrencyChoice').value||'RUB').toUpperCase();if(!CURRENCY_CODES.includes(currency))return;const nextProfiles={...profiles,master:{...(profiles.master||{}),currency}};if(persistProfilesSafely(nextProfiles)){refreshCurrencyLabels();renderAll();if(cloudReady()){if(!profiles.master?.cloudId){showAppToast('Валюта сохранена на этом устройстве, но не удалось найти облачный профиль мастера.');return}const synced=await syncMasterScheduleToCloud();if(!synced){showAppToast('Валюта сохранена на этом устройстве, но не удалось передать её клиентам.');return}}showAppToast(t('Валюта цен сохранена.'))}};
+$('masterCurrencyChoice').onchange=async()=>{
+ if(activeRole!=='master')return;
+ const choice=$('masterCurrencyChoice');
+ const currency=String(choice.value||'RUB').toUpperCase();
+ if(!CURRENCY_CODES.includes(currency))return;
+ if(ruMasterReadOnly()){
+   const previous=String(profiles.master?.currency||'RUB').toUpperCase();
+   if(currency===previous)return;
+   choice.disabled=true;
+   try{
+     const response=await ruSdk().saveCurrency(currency);
+     if(response?.success!==true||response?.currency!==currency)
+       throw new Error('Сервер не подтвердил сохранение валюты');
+     profiles.master={...profiles.master,currency};
+     refreshCurrencyLabels();
+     renderAll();
+     showAppToast(t('Валюта цен сохранена.'));
+   }catch(error){
+     choice.value=previous;
+     showAppToast('Валюта не сохранена: '+String(error?.message||'ошибка соединения'));
+   }finally{choice.disabled=false}
+   return;
+ }
+ const nextProfiles={...profiles,master:{...(profiles.master||{}),currency}};
+ if(persistProfilesSafely(nextProfiles)){
+   refreshCurrencyLabels();renderAll();
+   if(cloudReady()){
+     if(!profiles.master?.cloudId){
+       showAppToast('Валюта сохранена на этом устройстве, но не удалось найти облачный профиль мастера.');return;
+     }
+     const synced=await syncMasterScheduleToCloud();
+     if(!synced){
+       showAppToast('Валюта сохранена на этом устройстве, но не удалось передать её клиентам.');return;
+     }
+   }
+   showAppToast(t('Валюта цен сохранена.'));
+ }
+};
 $('accountEditForm').onsubmit=async e=>{
  e.preventDefault();if(!activeRole)return;
  if(ruIsAccount()){alert('Изменение российского профиля пока не подключено к серверу. Ничего не сохранено.');return;}
@@ -4795,8 +5318,62 @@ $('clientNext').onclick=()=>moveClientMonth(1);
 // Client calendar stays empty until a specific artist is explicitly selected.
 let selectedClientMasterKey='';
 function iso(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){alert(t('Не удалось сохранить данные в браузере. Возможно, хранилище заполнено фотографиями. Удали часть фото или экспортируй резервную копию.'))}renderAll();if(activeRole==='master'&&cloudReady())syncMasterScheduleToCloud()}
-function getPriceCurrency(){if(ruIsMasterSelected())return 'RUB';let currency;if(activeRole==='client'&&selectedCloudMasterId&&cloudScheduleData){currency=String(cloudScheduleData.currency||'RUB').toUpperCase()}else{currency=String((profiles.master&&profiles.master.currency)||'RUB').toUpperCase()}return CURRENCY_CODES.includes(currency)?currency:'RUB'}
+function save(){if(ruMasterReadOnly()){ruMasterReadOnlyNotice();return;}try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){alert(t('Не удалось сохранить данные в браузере. Возможно, хранилище заполнено фотографиями. Удали часть фото или экспортируй резервную копию.'))}renderAll();if(activeRole==='master'&&cloudReady())syncMasterScheduleToCloud()}
+// Russian calendar settings: server-authoritative, optimistic, NO localStorage writes.
+let ruCalendarSavePending = false;
+function ruCalendarFields(source){
+  return {
+    daysOff: structuredClone(Array.isArray(source?.daysOff)?source.daysOff:[]),
+    monthlyHours: structuredClone(source?.monthlyHours && typeof source.monthlyHours==='object' && !Array.isArray(source.monthlyHours)?source.monthlyHours:{}),
+    availabilityByDate: structuredClone(source?.availabilityByDate && typeof source.availabilityByDate==='object' && !Array.isArray(source.availabilityByDate)?source.availabilityByDate:{}),
+    blockedSlots: structuredClone(Array.isArray(source?.blockedSlots)?source.blockedSlots:[])
+  };
+}
+function ruStableJson(value){
+  if(Array.isArray(value))return value.map(ruStableJson);
+  if(value&&typeof value==='object'){
+    return Object.fromEntries(Object.keys(value).sort().map(k=>[k,ruStableJson(value[k])]));
+  }
+  return value;
+}
+function ruSameCalendar(a,b){
+  return JSON.stringify(ruStableJson(ruCalendarFields(a)))===JSON.stringify(ruStableJson(ruCalendarFields(b)));
+}
+async function ruSaveCalendarChange(transform,successMessage){
+  if(!ruMasterReadOnly())return false;
+  if(ruCalendarSavePending){showAppToast('Расписание уже сохраняется на сервере.');return false;}
+  ruCalendarSavePending=true;
+  try{
+    const before=ruCalendarFields(data);
+    const current=await ruSdk().schedule();
+    if(current?.success!==true||!current?.schedule_data||!current?.etag)
+      throw new Error('Не удалось проверить исходное расписание на сервере.');
+    if(!ruSameCalendar(before,current.schedule_data))
+      throw new Error('Расписание уже изменилось на сервере. Обнови страницу перед новым изменением.');
+    const draft=structuredClone(before);
+    transform(draft);
+    if(ruSameCalendar(draft,before))return false;
+    const response=await ruSdk().saveSchedule({calendar:draft,expected_etag:current.etag});
+    if(response?.success!==true||!response?.etag||!response?.schedule_data||
+       !ruSameCalendar(draft,response.schedule_data))
+      throw new Error('Сервер не подтвердил изменение расписания. Обнови страницу и проверь.');
+    const accepted=ruCalendarFields(response.schedule_data);
+    data.daysOff=accepted.daysOff;
+    data.monthlyHours=accepted.monthlyHours;
+    data.availabilityByDate=accepted.availabilityByDate;
+    data.blockedSlots=accepted.blockedSlots;
+    renderCalendar();renderAppointments();
+    setCloudStatus('Российский календарь сохранён на сервере');
+    showAppToast(successMessage||'Расписание сохранено на сервере.');
+    return true;
+  }catch(error){
+    const message=String(error?.message||'Ошибка сохранения календаря');
+    showAppToast('Не удалось сохранить календарь: '+message);
+    return false;
+  }finally{ruCalendarSavePending=false;}
+}
+
+function getPriceCurrency(){if(ruIsMasterSelected())return CURRENCY_CODES.includes(ruMasterCurrency)?ruMasterCurrency:'RUB';let currency;if(activeRole==='client'&&selectedCloudMasterId&&cloudScheduleData){currency=String(cloudScheduleData.currency||'RUB').toUpperCase()}else{currency=String((profiles.master&&profiles.master.currency)||'RUB').toUpperCase()}return CURRENCY_CODES.includes(currency)?currency:'RUB'}
 function refreshCurrencyLabels(){const mark='('+(CURRENCY_SYMBOLS[getPriceCurrency()]||getPriceCurrency())+')';['masterServicePriceCurrency','appointmentPriceCurrency','clientPriceCurrency','expenseAmountCurrency'].forEach(id=>{const el=$(id);if(el)el.textContent=mark})}
 function money(n){const amount=Number(n)||0;try{return new Intl.NumberFormat(LOCALES[currentLanguage]||currentLanguage,{style:'currency',currency:getPriceCurrency(),currencyDisplay:'narrowSymbol',minimumFractionDigits:2,maximumFractionDigits:2}).format(amount)}catch(e){return amount.toLocaleString(LOCALES[currentLanguage]||currentLanguage,{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(CURRENCY_SYMBOLS[getPriceCurrency()]||getPriceCurrency())}}
 function startingPrice(n){const amount=Number(n)||0;return amount>0?t('от')+' '+money(amount):money(amount)}
@@ -4822,12 +5399,31 @@ function monthHoursForDateLabel(date){const h=getMonthHours(date);return `${h.st
 function getAppointmentsOn(date){const source=(activeRole==='client'&&selectedCloudMasterId?cloudBookedSlots:data.appointments);return source.filter(a=>a.date===date&&a.status!=='cancelled').sort((a,b)=>String(a.time||'').localeCompare(String(b.time||'')))}
 function getBlockedSlotsOn(date){const base=(activeRole==='client'&&selectedCloudMasterId?(cloudScheduleData?.blockedSlots||[]):data.blockedSlots);return (Array.isArray(base)?base:[]).filter(b=>b.date===date).map(b=>({...b,_start:timeToMinutes(b.start),_end:timeToMinutes(b.end)})).filter(b=>b._end>b._start).sort((a,b)=>a._start-b._start)}
 function hasBlockedOverlap(date,start,end){return getBlockedSlotsOn(date).some(b=>start<b._end&&end>b._start)}
-function setSlotBlocked(date,start,end){if(!date||end<=start)return;if(isDayOff(date)){showAppToast(t('В выходной день нельзя блокировать отдельные интервалы.'));return}const hours=getMonthHours(date);if(start<timeToMinutes(hours.start)||end>timeToMinutes(hours.end)){showAppToast(t('Интервал находится за пределами рабочего времени.'));return}if(data.appointments.some(a=>a.date===date&&start<appointmentInterval(a).end&&end>appointmentInterval(a).start)){showAppToast(t('Нельзя заблокировать время с существующей записью.'));return}if(hasBlockedOverlap(date,start,end)){showAppToast(t('Этот интервал уже заблокирован.'));return}data.blockedSlots.push({id:(crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random()),date,start:minutesToTime(start),end:minutesToTime(end)});save();showAppToast(t('Время заблокировано. Клиенты не смогут его выбрать.'))}
-function unblockSlot(id){const exists=(data.blockedSlots||[]).some(b=>String(b.id)===String(id));if(!exists)return;data.blockedSlots=data.blockedSlots.filter(b=>String(b.id)!==String(id));save();showAppToast(t('Блокировка времени снята.'))}
+function setSlotBlocked(date,start,end){if(ruMasterReadOnly()){
+  if(!date||!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return;
+  if(isDayOff(date)){showAppToast('В выходной день нельзя блокировать время.');return;}
+  if(!masterAvailabilityIntervals(date).some(w=>start>=timeToMinutes(w.start)&&end<=timeToMinutes(w.end))){showAppToast('Интервал за пределами рабочего времени.');return;}
+  if(getAppointmentsOn(date).some(a=>start<appointmentInterval(a).end&&end>appointmentInterval(a).start)){
+    showAppToast('На это время уже есть запись.');return;
+  }
+  if(hasBlockedOverlap(date,start,end)){showAppToast('Время уже заблокировано.');return;}
+  const block={id:(crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random()),date,start:minutesToTime(start),end:minutesToTime(end)};
+  void ruSaveCalendarChange(draft=>draft.blockedSlots.push(block),'Время заблокировано на российском сервере.');
+  return;
+ }if(!date||end<=start)return;if(isDayOff(date)){showAppToast(t('В выходной день нельзя блокировать отдельные интервалы.'));return}const hours=getMonthHours(date);if(start<timeToMinutes(hours.start)||end>timeToMinutes(hours.end)){showAppToast(t('Интервал находится за пределами рабочего времени.'));return}if(data.appointments.some(a=>a.date===date&&start<appointmentInterval(a).end&&end>appointmentInterval(a).start)){showAppToast(t('Нельзя заблокировать время с существующей записью.'));return}if(hasBlockedOverlap(date,start,end)){showAppToast(t('Этот интервал уже заблокирован.'));return}data.blockedSlots.push({id:(crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random()),date,start:minutesToTime(start),end:minutesToTime(end)});save();showAppToast(t('Время заблокировано. Клиенты не смогут его выбрать.'))}
+function unblockSlot(id){if(ruMasterReadOnly()){
+  if(!(data.blockedSlots||[]).some(b=>String(b.id)===String(id)))return;
+  void ruSaveCalendarChange(draft=>{draft.blockedSlots=draft.blockedSlots.filter(b=>String(b.id)!==String(id))},
+    'Блокировка снята на российском сервере.');return;
+ }const exists=(data.blockedSlots||[]).some(b=>String(b.id)===String(id));if(!exists)return;data.blockedSlots=data.blockedSlots.filter(b=>String(b.id)!==String(id));save();showAppToast(t('Блокировка времени снята.'))}
 let appToastTimer=null;
 function showAppToast(message){const el=$('reminderToast');if(!el)return;el.innerHTML='';const span=document.createElement('span');span.textContent=message;el.appendChild(span);el.hidden=false;if(appToastTimer)clearTimeout(appToastTimer);const isError=/не удалось|ошибка|только в этом браузере/i.test(String(message));appToastTimer=setTimeout(()=>{el.hidden=true},isError?15000:3200)}
 function renderMonthHoursForm(){const h=data.monthlyHours&&data.monthlyHours[monthKeyForCursor()]||{start:'09:00',end:'20:00'};if($('monthStartTime'))$('monthStartTime').value=h.start||'09:00';if($('monthEndTime'))$('monthEndTime').value=h.end||'20:00';if($('monthHoursStatus'))$('monthHoursStatus').textContent=monthKeyForCursor()+' · '+(h.start||'09:00')+'–'+(h.end||'20:00')}
-$('saveMonthHours').onclick=()=>{const start=$('monthStartTime').value,end=$('monthEndTime').value;if(!start||!end||timeToMinutes(end)<=timeToMinutes(start)){alert(t('Время окончания должно быть позже начала.'));return}const key=monthKeyForCursor();data.monthlyHours={...(data.monthlyHours||{}),[key]:{start,end}};save();alert(t('Рабочее время применено ко всему месяцу.'))};
+$('saveMonthHours').onclick=()=>{const start=$('monthStartTime').value,end=$('monthEndTime').value;if(!start||!end||timeToMinutes(end)<=timeToMinutes(start)){alert(t('Время окончания должно быть позже начала.'));return}const key=monthKeyForCursor();
+ if(ruMasterReadOnly()){
+   void ruSaveCalendarChange(draft=>{draft.monthlyHours[key]={start,end}},'Рабочее время месяца сохранено на сервере.');return;
+ }
+ data.monthlyHours={...(data.monthlyHours||{}),[key]:{start,end}};save();alert(t('Рабочее время применено ко всему месяцу.'))};
 function ensureClientCard({id='',name='',phone='',service='',price='',notes=''}={}){
  name=String(name||'').trim();if(!name)return null;
  const phoneKey=normalizePhone(phone), nameKey=name.toLocaleLowerCase();
@@ -4879,8 +5475,25 @@ function collectAvailabilityIntervalRows(){const host=$('availabilityIntervals')
 function closeAvailabilityEditor(){const dialog=$('availabilityDialog');if(dialog.open&&typeof dialog.close==='function')dialog.close();else dialog.removeAttribute('open')}
 $('closeAvailabilityDialog').onclick=closeAvailabilityEditor;$('cancelAvailabilityIntervals').onclick=closeAvailabilityEditor;$('addAvailabilityInterval').onclick=()=>{const host=$('availabilityIntervals'),rows=Array.from(host.querySelectorAll('.availability-interval-row'));let start='12:00',end='14:00';if(rows.length){const last=rows[rows.length-1],lastEnd=last.querySelector('.availability-end').value||'10:00',mins=timeToMinutes(lastEnd);if(mins+120<=24*60){start=minutesToTime(mins);end=minutesToTime(mins+120)}}const row=document.createElement('div');row.className='availability-interval-row';row.innerHTML=`<div><label>Начало</label><input type="time" class="availability-start" value="${start}" required></div><div><label>Окончание</label><input type="time" class="availability-end" value="${end}" required></div><button type="button" class="btn danger remove-interval">Убрать</button>`;row.querySelector('.remove-interval').onclick=()=>row.remove();host.append(row)};
 $('availabilityDialog').addEventListener('click',e=>{if(e.target===$('availabilityDialog'))closeAvailabilityEditor()});
-$('saveAvailabilityIntervals').onclick=async()=>{if(!editingAvailabilityDate)return;let intervals;try{intervals=collectAvailabilityIntervalRows()}catch(err){alert(err.message);return}data.availabilityByDate={...(data.availabilityByDate||{}),[editingAvailabilityDate]:intervals};closeAvailabilityEditor();save();if(cloudReady()&&activeRole==='master'){const synced=await syncMasterScheduleToCloud();if(synced){setCloudStatus('Расписание синхронизировано с Supabase');showAppToast(intervals.length?'Рабочие интервалы сохранены в Nailora и облаке.':'Для этого дня закрыты все рабочие интервалы.')}else showAppToast('Интервалы сохранены в этом браузере, но не синхронизированы с Supabase.')}else showAppToast(intervals.length?'Рабочие интервалы дня сохранены.':'Для этого дня нет доступных рабочих интервалов.');renderCalendar();renderAppointments()};
-function toggleDayOff(ds){
+$('saveAvailabilityIntervals').onclick=async()=>{if(!editingAvailabilityDate)return;let intervals;try{intervals=collectAvailabilityIntervalRows()}catch(err){alert(err.message);return}
+if(ruMasterReadOnly()){
+ const date=editingAvailabilityDate;
+ const saved=await ruSaveCalendarChange(draft=>{draft.availabilityByDate[date]=intervals},
+   intervals.length?'Интервалы дня сохранены на российском сервере.':'День закрыт для новых записей на сервере.');
+ if(saved)closeAvailabilityEditor();return;
+}
+data.availabilityByDate={...(data.availabilityByDate||{}),[editingAvailabilityDate]:intervals};closeAvailabilityEditor();save();if(cloudReady()&&activeRole==='master'){const synced=await syncMasterScheduleToCloud();if(synced){setCloudStatus('Расписание синхронизировано с Supabase');showAppToast(intervals.length?'Рабочие интервалы сохранены в Nailora и облаке.':'Для этого дня закрыты все рабочие интервалы.')}else showAppToast('Интервалы сохранены в этом браузере, но не синхронизированы с Supabase.')}else showAppToast(intervals.length?'Рабочие интервалы дня сохранены.':'Для этого дня нет доступных рабочих интервалов.');renderCalendar();renderAppointments()};
+function toggleDayOff(ds){if(ruMasterReadOnly()){
+ const currentlyOff=isDayOff(ds);
+ const count=getAppointmentsOn(ds).length;
+ if(!currentlyOff&&count&&!confirm(t('На этот день уже есть записи. Отметить выходной?')+
+   ' ('+count+')\n'+t('Существующие записи останутся, но новые заявки клиентов на этот день будут заблокированы.')))return;
+ void ruSaveCalendarChange(draft=>{
+   draft.daysOff=currentlyOff?draft.daysOff.filter(d=>d!==ds):[...draft.daysOff,ds];
+ },currentlyOff?'Выходной снят на российском сервере.':'Выходной сохранён на российском сервере.');
+ return;
+}
+
  if(isDayOff(ds)){data.daysOff=data.daysOff.filter(d=>d!==ds);save();return}
  const count=data.appointments.filter(a=>a.date===ds).length;
  if(count&&!confirm(t('На этот день уже есть записи. Отметить выходной?')+' ('+count+')\n'+t('Существующие записи останутся, но новые заявки клиентов на этот день будут заблокированы.')))return;
@@ -4984,7 +5597,7 @@ async function renderMasterSearch(){
     }catch(err){box.innerHTML=`<p class="muted">Не удалось загрузить российских мастеров: ${escapeHtml(err?.message||'ошибка соединения')}</p>`;}
     return;
   }
-   if(ruSelectedMasterId){ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';ruMasterTimeZone='';ruDaySummary.clear();ruAvailableContext='';ruDaySequence++;selectedClientMasterKey='';}
+   if(ruSelectedMasterId){ruSelectedMasterId='';ruServices=[];ruMasterCurrency='RUB';ruSelectedServiceId='';ruMasterTimeZone='';ruDaySummary.clear();ruAvailableContext='';ruDaySequence++;selectedClientMasterKey='';}
   if(!country||!city){box.innerHTML=`<p class="muted">${escapeHtml(t('Введи страну и город для поиска.'))}</p>`;if(selectedClientMasterKey){selectedClientMasterKey='';selectedCloudMasterId='';renderClientCalendar()}translatePage();return}
  let found=[];
  if(cloud&&cloudUser){try{const {data:rows,error}=await cloud.from('nailora_master_public_directory').select('*').eq('is_active',true).ilike('country',country).ilike('city',city).limit(100);if(error)throw error;found=(rows||[]).map(r=>({...profileFromCloudRow('master',r),cloudId:r.id,profileId:r.id,masterId:r.id,phone:r.phone||'',avatar:r.avatar_url||'',avatarUrl:r.avatar_url||'',reviews:[]}));cloudMasterDirectory=found;}catch(err){console.error(err);box.innerHTML=`<p class="muted">Не удалось загрузить мастеров из Supabase: ${escapeHtml(err.message||'ошибка')}</p>`;translatePage();return}}
@@ -5087,16 +5700,20 @@ async function chooseMasterForBooking(cloudId=''){
  if(nailoraIsRussianCountry(master.country)){
   const masterId=String(master.masterId||master.profileId||master.cloudId||'');
   if(ruSelectedMasterId===masterId){
-   ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';ruMasterTimeZone='';ruDaySummary.clear();ruAvailableContext='';ruDaySequence++;selectedClientMasterKey='';
+   ruSelectedMasterId='';ruServices=[];ruMasterCurrency='RUB';ruSelectedServiceId='';ruMasterTimeZone='';ruDaySummary.clear();ruAvailableContext='';ruDaySequence++;selectedClientMasterKey='';
    renderMasterSearch();renderClientCalendar();return;
   }
   const scheduleBox=$('clientDaySchedule');
   if(scheduleBox)scheduleBox.innerHTML='<div class="schedule-empty">Загружаю услуги и расписание мастера…</div>';
   try{
-   const fetched=ruNormalizeServices(await ruSdk().services(masterId));
+   const serviceResponse=await ruSdk().services(masterId);
+   const fetched=ruNormalizeServices(serviceResponse);
+   const selectedCurrency=String(serviceResponse?.currency||'RUB').toUpperCase();
    if(!fetched.length)throw new Error('У мастера пока нет доступных услуг');
    if(ruSelectedMasterId!==masterId){ruMasterTimeZone='';ruDaySummary.clear();}
    ruSelectedMasterId=masterId;ruServices=fetched;ruSelectedServiceId=fetched[0].id;
+    ruMasterCurrency=CURRENCY_CODES.includes(selectedCurrency)?selectedCurrency:'RUB';
+    refreshCurrencyLabels();
    ruAvailableContext='';ruDaySequence++;
    selectedClientMasterKey=masterSelectionKey(master);selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;
    clientSelectedDate=iso(new Date());clientCursor=new Date(clientSelectedDate+'T12:00:00');clientCursor.setDate(1);
@@ -5111,7 +5728,7 @@ async function chooseMasterForBooking(cloudId=''){
   }
   return;
  }
- ruSelectedMasterId='';ruServices=[];ruSelectedServiceId='';ruMasterTimeZone='';ruDaySummary.clear();
+ ruSelectedMasterId='';ruServices=[];ruMasterCurrency='RUB';ruSelectedServiceId='';ruMasterTimeZone='';ruDaySummary.clear();
  const key=masterSelectionKey(master);
  if(selectedClientMasterKey===key){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';renderMasterSearch();renderClientCalendar();showAppToast(t('Выбор мастера снят. Выбери мастера, чтобы открыть расписание.'));return}
  selectedClientMasterKey=key;selectedCloudMasterId=cloudUser?String(master.cloudId||master.profileId||master.masterId||''):'';cloudScheduleData=null;cloudBookedSlots=[];cloudScheduleLoading=false;cloudScheduleLoadError='';cloudScheduleWarning='';window._nailoraLoadedClientRange='';
@@ -5190,7 +5807,7 @@ async function ruRenderDay(){
   box.innerHTML=`<div class="schedule-header"><strong>${escapeHtml(formatDate(new Date(date+'T12:00:00')))}</strong></div><div class="schedule-empty">Загружаю свободное время…</div>`;
   ruAvailableContext='';ruAvailableStarts=[];ruAvailableByService=new Map();
   try{
-    const responses=await Promise.allSettled(ruServices.map(service=>ruSdk().availability(id,date,service.id)));
+    const responses=await ruSelectedDayAvailability(id,date,ruServices);
     if(seq!==ruDaySequence||id!==ruSelectedMasterId||date!==clientSelectedDate)return;
     const union=new Set();let timezone='',work=[],hasSuccess=false,dayOff=false,failed=false;
     for(let i=0;i<responses.length;i++){
@@ -5543,7 +6160,7 @@ function scheduleRowHtml(start,end,kind,label,detail='',appointmentId=null,date=
  let actions='';
  if(ap&&!clientView){
   const completionLabel=normalizeAppointmentStatus(ap.status)==='completed'?'Вернуть в запланированные':'Отметить приём состоявшимся';
-  actions=`<div class="schedule-actions"><button class="btn fixed" type="button" onclick="toggleAppointmentCompleted('${escapeHtml(ap.id)}')">${escapeHtml(t(completionLabel))}</button><button class="btn fixed" type="button" onclick="togglePaid('${escapeHtml(ap.id)}')">${escapeHtml(ap.paid?t('Снять оплату'):t('Отметить оплату'))}</button><button class="btn fixed" type="button" onclick="editAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="cancelMasterAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Отменить запись'))}</button><button class="btn fixed" type="button" onclick="remindAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Напомнить клиенту'))}</button></div>`
+  actions=`<div class="schedule-actions"><button class="btn fixed" type="button" onclick="toggleAppointmentCompleted('${escapeHtml(ap.id)}')">${escapeHtml(t(completionLabel))}</button><button class="btn fixed" type="button" onclick="togglePaid('${escapeHtml(ap.id)}')">${escapeHtml(ap.paid?(ruMasterReadOnly()?t('Оплачено'):t('Снять оплату')):t('Отметить оплату'))}</button><button class="btn fixed" type="button" onclick="editAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="cancelMasterAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Отменить запись'))}</button><button class="btn fixed" type="button" onclick="remindAppointment('${escapeHtml(ap.id)}')">${escapeHtml(t('Напомнить клиенту'))}</button></div>`
  }
  else if(ap&&clientView&&clientOwnsAppointment(ap)){const existingReview=getReviewForAppointment(ap);const reviewAction=appointmentHasPassed(ap)?`<button class="btn fixed" type="button" onclick="openReviewDialog('${escapeHtml(ap.id)}')">${escapeHtml(t(existingReview?'Изменить отзыв':'Оценить мастера'))}</button>`:'';actions=`<div class="schedule-actions"><button class="btn fixed" type="button" onclick="editClientBooking('${escapeHtml(ap.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="deleteClientBooking('${escapeHtml(ap.id)}')">${escapeHtml(t('Удалить'))}</button>${reviewAction}</div>`}
  // Match the existing client's 'Изменить' action for a verified Russian booking.
@@ -5581,7 +6198,7 @@ $('clientBookingForm').onsubmit=e=>{if(ruIsMasterSelected()){e.preventDefault();
 function renderMasterServices(){const list=$('masterServicesList');if(!list)return;const services=Array.isArray(data.services)?data.services:[];list.innerHTML=services.length?services.map(s=>`<div class="service-row"><div class="service-description"><strong>${escapeHtml(s.name)}</strong><span>${Math.max(15,Math.min(480,Number(s.durationMinutes)||60))} ${escapeHtml(t('мин.'))}${Number(s.price)>0?' · '+escapeHtml(startingPrice(s.price)):''}</span></div><div class="service-actions"><button class="btn fixed" type="button" onclick="editMasterService('${escapeHtml(s.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="deleteMasterService('${escapeHtml(s.id)}')">${escapeHtml(t('Удалить'))}</button></div></div>`).join(''):`<p class="muted">${escapeHtml(t('Услуг пока нет. Добавь первую услугу.'))}</p>`}
 function resetMasterServiceForm(){ $('masterServiceId').value='';$('masterServiceName').value='';$('masterServiceDuration').value='90';$('masterServicePrice').value='0';$('masterServiceEditorSummary').textContent=t('+ Добавить услугу');$('cancelMasterServiceEdit').classList.add('hidden') }
 function editMasterService(id){const s=data.services.find(x=>String(x.id)===String(id));if(!s)return;$('masterServiceId').value=s.id;$('masterServiceName').value=s.name;$('masterServiceDuration').value=appointmentDurationMinutes({durationMinutes:s.durationMinutes});$('masterServicePrice').value=Number(s.price)||0;$('masterServiceEditorSummary').textContent=t('Изменить услугу');$('cancelMasterServiceEdit').classList.remove('hidden');$('masterServiceEditor').open=true;$('masterServiceName').focus()}
-function deleteMasterService(id){const s=data.services.find(x=>String(x.id)===String(id));if(!s)return;if(!confirm(t('Удалить услугу из каталога? Уже созданные записи сохранят свою длительность.')))return;data.services=data.services.filter(x=>String(x.id)!==String(id));save();resetMasterServiceForm();renderMasterServices()}
+function deleteMasterService(id){if(ruMasterReadOnly()){ruMasterReadOnlyNotice();return;}const s=data.services.find(x=>String(x.id)===String(id));if(!s)return;if(!confirm(t('Удалить услугу из каталога? Уже созданные записи сохранят свою длительность.')))return;data.services=data.services.filter(x=>String(x.id)!==String(id));save();resetMasterServiceForm();renderMasterServices()}
 $('cancelMasterServiceEdit').onclick=()=>{resetMasterServiceForm();$('masterServiceEditor').open=false};
 $('masterServiceForm').onsubmit=e=>{e.preventDefault();const id=$('masterServiceId').value,name=$('masterServiceName').value.trim(),durationMinutes=Number($('masterServiceDuration').value),price=Math.max(0,Number($('masterServicePrice').value)||0);if(!name){alert(t('Укажи название услуги.'));return}if(!Number.isFinite(durationMinutes)||durationMinutes<15||durationMinutes>480||durationMinutes%15!==0){alert(t('Длительность должна быть от 15 до 480 минут с шагом 15 минут.'));return}if(data.services.some(x=>x.name.trim().toLocaleLowerCase()===name.toLocaleLowerCase()&&String(x.id)!==String(id))){alert(t('Услуга с таким названием уже есть.'));return}if(id){const service=data.services.find(x=>String(x.id)===String(id));if(!service)return;Object.assign(service,{name,durationMinutes,price})}else{data.services.push({id:(crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random()),name,durationMinutes,price})}resetMasterServiceForm();$('masterServiceEditor').open=false;save();showAppToast(t('Услуга сохранена.'))};
 function renderAppointments(){
@@ -5591,8 +6208,13 @@ function renderAppointments(){
 }
 
 function openAppointmentForm(client=null,appointment=null,slot=null){
+ if(ruMasterReadOnly() && appointment && !(appointment?._ruServer===true &&
+    ['booked','completed'].includes(normalizeAppointmentStatus(appointment.status)))){
+   ruMasterReadOnlyNotice();return;
+ }
  masterCommentPhotos=Array.isArray(appointment?.photos)?appointment.photos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS):[];$('appointmentPhotos').value='';renderPhotoPreviews('appointmentPhotoPreview',masterCommentPhotos,index=>removeCommentPhoto('master',index));
  $('appointmentFormPanel').classList.remove('hidden');
+ if(ruMasterReadOnly() && !appointment) $('appointmentForm').dataset.ruCreateRequestId=ruNewRequestId();
  $('appointmentFormTitle').textContent=appointment?'Изменить запись':'Новая запись';
  $('appointmentId').value=appointment?.id||'';
  $('appointmentDate').value=appointment?.date||slot?.date||selectedDate;
@@ -5611,21 +6233,433 @@ function openAppointmentForm(client=null,appointment=null,slot=null){
 function newAppointment(client=null){openAppointmentForm(client)}
 
 $('cancelAppointment').onclick=()=>{$('appointmentFormPanel').classList.add('hidden');$('appointmentForm').reset();$('appointmentId').value='';masterCommentPhotos=[];renderPhotoPreviews('appointmentPhotoPreview',masterCommentPhotos,()=>{})};
-$('appointmentForm').onsubmit=e=>{
- e.preventDefault();const id=$('appointmentId').value,date=$('appointmentDate').value,time=$('appointmentTime').value,name=$('appointmentName').value.trim(),phone=$('appointmentPhone').value.trim(),service=$('appointmentService').value.trim(),price=Number($('appointmentPrice').value)||0,notes=$('appointmentNotes').value.trim(),paid=$('appointmentPaid').checked,durationMinutes=Math.max(15,Math.min(480,Number($('appointmentDuration').value)||60)),photos=masterCommentPhotos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS);
- if(!date||!time||!name){alert(t('Заполни дату, время и имя клиента.'));return}
- if(isDayOff(date)){alert(t('Этот день отмечен как выходной. Сними отметку выходного в календаре, прежде чем добавлять запись.'));return}
- const intervalStart=timeToMinutes(time),intervalEnd=intervalStart+durationMinutes;
- if(!intervalFitsWorkWindow(date,intervalStart,intervalEnd,false)){alert(t('Запись должна целиком помещаться в один рабочий интервал этого дня.'));return}
- if(hasBlockedOverlap(date,intervalStart,intervalEnd)){alert(t('Часть выбранного времени заблокирована. Сними блокировку или выбери другое время.'));return}
- const conflict=data.appointments.find(a=>a.date===date&&String(a.id)!==String(id)&&intervalStart<appointmentInterval(a).end&&intervalEnd>appointmentInterval(a).start);
- if(conflict){alert(t('Запись пересекается с другой записью. Выбери другое время.'));return}
+let ruMasterManualCreatePending=false;
+async function ruSubmitMasterManualBooking(fields){
+  if(ruMasterManualCreatePending)return;
+  const form=$('appointmentForm');
+  const btn=form.querySelector('button[type="submit"]');
+  const rawDuration=Number($('appointmentDuration').value);
+  if(!Number.isInteger(rawDuration)||rawDuration<15||rawDuration>480||rawDuration%15!==0){
+    alert('Длительность должна быть от 15 до 480 минут с шагом 15 минут.');return;
+  }
+  if(!fields.service||fields.service.length>120||fields.phone.length>30||
+     fields.notes.length>500){
+    alert('Проверь поля новой записи.');return;
+  }
+  const requestId=form.dataset.ruCreateRequestId ||
+    (form.dataset.ruCreateRequestId=ruNewRequestId());
+  ruMasterManualCreatePending=true;
+  if(btn)btn.disabled=true;
+  try{
+    const response=await ruSdk().createMasterAppointment({
+      ...fields,request_id:requestId
+    });
+    const a=response?.item;
+    const valid=response?.success===true &&
+      /^[0-9a-f-]{36}$/i.test(String(a?.id||'')) && a.status==='booked' &&
+      a.local_date===fields.date && a.local_time===fields.time &&
+      a.client_name===fields.name && String(a.client_phone||'')===fields.phone &&
+      a.service_name===fields.service && Number(a.price)===fields.price &&
+      Number(a.duration_minutes)===fields.durationMinutes &&
+      a.paid===fields.paid && String(a.notes||'')===fields.notes &&
+      Array.isArray(a.photos) && JSON.stringify(a.photos)===JSON.stringify(fields.photos);
+    if(!valid)throw new Error('Сервер не подтвердил создание записи. Повторно проверь календарь.');
+    if(!data.appointments.some(item=>String(item.id)===a.id)){
+      data.appointments.push({
+        id:a.id,cloudId:'',_ruServer:true,source:'client-booking',
+        name:a.client_name,phone:a.client_phone,service:a.service_name,
+        date:a.local_date,time:a.local_time,
+        durationMinutes:Number(a.duration_minutes),price:Number(a.price),
+        paid:a.paid,notes:String(a.notes||''),photos:a.photos.slice(),status:'booked'
+      });
+    }
+    selectedDate=a.local_date;
+    cursor=new Date(a.local_date+'T12:00:00');cursor.setDate(1);
+    form.dataset.ruCreateRequestId='';
+    $('appointmentFormPanel').classList.add('hidden');
+    form.reset();$('appointmentId').value='';
+    masterCommentPhotos=[];$('appointmentPhotos').value='';
+    renderPhotoPreviews('appointmentPhotoPreview',masterCommentPhotos,()=>{});
+    renderCalendar();renderAppointments();renderFinance();
+    document.querySelector('[data-tab="calendar"]')?.click();
+    showAppToast('Новая запись сохранена на сервере.');
+  }catch(err){
+    showAppToast('Не удалось подтвердить создание: '+String(err?.message||'Ошибка соединения')+
+      '. Если соединение пропало, сначала проверь календарь.');
+  }finally{
+    ruMasterManualCreatePending=false;
+    if(btn)btn.disabled=false;
+  }
+}
+$('appointmentForm').onsubmit=async e=>{
+ e.preventDefault();
+
+ const id=$('appointmentId').value;
+ const date=$('appointmentDate').value;
+ const time=$('appointmentTime').value;
+ const name=$('appointmentName').value.trim();
+ const phone=$('appointmentPhone').value.trim();
+ const service=$('appointmentService').value.trim();
+ const price=Number($('appointmentPrice').value)||0;
+ const notes=$('appointmentNotes').value.trim();
+ const paid=$('appointmentPaid').checked;
+ const durationMinutes=Math.max(15,Math.min(480,Number($('appointmentDuration').value)||60));
+ const photos=masterCommentPhotos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS);
+
+ if(!date||!time||!name){
+   alert(t('Заполни дату, время и имя клиента.'));return;
+ }
+
+ const ruEditing=ruMasterReadOnly();
+ const ruExisting=ruEditing
+   ? data.appointments.find(x=>String(x.id)===String(id))
+   : null;
+
+ // RU manual creation: same existing form, database-verified operation.
+ if(ruEditing && !id){
+   await ruSubmitMasterManualBooking({date,time,name,phone,service,price,
+     durationMinutes,notes,paid,photos});
+   return;
+ }
+ // Российский профиль: исключительно серверное редактирование.
+ if(ruEditing){
+   if(!id||!ruExisting||ruExisting._ruServer!==true||
+      !['booked','completed'].includes(normalizeAppointmentStatus(ruExisting.status))){
+     ruMasterReadOnlyNotice();return;
+   }
+
+   const rawDuration=Number($('appointmentDuration').value);
+
+   if(!Number.isInteger(rawDuration)||
+      rawDuration<15||rawDuration>480||rawDuration%15!==0){
+     alert('Длительность должна быть от 15 до 480 минут с шагом 15 минут.');
+     return;
+   }
+
+   if(!service||name.length>100||phone.length>30||
+      service.length>120||notes.length>500){
+     alert('Проверь название услуги и длину полей записи.');return;
+   }
+
+   const oldDuration=Math.max(15,Math.min(480,Number(ruExisting.durationMinutes)||60));
+   const reschedule=date!==ruExisting.date||
+     time!==ruExisting.time||durationMinutes!==oldDuration;
+
+   if(normalizeAppointmentStatus(ruExisting.status)==='completed'&&reschedule){
+     alert('Завершённую запись нельзя переносить или менять её длительность.');
+     return;
+   }
+
+   if(ruExisting.paid===true&&!paid&&
+      !window.confirm('Снять отметку об оплате?'))return;
+
+   const key=String(id);
+   if(ruMasterBookingEditPending.has(key))return;
+   ruMasterBookingEditPending.add(key);
+
+   const form=$('appointmentForm');
+   const submitButton=form.querySelector('button[type="submit"]');
+   if(submitButton)submitButton.disabled=true;
+
+   try{
+     const response=await ruSdk().editMasterAppointment(key,{
+       date,time,name,phone,service,price,
+       durationMinutes,notes,paid,photos
+     });
+
+     const item=response?.item;
+
+     const serverPhotosValid=
+       Array.isArray(item?.photos)&&
+       item.photos.length<=MAX_COMMENT_PHOTOS&&
+       item.photos.every(isImageData);
+
+     const confirmed=response?.success===true&&
+       String(item?.id)===key&&
+       item?.paid===paid&&
+       item?.client_name===name&&
+       String(item?.client_phone||'')===phone&&
+       item?.service_name===service&&
+       Number.isFinite(Number(item?.price))&&
+       Number(item.price)===price&&
+       Number.isInteger(Number(item?.duration_minutes))&&
+       Number(item.duration_minutes)===durationMinutes&&
+       String(item?.notes||'')===notes&&
+       item?.local_date===date&&
+       /^\d{4}-\d{2}-\d{2}$/.test(item?.local_date||'')&&
+       item?.local_time===time&&
+       /^([01]\d|2[0-3]):[0-5]\d$/.test(item?.local_time||'')&&
+       serverPhotosValid&&
+       typeof item?.start_time==='string'&&
+       typeof item?.end_time==='string'&&
+       ['booked','completed'].includes(String(item?.status));
+
+     if(!confirmed){
+       const e=new Error('Ответ сервера не прошёл проверку.');
+       e.code='RU_UNCONFIRMED_RESPONSE';
+       throw e;
+     }
+
+     // Обновляем интерфейс исключительно подтверждёнными данными PostgreSQL.
+     Object.assign(ruExisting,{
+       name:item.client_name,
+       phone:String(item.client_phone||''),
+       service:item.service_name,
+       price:Number(item.price),
+       date:item.local_date,
+       time:item.local_time,
+       notes:String(item.notes||''),
+       paid:item.paid,
+       durationMinutes:Number(item.duration_minutes),
+       photos:item.photos.slice(),
+       status:normalizeAppointmentStatus(item.status)
+     });
+
+     selectedDate=item.local_date;
+     cursor=new Date(item.local_date+'T12:00:00');
+     cursor.setDate(1);
+
+     $('appointmentFormPanel').classList.add('hidden');
+     $('appointmentForm').reset();
+     $('appointmentId').value='';
+     masterCommentPhotos=[];
+     $('appointmentPhotos').value='';
+     renderPhotoPreviews('appointmentPhotoPreview',masterCommentPhotos,()=>{});
+
+     renderCalendar();
+     renderAppointments();
+     renderFinance();
+     document.querySelector('[data-tab="calendar"]').click();
+
+     showAppToast('Запись сохранена на сервере.');
+
+   }catch(error){
+     const status=Number(error?.status)||0;
+     const definitiveRejection=[400,401,403,409,429].includes(status);
+
+     if(definitiveRejection){
+       showAppToast('Не удалось сохранить: '+String(error?.message||'Сервер отклонил изменения'));
+       return;
+     }
+
+     try{
+       // Получаем фактическое состояние записи. PATCH повторно не отправляем.
+       const check=await ruSdk().me({include_master:true});
+       const profile=ruProfileData(check,'master');
+       const snap=check?.master_data;
+
+       if(!profile?.profile_id ||
+          String(snap?.profile?.id)!==String(profile.profile_id) ||
+          !Array.isArray(snap?.appointments)){
+         throw new Error('Сервер не подтвердил профиль и список записей.');
+       }
+
+       const serverItem=snap.appointments.find(
+         a=>String(a?.id)===key
+       );
+
+       const serverPhotosValid=
+         Array.isArray(serverItem?.photos)&&
+         serverItem.photos.length<=MAX_COMMENT_PHOTOS&&
+         serverItem.photos.every(isImageData);
+
+       if(!serverItem ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(String(serverItem.local_date||'')) ||
+          !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(serverItem.local_time||'')) ||
+          !Number.isFinite(Number(serverItem.price)) ||
+          Number(serverItem.price)<0 ||
+          !Number.isInteger(Number(serverItem.duration_minutes)) ||
+          Number(serverItem.duration_minutes)<15 ||
+          Number(serverItem.duration_minutes)>480 ||
+          Number(serverItem.duration_minutes)%15!==0 ||
+          typeof serverItem.paid!=='boolean' ||
+          !['booked','completed','cancelled'].includes(String(serverItem.status)) ||
+          !serverPhotosValid){
+         throw new Error('Сервер вернул некорректное состояние записи.');
+       }
+
+       if(!ruExisting){
+         throw new Error('Исходная запись не найдена в интерфейсе.');
+       }
+
+       const serverPhotos=serverItem.photos.slice();
+
+       const serverMatches=
+         String(serverItem.client_name||'')===name&&
+         String(serverItem.client_phone||'')===phone&&
+         String(serverItem.service_name||'')===service&&
+         Number(serverItem.price)===price&&
+         Number(serverItem.duration_minutes)===durationMinutes&&
+         String(serverItem.notes||'')===notes&&
+         serverItem.paid===paid&&
+         serverItem.local_date===date&&
+         serverItem.local_time===time&&
+         ['booked','completed'].includes(String(serverItem.status))&&
+         JSON.stringify(serverPhotos)===JSON.stringify(photos);
+
+       // В локальную модель записываем только фактические данные сервера.
+       Object.assign(ruExisting,{
+         name:String(serverItem.client_name||'Клиент'),
+         phone:String(serverItem.client_phone||''),
+         service:String(serverItem.service_name||''),
+         date:serverItem.local_date,
+         time:serverItem.local_time,
+         price:Number(serverItem.price),
+         durationMinutes:Number(serverItem.duration_minutes),
+         notes:String(serverItem.notes||''),
+         paid:serverItem.paid,
+         photos:serverPhotos,
+         status:normalizeAppointmentStatus(serverItem.status)
+       });
+
+       selectedDate=serverItem.local_date;
+       cursor=new Date(serverItem.local_date+'T12:00:00');
+       cursor.setDate(1);
+
+       renderCalendar();
+       renderAppointments();
+       renderFinance();
+
+       if(String(serverItem.status)==='cancelled'){
+         $('appointmentFormPanel').classList.add('hidden');
+         form.reset();
+         $('appointmentId').value='';
+         masterCommentPhotos=[];
+         $('appointmentPhotos').value='';
+         renderPhotoPreviews('appointmentPhotoPreview',masterCommentPhotos,()=>{});
+         document.querySelector('[data-tab="calendar"]')?.click();
+         showAppToast('Запись отменена на сервере. Изменения не сохранены.');
+         return;
+       }
+
+       if(serverMatches){
+         $('appointmentFormPanel').classList.add('hidden');
+         form.reset();
+         $('appointmentId').value='';
+         masterCommentPhotos=[];
+         $('appointmentPhotos').value='';
+         renderPhotoPreviews('appointmentPhotoPreview',masterCommentPhotos,()=>{});
+
+         document.querySelector('[data-tab="calendar"]')?.click();
+
+         showAppToast('Изменения подтверждены повторной проверкой сервера.');
+       }else{
+         showAppToast('Показаны актуальные данные сервера. Проверь изменения в открытой форме перед повторным сохранением.');
+       }
+
+     }catch(reconcileError){
+       showAppToast('Не удалось проверить состояние записи на сервере. Не повторяй сохранение, пока не обновишь профиль.');
+     }
+   }finally{
+     ruMasterBookingEditPending.delete(key);
+     if(submitButton)submitButton.disabled=false;
+   }
+   return;
+ }
+
+ // Зарубежная ветка сохраняет прежнюю логику.
+ if(isDayOff(date)){
+   alert(t('Этот день отмечен как выходной. Сними отметку выходного в календаре, прежде чем добавлять запись.'));
+   return;
+ }
+
+ const intervalStart=timeToMinutes(time);
+ const intervalEnd=intervalStart+durationMinutes;
+
+ if(!intervalFitsWorkWindow(date,intervalStart,intervalEnd,false)){
+   alert(t('Запись должна целиком помещаться в один рабочий интервал этого дня.'));
+   return;
+ }
+ if(hasBlockedOverlap(date,intervalStart,intervalEnd)){
+   alert(t('Часть выбранного времени заблокирована. Сними блокировку или выбери другое время.'));
+   return;
+ }
+
+ const conflict=data.appointments.find(a=>
+   a.date===date&&String(a.id)!==String(id)&&
+   intervalStart<appointmentInterval(a).end&&
+   intervalEnd>appointmentInterval(a).start
+ );
+ if(conflict){
+   alert(t('Запись пересекается с другой записью. Выбери другое время.'));
+   return;
+ }
+
  const clientCard=ensureClientCard({name,phone,service,price});
- if(id){const ap=data.appointments.find(a=>String(a.id)===String(id));if(!ap)return;Object.assign(ap,{clientId:clientCard?.id||ap.clientId||'',name,phone,service,price,date,time,notes,paid,durationMinutes,photos})}
- else{data.appointments.push({id:(crypto.randomUUID&&crypto.randomUUID())||String(Date.now()),clientId:clientCard?.id||'',name,phone,service,price,date,time,paid,notes,durationMinutes,photos})}
- const savedAp=data.appointments.find(a=>String(a.id)===String(id))||data.appointments[data.appointments.length-1];selectedDate=date;cursor=new Date(date+'T12:00:00');cursor.setDate(1);$('appointmentFormPanel').classList.add('hidden');$('appointmentForm').reset();$('appointmentId').value='';masterCommentPhotos=[];$('appointmentPhotos').value='';renderPhotoPreviews('appointmentPhotoPreview',masterCommentPhotos,()=>{});save();if(cloudReady()&&savedAp)syncCloudAppointment(savedAp,'master');document.querySelector('[data-tab="calendar"]').click();
+
+ if(id){
+   const ap=data.appointments.find(x=>String(x.id)===String(id));
+   if(!ap)return;
+   Object.assign(ap,{
+     clientId:clientCard?.id||ap.clientId||'',
+     name,phone,service,price,date,time,notes,paid,durationMinutes,photos
+   });
+ }else{
+   data.appointments.push({
+     id:(crypto.randomUUID&&crypto.randomUUID())||String(Date.now()),
+     clientId:clientCard?.id||'',
+     name,phone,service,price,date,time,paid,notes,durationMinutes,photos
+   });
+ }
+
+ const savedAp=data.appointments.find(a=>String(a.id)===String(id))||
+   data.appointments[data.appointments.length-1];
+
+ selectedDate=date;
+ cursor=new Date(date+'T12:00:00');
+ cursor.setDate(1);
+
+ $('appointmentFormPanel').classList.add('hidden');
+ $('appointmentForm').reset();
+ $('appointmentId').value='';
+ masterCommentPhotos=[];
+ $('appointmentPhotos').value='';
+ renderPhotoPreviews('appointmentPhotoPreview',masterCommentPhotos,()=>{});
+
+ save();
+ if(cloudReady()&&savedAp)syncCloudAppointment(savedAp,'master');
+ document.querySelector('[data-tab="calendar"]').click();
 };
-async function togglePaid(id){
+// RU master state: server is authoritative. Never call save() or Supabase here.
+// Reload only after a confirmed mutation to obtain fresh server calendar and finances.
+const ruMasterAppointmentStatePending = new Set();
+const ruMasterBookingEditPending = new Set();
+async function ruSetMasterAppointmentState(id,field){
+  if(!ruMasterReadOnly())return;
+  const key=String(id);
+  if(ruMasterAppointmentStatePending.has(key))return;
+  const ap=data.appointments.find(x=>String(x.id)===key);
+  if(!ap){showAppToast('Запись не найдена. Обнови страницу.');return;}
+  const nextValue=field==='paid'
+    ? ap.paid!==true
+    : normalizeAppointmentStatus(ap.status)!=='completed';
+  if(field==='paid' && !nextValue &&
+     !window.confirm('Снять отметку об оплате?'))return;
+  ruMasterAppointmentStatePending.add(key);
+  try{
+    const response=await ruSdk().setMasterAppointmentState(key,field,nextValue);
+    const item=response?.item;
+    const confirmed=response?.success===true && String(item?.id)===key &&
+      (field==='paid' ? item.paid===nextValue
+        : item.status===(nextValue?'completed':'booked'));
+    if(!confirmed)throw new Error('Сервер не подтвердил сохранение. Обнови страницу и проверь запись.');
+    // Update the screen only after receiving the confirmed server state.
+    ap.paid = item.paid === true;
+    ap.status = normalizeAppointmentStatus(item.status);
+    renderCalendar();
+    renderAppointments();
+    renderFinance();
+    showAppToast(field === 'paid'
+      ? (ap.paid ? 'Оплата сохранена на сервере.' : 'Оплата снята на сервере.')
+      : (ap.status === 'completed' ? 'Приём отмечен состоявшимся.' : 'Приём возвращён в запланированные.'));
+
+  }catch(error){
+    showAppToast('Не удалось сохранить: '+String(error?.message||'Ошибка соединения'));
+  }finally{
+    ruMasterAppointmentStatePending.delete(key);
+  }
+}
+async function togglePaid(id){if(ruMasterReadOnly()){await ruSetMasterAppointmentState(id,'paid');return;}
  const appointment=data.appointments.find(x=>String(x.id)===String(id));
  if(!appointment)return;
  appointment.paid=appointment.paid!==true;
@@ -5633,7 +6667,7 @@ async function togglePaid(id){
  if(cloudReady())await syncCloudAppointment(appointment,'master','upsert');
  else showAppToast(t('Оплата сохранена на этом устройстве. Для облачной синхронизации войди в аккаунт мастера.'));
 }
-async function toggleAppointmentCompleted(id){
+async function toggleAppointmentCompleted(id){if(ruMasterReadOnly()){await ruSetMasterAppointmentState(id,'completed');return;}
  const appointment=data.appointments.find(x=>String(x.id)===String(id));
  if(!appointment)return;
  appointment.status=normalizeAppointmentStatus(appointment.status)==='completed'?'booked':'completed';
@@ -5641,13 +6675,86 @@ async function toggleAppointmentCompleted(id){
  if(cloudReady())await syncCloudAppointment(appointment,'master','upsert');
  else showAppToast(t('Статус приёма сохранён на этом устройстве. Для облачной синхронизации войди в аккаунт мастера.'));
 }
-async function cancelMasterAppointment(id){const a=data.appointments.find(x=>String(x.id)===String(id));if(!a)return;if(confirm(t('Отменить эту запись? Клиент будет удалён из расписания.'))){if(a.cloudId&&cloudReady()){const synced=await syncCloudAppointment(a,'master','cancel');if(!synced)return}data.appointments=data.appointments.filter(x=>String(x.id)!==String(id));save();showAppToast(t('Запись отменена.'))}}
-function deleteAppointment(id){if(confirm(t('Удалить эту запись?'))){data.appointments=data.appointments.filter(x=>x.id!==id);save()}}
-function editAppointment(id){let a=data.appointments.find(x=>x.id===id);if(a)openAppointmentForm(null,a)}
-function remindAppointment(id){const a=data.appointments.find(x=>String(x.id)===String(id));if(!a){alert(t('Запись не найдена'));return}let c=data.clients.find(x=>(a.clientId&&String(x.id)===String(a.clientId))||(normalizePhone(a.phone)&&normalizePhone(x.phone)===normalizePhone(a.phone))||String(x.name||'').trim().toLocaleLowerCase()===String(a.name||'').trim().toLocaleLowerCase());if(!c)c=ensureClientCard({id:a.clientId||'',name:a.name||'',phone:a.phone||'',service:a.service||'',price:a.price??''});if(!c){alert(t('Не удалось найти карточку клиента.'));return}openClientReminder(c.id)}
+const ruMasterCancelPending=new Set();
+async function cancelMasterAppointment(id){
+ if(ruMasterReadOnly()){
+   const key=String(id);
+   const a=data.appointments.find(x=>String(x.id)===key);
+   if(!a||a._ruServer!==true||normalizeAppointmentStatus(a.status)!=='booked'){
+     ruMasterReadOnlyNotice();return;
+   }
+   if(ruMasterCancelPending.has(key))return;
+   if(!confirm(t('Отменить эту запись? Клиент будет удалён из расписания.')))return;
+   ruMasterCancelPending.add(key);
+   try{
+     const response=await ruSdk().cancelMasterAppointment(key);
+     const item=response?.item;
+     if(response?.success!==true||String(item?.id)!==key||
+        item?.status!=='cancelled'||typeof item.changed!=='boolean'){
+       throw new Error('Сервер не подтвердил отмену');
+     }
+     a.status='cancelled';
+     renderCalendar();renderAppointments();renderFinance();
+     showAppToast('Запись отменена на сервере. Время освобождено.');
+   }catch(error){
+     showAppToast('Отмена не подтверждена: '+String(error?.message||'Ошибка соединения')+
+       '. Обнови календарь перед повторной попыткой.');
+   }finally{ruMasterCancelPending.delete(key)}
+   return;
+ }
+ const a=data.appointments.find(x=>String(x.id)===String(id));
+ if(!a)return;
+ if(confirm(t('Отменить эту запись? Клиент будет удалён из расписания.'))){
+   if(a.cloudId&&cloudReady()){
+     const synced=await syncCloudAppointment(a,'master','cancel');if(!synced)return;
+   }
+   data.appointments=data.appointments.filter(x=>String(x.id)!==String(id));
+   save();showAppToast(t('Запись отменена.'));
+ }
+}
+function deleteAppointment(id){if(ruMasterReadOnly()){ruMasterReadOnlyNotice();return;}if(confirm(t('Удалить эту запись?'))){data.appointments=data.appointments.filter(x=>x.id!==id);save()}}
+function editAppointment(id){
+ const a=data.appointments.find(x=>String(x.id)===String(id));
+ if(ruMasterReadOnly()){
+   if(!a||a._ruServer!==true||
+      !['booked','completed'].includes(normalizeAppointmentStatus(a.status))){
+     ruMasterReadOnlyNotice();return;
+   }
+   openAppointmentForm(null,a);
+   return;
+ }
+ if(a)openAppointmentForm(null,a);
+}
+function remindAppointment(id){
+ const a=data.appointments.find(x=>String(x.id)===String(id));
+ if(!a){alert(t('Запись не найдена'));return}
+ if(a._ruServer===true){
+   const c={
+     id:'ru-appointment:'+String(a.id),
+     name:String(a.name||'Клиент').trim(),
+     phone:String(a.phone||'').trim(),
+     service:String(a.service||''),
+     price:a.price??''
+   };
+   if(!c.phone){
+     alert(t('Добавь номер телефона в карточку клиента, чтобы отправить напоминание.'));
+     return;
+   }
+   openClientReminder(c.id,c,String(a.id));
+   return;
+ }
+ let c=data.clients.find(x=>
+   (a.clientId&&String(x.id)===String(a.clientId))||
+   (normalizePhone(a.phone)&&normalizePhone(x.phone)===normalizePhone(a.phone))||
+   String(x.name||'').trim().toLocaleLowerCase()===String(a.name||'').trim().toLocaleLowerCase()
+ );
+ if(!c)c=ensureClientCard({id:a.clientId||'',name:a.name||'',phone:a.phone||'',service:a.service||'',price:a.price??''});
+ if(!c){alert(t('Не удалось найти карточку клиента.'));return}
+ openClientReminder(c.id);
+}
 $('addClient').onclick=()=>showClientForm();
 $('cancelClient').onclick=()=>$('clientFormPanel').classList.add('hidden');
-function showClientForm(c=null){$('clientFormPanel').classList.remove('hidden');$('clientFormTitle').textContent=c?'Изменить карточку':'Новая карточка';$('clientId').value=c?.id||'';$('clientName').value=c?.name||'';$('clientPhone').value=c?.phone||'';$('clientService').value=c?.service||'';$('clientPrice').value=c?.price??'';$('clientNotes').value=c?.notes||'';$('clientName').focus();translatePage()}
+function showClientForm(c=null){if(ruMasterReadOnly()){ruMasterReadOnlyNotice();return;}$('clientFormPanel').classList.remove('hidden');$('clientFormTitle').textContent=c?'Изменить карточку':'Новая карточка';$('clientId').value=c?.id||'';$('clientName').value=c?.name||'';$('clientPhone').value=c?.phone||'';$('clientService').value=c?.service||'';$('clientPrice').value=c?.price??'';$('clientNotes').value=c?.notes||'';$('clientName').focus();translatePage()}
 $('clientForm').onsubmit=e=>{e.preventDefault();let id=$('clientId').value||String(Date.now());let c={id,name:$('clientName').value.trim(),phone:$('clientPhone').value.trim(),service:$('clientService').value.trim(),price:Number($('clientPrice').value)||0,notes:$('clientNotes').value.trim()};let idx=data.clients.findIndex(x=>x.id===id);if(idx>=0)data.clients[idx]=c;else data.clients.push(c);$('clientFormPanel').classList.add('hidden');save()};
 $('clientSearch').oninput=renderClients;
 function renderClients(){let q=$('clientSearch').value.toLowerCase();let cs=data.clients.filter(c=>(c.name+' '+c.phone).toLowerCase().includes(q));$('clientList').innerHTML=cs.length?cs.map(c=>`<div class="card"><h3>${escapeHtml(c.name)}</h3><div>${escapeHtml(c.phone||'Телефон не указан')}</div><div>${escapeHtml(c.service||'Услуга не указана')} · ${money(c.price)}</div>${c.notes?`<p class="muted">${escapeHtml(c.notes)}</p>`:''}<div class="row" style="margin-top:8px"><button class="btn primary fixed" onclick="bookClient('${c.id}')">Записать</button><button class="btn fixed" onclick="openClientReminder('${c.id}')">Напомнить клиенту</button><button class="btn fixed" onclick="editClient('${c.id}')">Изменить</button><button class="btn danger fixed" onclick="removeClient('${c.id}')">Удалить</button></div></div>`).join(''):'<p class="muted">Клиентов пока нет. Добавь первую карточку.</p>';translatePage()}
@@ -5660,18 +6767,18 @@ function bookClient(id){
  if(calendarTab)calendarTab.click();
  newAppointment(c);
 }
-let activeReminderClientId='';
+let activeReminderClientId='',activeReminderClientOverride=null;
 function appointmentsForClient(client){const phone=normalizePhone(client?.phone),name=String(client?.name||'').trim().toLocaleLowerCase();const now=new Date();return data.appointments.filter(a=>{const sameId=client?.id&&a.clientId&&String(client.id)===String(a.clientId);const samePhone=phone&&normalizePhone(a.phone)===phone;const sameName=name&&String(a.name||'').trim().toLocaleLowerCase()===name;const dt=appointmentDateTime(a);return (sameId||samePhone||sameName)&&dt&&dt>now}).sort((a,b)=>appointmentDateTime(a)-appointmentDateTime(b))}
 function appointmentDateTime(a){if(!a?.date)return null;const dt=new Date(`${a.date}T${a.time||'00:00'}:00`);return Number.isNaN(dt.getTime())?null:dt}
-function openClientReminder(id){const c=data.clients.find(x=>String(x.id)===String(id));if(!c){alert(t('Клиент не найден'));return}if(!String(c.phone||'').trim()){alert(t('Добавь номер телефона в карточку клиента, чтобы отправить напоминание.'));showClientForm(c);return}activeReminderClientId=String(c.id);$('clientReminderPhone').value=c.phone;const upcoming=appointmentsForClient(c);$('clientReminderAppointment').innerHTML='<option value="">'+escapeHtml(t('Без привязки к записи'))+'</option>'+upcoming.map(a=>`<option value="${escapeHtml(a.id)}">${escapeHtml(formatDate(new Date(a.date+'T12:00:00')))} · ${escapeHtml(a.time||'')} · ${escapeHtml(a.service||t('Услуга не указана'))}</option>`).join('');$('clientReminderAppointment').value=upcoming[0]?String(upcoming[0].id):'';refreshClientReminderMessage();$('clientReminderStatus').textContent=upcoming.length?'':'В карточке нет будущих записей. Можно написать клиенту вручную.';if(typeof $('clientReminderDialog').showModal==='function')$('clientReminderDialog').showModal();else $('clientReminderDialog').setAttribute('open','');translatePage()}
-function refreshClientReminderMessage(){const c=data.clients.find(x=>String(x.id)===activeReminderClientId);if(!c)return;const ap=data.appointments.find(a=>String(a.id)===$('clientReminderAppointment').value);if(ap){const dateLabel=formatDate(new Date(ap.date+'T12:00:00'));const service=ap.service?` (${ap.service})`:'';$('clientReminderMessage').value=currentLanguage==='ru'?`Здравствуйте, ${c.name}! Напоминаю о вашей записи на ${dateLabel} в ${ap.time}${service}. До встречи!`:`Hello, ${c.name}! This is a reminder of your appointment on ${dateLabel} at ${ap.time}${service}. See you soon!`}else $('clientReminderMessage').value=currentLanguage==='ru'?`Здравствуйте, ${c.name}! Это напоминание от вашего мастера. Если у вас есть вопросы, пожалуйста, ответьте на это сообщение.`:`Hello, ${c.name}! This is a reminder from your nail artist. Please reply to this message if you have any questions.`}
+function openClientReminder(id,clientOverride=null,preferredAppointmentId=''){const c=clientOverride||data.clients.find(x=>String(x.id)===String(id));if(!c){alert(t('Клиент не найден'));return}if(!String(c.phone||'').trim()){alert(t('Добавь номер телефона в карточку клиента, чтобы отправить напоминание.'));showClientForm(c);return}activeReminderClientId=String(c.id);activeReminderClientOverride=clientOverride||null;$('clientReminderPhone').value=c.phone;const upcoming=appointmentsForClient(c);$('clientReminderAppointment').innerHTML='<option value="">'+escapeHtml(t('Без привязки к записи'))+'</option>'+upcoming.map(a=>`<option value="${escapeHtml(a.id)}">${escapeHtml(formatDate(new Date(a.date+'T12:00:00')))} · ${escapeHtml(a.time||'')} · ${escapeHtml(a.service||t('Услуга не указана'))}</option>`).join('');$('clientReminderAppointment').value=upcoming.some(a=>String(a.id)===String(preferredAppointmentId))?String(preferredAppointmentId):(upcoming[0]?String(upcoming[0].id):'');refreshClientReminderMessage();$('clientReminderStatus').textContent=upcoming.length?'':'В карточке нет будущих записей. Можно написать клиенту вручную.';if(typeof $('clientReminderDialog').showModal==='function')$('clientReminderDialog').showModal();else $('clientReminderDialog').setAttribute('open','');translatePage()}
+function refreshClientReminderMessage(){const c=activeReminderClientOverride||data.clients.find(x=>String(x.id)===activeReminderClientId);if(!c)return;const ap=data.appointments.find(a=>String(a.id)===$('clientReminderAppointment').value);if(ap){const dateLabel=formatDate(new Date(ap.date+'T12:00:00'));const service=ap.service?` (${ap.service})`:'';$('clientReminderMessage').value=currentLanguage==='ru'?`Здравствуйте, ${c.name}! Напоминаю о вашей записи на ${dateLabel} в ${ap.time}${service}. До встречи!`:`Hello, ${c.name}! This is a reminder of your appointment on ${dateLabel} at ${ap.time}${service}. See you soon!`}else $('clientReminderMessage').value=currentLanguage==='ru'?`Здравствуйте, ${c.name}! Это напоминание от вашего мастера. Если у вас есть вопросы, пожалуйста, ответьте на это сообщение.`:`Hello, ${c.name}! This is a reminder from your nail artist. Please reply to this message if you have any questions.`}
 $('clientReminderAppointment').onchange=refreshClientReminderMessage;
-function closeClientReminder(){$('clientReminderDialog').close();activeReminderClientId=''}
+function closeClientReminder(){$('clientReminderDialog').close();activeReminderClientId='';activeReminderClientOverride=null}
 $('closeClientReminder').onclick=closeClientReminder;$('clientReminderCloseBottom').onclick=closeClientReminder;$('clientReminderDialog').addEventListener('click',e=>{if(e.target===$('clientReminderDialog'))closeClientReminder()});
 $('clientReminderOpenSms').onclick=()=>{const phone=String($('clientReminderPhone').value||'').trim();if(!phone){alert(t('Добавь номер телефона в карточку клиента, чтобы отправить напоминание.'));return}const body=String($('clientReminderMessage').value||'').trim();const smsPhone=phone.replace(/[^0-9+*#,;]/g,'');window.location.href=`sms:${smsPhone}?body=${encodeURIComponent(body)}`;$('clientReminderStatus').textContent=t('Сообщение не отправлено автоматически. Откроется приложение SMS, где нужно проверить текст и нажать «Отправить». На компьютере поддержка SMS зависит от настроенных приложений.')};
 $('clientReminderCopy').onclick=async()=>{const text=$('clientReminderMessage').value;try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text)}else{throw new Error('Clipboard API unavailable')}$('clientReminderStatus').textContent=t('Скопировать текст')+' ✓'}catch(e){const ta=$('clientReminderMessage');ta.focus();ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(_){}$('clientReminderStatus').textContent=ok?t('Скопировать текст')+' ✓':'Выдели текст сообщения и скопируй его вручную.'}};
 function editClient(id){let c=data.clients.find(x=>x.id===id);if(c)showClientForm(c)}
-function removeClient(id){if(confirm(t('Удалить карточку клиента? Уже созданные записи останутся.'))){data.clients=data.clients.filter(x=>x.id!==id);save()}}
+function removeClient(id){if(ruMasterReadOnly()){ruMasterReadOnlyNotice();return;}if(confirm(t('Удалить карточку клиента? Уже созданные записи останутся.'))){data.clients=data.clients.filter(x=>x.id!==id);save()}}
 function renderFinance(){
 let from=$('financeFrom').value,to=$('financeTo').value;
 let paid=data.appointments.filter(a=>a.paid&&(!from||a.date>=from)&&(!to||a.date<=to));
@@ -5681,8 +6788,53 @@ $('incomeTotal').textContent=money(inc);$('expenseTotal').textContent=money(out)
 let ops=[...paid.map(a=>({date:a.date,label:t('Доход')+' · '+a.name,amount:Number(a.price)||0,type:'in',id:a.id})),...expenses.map(a=>({date:a.date,label:t('Расход')+' · '+t(a.category)+(a.note?' · '+a.note:''),amount:Number(a.amount)||0,type:'out',id:a.id}))].sort((a,b)=>b.date.localeCompare(a.date));
 $('financeList').innerHTML=ops.length?ops.map(o=>`<div class="card"><div class="row"><div><strong>${escapeHtml(o.label)}</strong><div class="muted">${o.date}</div></div><strong>${o.type==='in'?'+':'−'}${money(o.amount)}</strong>${o.type==='out'?`<button class="btn danger fixed" onclick="deleteExpense('${o.id}')">Удалить</button>`:''}</div></div>`).join(''):'<p class="muted">Операций за этот период пока нет.</p>';translatePage()}
 $('financeFrom').value=iso(new Date(new Date().getFullYear(),new Date().getMonth(),1));$('financeTo').value=iso(new Date());$('financeFrom').onchange=renderFinance;$('financeTo').onchange=renderFinance;$('expenseDate').value=iso(new Date());
-$('expenseForm').onsubmit=e=>{e.preventDefault();data.expenses.push({id:String(Date.now()),date:$('expenseDate').value,category:$('expenseCategory').value,amount:Number($('expenseAmount').value),note:$('expenseNote').value.trim()});e.target.reset();$('expenseDate').value=iso(new Date());save()};
-function deleteExpense(id){if(confirm(t('Удалить расход?'))){data.expenses=data.expenses.filter(x=>x.id!==id);save()}}
+let ruExpenseBusy=false;
+$('expenseForm').onsubmit=async e=>{
+  e.preventDefault();
+  if(ruMasterReadOnly()){
+    if(ruExpenseBusy)return;
+    const fields={date:$('expenseDate').value,category:$('expenseCategory').value,
+       amount:Number($('expenseAmount').value),note:$('expenseNote').value.trim()};
+    ruExpenseBusy=true;
+    const button=$('expenseForm').querySelector('button[type="submit"],button:not([type])');
+    if(button)button.disabled=true;
+    try{
+      const response=await ruSdk().createExpense(fields);
+      const item=response?.item;
+      if(!response?.success||!item?.id)throw new Error('Сервер не подтвердил сохранение расхода');
+      // Reload from the authoritative server to avoid locally invented results.
+      const fresh=await ruSdk().listExpenses();
+      if(!Array.isArray(fresh?.items))throw new Error('Не удалось обновить расходы. Проверь данные на сервере перед повтором.');
+      data.expenses=fresh.items.map(x=>({id:String(x.id),date:String(x.date),
+         category:String(x.category),amount:Number(x.amount),note:String(x.note||'')}));
+      e.target.reset();$('expenseDate').value=iso(new Date());renderFinance();
+      showAppToast('Расход сохранён на российском сервере.');
+    }catch(err){
+      showAppToast('Не удалось подтвердить расход: '+(err?.message||'ошибка')+'. Перед повтором проверь список расходов.');
+    }finally{ruExpenseBusy=false;if(button)button.disabled=false;}
+    return;
+  }
+  data.expenses.push({id:String(Date.now()),date:$('expenseDate').value,
+    category:$('expenseCategory').value,amount:Number($('expenseAmount').value),
+    note:$('expenseNote').value.trim()});
+  e.target.reset();$('expenseDate').value=iso(new Date());save();
+};
+async function deleteExpense(id){
+  if(ruMasterReadOnly()){
+    if(ruExpenseBusy||!data.expenses.some(x=>String(x.id)===String(id)))return;
+    if(!confirm(t('Удалить расход?')))return;
+    ruExpenseBusy=true;
+    try{
+      const result=await ruSdk().deleteExpense(id);
+      if(!result?.success||String(result.id)!==String(id))throw new Error('Сервер не подтвердил удаление');
+      data.expenses=data.expenses.filter(x=>String(x.id)!==String(id));renderFinance();
+      showAppToast('Расход удалён на российском сервере.');
+    }catch(err){showAppToast('Не удалось удалить расход: '+(err?.message||'ошибка'));}
+    finally{ruExpenseBusy=false;}
+    return;
+  }
+  if(confirm(t('Удалить расход?'))){data.expenses=data.expenses.filter(x=>x.id!==id);save()}
+}
 $('exportData').onclick=()=>{
   const backup={
     app:'Nailora',
