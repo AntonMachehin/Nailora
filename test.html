@@ -241,7 +241,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 
 
 /* Nailora v8.5: обзор мастера и более читаемые ячейки календаря */
-.dashboard-grid{display:grid;grid-template-columns:1.35fr repeat(2,minmax(0,1fr));gap:12px;margin:0 0 16px}
+.dashboard-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 16px}
 .dashboard-card{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:16px;border:1px solid var(--border-color,#e9e3ee);border-radius:16px;background:var(--panel-bg,#fff);box-shadow:0 5px 18px rgba(45,29,62,.045)}
 .dashboard-feature{background:linear-gradient(145deg,#f1eafa,#fbf8ff);border-color:#e4d7f2}
 .dashboard-eyebrow{font-size:10px;font-weight:800;letter-spacing:.09em;color:#76549a}
@@ -1519,7 +1519,7 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
 </nav>
 <section id="calendar" class="tab">
 <div class="dashboard-grid" id="masterDashboard" aria-label="Сводка мастера">
- <article class="dashboard-card dashboard-feature"><span class="dashboard-eyebrow">ВЫБРАННЫЙ ДЕНЬ</span><strong id="dashSelectedCount">0</strong><span id="dashSelectedLabel">записей на выбранную дату</span></article>
+
  <article class="dashboard-card"><span class="dashboard-icon">◷</span><span class="dashboard-label">Сегодня</span><strong id="dashTodayCount">0</strong><small>записей</small></article>
  <article class="dashboard-card"><span class="dashboard-icon">↗</span><span class="dashboard-label">Ближайшая запись</span><strong id="dashNextTime">—</strong><small id="dashNextName">Предстоящих записей нет</small></article>
 </div>
@@ -5703,8 +5703,6 @@ function renderMasterDashboard(){
  const selected=appointments.filter(a=>a.date===selectedDate).sort((a,b)=>String(a.time||'').localeCompare(String(b.time||'')));
  const today=iso(new Date());const todays=appointments.filter(a=>a.date===today);
  const upcoming=appointments.filter(a=>{const dt=appointmentDateTime(a);return dt&&dt.getTime()>=Date.now()}).sort((a,b)=>appointmentDateTime(a)-appointmentDateTime(b))[0];
- $('dashSelectedCount').textContent=String(selected.length);
- $('dashSelectedLabel').textContent=selectedDate===today?'записей на сегодня':`записей · ${formatDate(new Date(selectedDate+'T12:00:00'))}`;
  $('dashTodayCount').textContent=String(todays.length);
  $('dashNextTime').textContent=upcoming?(upcoming.time||'—'):'—';
  $('dashNextName').textContent=upcoming?`${upcoming.name||t('Клиент')} · ${formatDate(new Date(upcoming.date+'T12:00:00'))}`:t('Предстоящих записей нет');
