@@ -1328,6 +1328,12 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
           ...(x.details === undefined ? {} : {details:x.details})
         }});
       },
+      clientFavorites(operation,ids=[]){
+        return request('POST','/v1/me/profiles',{
+          auth:true,
+          body:{action:'client_favorites',operation,ids}
+        });
+      },
       updateMasterProfile(fields){
         return request('POST','/v1/me/profiles',{
           auth:true,
@@ -5026,7 +5032,10 @@ async function openRole(role){
  }
 }
 async function logout(){
- if(ruIsAccount()){++ruBookingsLoadSequence;++ruDaySequence;ruOwnBookings=[];ruDaySummary.clear();ruMasterTimeZone='';ruSelectedMasterId='';ruServices=[];ruMasterCurrency='RUB';ruSelectedServiceId='';ruAvailableStarts=[];ruAvailableContext='';ruBookingRequest=null;ruEditBookingId='';ruBookingEditingNoteId='';selectedClientMasterKey='';if($('settingsDialog').open)$('settingsDialog').close();try{await ruSdk().logout()}catch(_){}activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);showOnly('welcome');setCloudStatus('Выход выполнен');return;}
+ if(ruIsAccount()){
+ bmServerFavorites=null;
+ bmFavoritesPending=null;
+++ruBookingsLoadSequence;++ruDaySequence;ruOwnBookings=[];ruDaySummary.clear();ruMasterTimeZone='';ruSelectedMasterId='';ruServices=[];ruMasterCurrency='RUB';ruSelectedServiceId='';ruAvailableStarts=[];ruAvailableContext='';ruBookingRequest=null;ruEditBookingId='';ruBookingEditingNoteId='';selectedClientMasterKey='';if($('settingsDialog').open)$('settingsDialog').close();try{await ruSdk().logout()}catch(_){}activeRole=null;localStorage.removeItem(ACTIVE_ROLE_KEY);showOnly('welcome');setCloudStatus('Выход выполнен');return;}
  if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=null;
  if($('settingsDialog').open)$('settingsDialog').close();
  setCloudStatus('Выхожу из аккаунта…');
@@ -6170,6 +6179,12 @@ async function toggleFavoriteMaster(cloudId=''){
 async function removeFavoriteMaster(cloudId=''){return toggleFavoriteMaster(cloudId)}
 async function loadFavoriteMasters(){
  if(activeRole!=='client')return;
+ if(ruIsAccount()){
+  cloudFavoriteMasters=[];
+  await bmSyncServerFavorites();
+  return;
+ }
+
  const ids=favoriteMasterIds();
  if(!ids.length){cloudFavoriteMasters=[];renderFavoriteMasters();return}
  const cached=Array.isArray(profiles.client?.favoriteMasterProfiles)?profiles.client.favoriteMasterProfiles:[];
@@ -6201,7 +6216,19 @@ function bmRuFavoriteKey(){
    :'';
 }
 
+var bmServerFavorites=null;
+var bmFavoritesPending=null;
+
 function bmRuFavorites(){
+ if(ruIsAccount()){
+  const key=bmRuFavoriteKey();
+  return bmServerFavorites?.key===key
+    ?bmServerFavorites.items:[];
+ }
+ return bmLocalRuFavorites();
+}
+
+function bmLocalRuFavorites(){
  try{
   const key=bmRuFavoriteKey();
   if(!key)return [];
@@ -6213,6 +6240,118 @@ function bmRuFavorites(){
 }
 
 function bmToggleRuFavorite(m){
+ if(ruIsAccount()){
+  void bmSyncServerFavorites(m);
+  return;
+ }
+ bmToggleLocalRuFavorite(m);
+}
+
+async function bmSyncServerFavorites(master=null){
+ const key=bmRuFavoriteKey();
+ if(!key||!ruIsAccount())return;
+
+ if(bmFavoritesPending){
+  if(master)showAppToast('Подожди сохранения списка.');
+  return;
+ }
+
+ const owner=profiles.client;
+ const pending={key};
+ bmFavoritesPending=pending;
+
+ const current=()=>activeRole==='client'&&
+   ruIsAccount()&&bmRuFavoriteKey()===key&&
+   profiles.client===owner;
+
+ try{
+  let result;
+  const legacy=bmLocalRuFavorites()
+    .map(x=>String(x.masterId))
+    .filter(x=>/^[0-9a-f-]{36}$/i.test(x));
+
+  if(legacy.length){
+   result=await ruSdk().clientFavorites(
+     'merge',[...new Set(legacy)].slice(0,100));
+  }else{
+   result=await ruSdk().clientFavorites('list');
+  }
+
+  if(!current())return;
+
+  if(result?.success!==true||
+     !Array.isArray(result.ids)||
+     !Array.isArray(result.items))
+    throw new Error('Сервер не подтвердил список');
+
+  if(legacy.length){
+   localStorage.removeItem(key);
+  }
+
+  if(master){
+   const id=String(master.masterId||
+     master.profileId||master.cloudId||'');
+
+   const operation=result.ids.includes(id)
+     ?'remove':'add';
+
+   result=await ruSdk().clientFavorites(operation,[id]);
+
+   if(!current())return;
+
+   if(result?.success!==true||
+      !Array.isArray(result.items))
+     throw new Error('Сохранение не подтверждено');
+
+   showAppToast(operation==='add'
+     ?'Мастер добавлен в ваш список.'
+     :'Мастер удалён из вашего списка.');
+  }
+
+  const items=result.items.map(m=>({
+   masterId:String(m.id),
+   profileId:String(m.id),
+   cloudId:String(m.id),
+   name:String(m.name||''),
+   country:String(m.country||'Россия'),
+   city:String(m.city||''),
+   area:String(m.area||''),
+   address:String(m.address||''),
+   specialty:String(m.specialty||''),
+   activityDirection:String(m.activity_direction||''),
+   avatar:String(m.avatar_url||''),
+   avatarUrl:String(m.avatar_url||''),
+   publicPhoneConsent:m.phone_publication_consent===true,
+   phone:m.phone_publication_consent===true
+     ?String(m.public_phone||''):'',
+   reviews:[]
+  }));
+
+  bmServerFavorites={key,items};
+
+  document.querySelectorAll(
+    '#masterSearchResults .bm-profile-card'
+  ).forEach(card=>{
+   const saved=items.some(
+     m=>m.masterId===card.dataset.profileId);
+   card.querySelector('.bm-heart')
+     ?.setAttribute('aria-pressed',String(saved));
+  });
+
+  renderFavoriteMasters();
+
+ }catch(err){
+  if(current()){
+   showAppToast('Не удалось синхронизировать избранное: '+
+     (err.message||'ошибка соединения'));
+  }
+ }finally{
+  if(bmFavoritesPending===pending)
+    bmFavoritesPending=null;
+ }
+}
+
+function bmToggleLocalRuFavorite(m){
  const key=bmRuFavoriteKey();
  if(!key)return;
 
