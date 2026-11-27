@@ -4633,6 +4633,9 @@ async function refreshCloudDataForRole(role){
  if(scheduleError){console.error('Master schedule restore failed:',scheduleError);showAppToast('Не удалось загрузить облачное расписание: '+(scheduleError.message||'ошибка Supabase'));}
  else if(scheduleRow&&scheduleRow.schedule_data&&typeof scheduleRow.schedule_data==='object'){
   const remote=scheduleRow.schedule_data;
+  data.serviceGroups=ruGroupFields(
+    Array.isArray(remote.serviceGroups)?remote.serviceGroups:[]
+  );
   data.daysOff=Array.isArray(remote.daysOff)?remote.daysOff:[];
   data.monthlyHours=remote.monthlyHours&&typeof remote.monthlyHours==='object'&&!Array.isArray(remote.monthlyHours)?remote.monthlyHours:{};
   data.availabilityByDate=remote.availabilityByDate&&typeof remote.availabilityByDate==='object'&&!Array.isArray(remote.availabilityByDate)?remote.availabilityByDate:{};
@@ -4667,7 +4670,10 @@ function remoteAppointmentToLocal(r){
   photos:Array.isArray(r.photos)?r.photos.filter(isImageData).slice(0,MAX_COMMENT_PHOTOS):[]
  };
 }
-async function syncMasterScheduleToCloud(){if(!cloudReady()||activeRole!=='master')return false;const id=profiles.master.cloudId;const payload={master_id:id,schedule_data:{daysOff:data.daysOff||[],monthlyHours:data.monthlyHours||{},availabilityByDate:data.availabilityByDate||{},blockedSlots:data.blockedSlots||[],services:(data.services||[]).map(s=>({id:String(s.id),name:s.name,durationMinutes:Number(s.durationMinutes)||60,price:Number(s.price)||0})),currency:getPriceCurrency()},updated_at:new Date().toISOString()};const {error}=await cloud.from('nailora_master_schedule').upsert(payload,{onConflict:'master_id'});if(error){console.warn('Schedule sync:',error.message);return false}return true}
+async function syncMasterScheduleToCloud(){if(!cloudReady()||activeRole!=='master')return false;const id=profiles.master.cloudId;const payload={master_id:id,schedule_data:{daysOff:data.daysOff||[],monthlyHours:data.monthlyHours||{},availabilityByDate:data.availabilityByDate||{},blockedSlots:data.blockedSlots||[],services:(data.services||[]).map(s=>({id:String(s.id),name:s.name,durationMinutes:Number(s.durationMinutes)||60,price:Number(s.price)||0,
+      groupId:s.groupId||null})),
+      serviceGroups:ruGroupFields(data.serviceGroups||[]),
+      currency:getPriceCurrency()},updated_at:new Date().toISOString()};const {error}=await cloud.from('nailora_master_schedule').upsert(payload,{onConflict:'master_id'});if(error){console.warn('Schedule sync:',error.message);return false}return true}
 function asIsoTime(date,time){return new Date(String(date)+'T'+String(time||'00:00')+':00').toISOString()}
 async function syncCloudAppointment(ap,role=activeRole,eventType='upsert'){
  if(!cloudReady()||!ap)return false;
@@ -7050,7 +7056,109 @@ function ruSameServices(a,b){
 async function ruSaveServiceChange(transform,successMessage){
   return ruSaveCatalogChange(c=>{c.items=transform(c.items);return c;},successMessage);
 }
+async function cloudSaveCatalogChange(transform,successMessage){
+  if(!masterCatalogEnabled()||ruIsAccount())return false;
+  if(ruCalendarSavePending)return false;
+
+  const owner=data;
+  const id=String(profiles.master.cloudId);
+  const userId=cloudUser.id;
+
+  const current=()=>!ruIsAccount()&&
+    activeRole==='master'&&data===owner&&
+    cloudUser?.id===userId&&
+    String(profiles.master?.cloudId)===id;
+
+  ruCalendarSavePending=true;
+
+  const controls=Array.from(document.querySelectorAll(
+    '#masterServiceForm input,#masterServiceForm button,'+
+    '#masterServiceForm select,#masterServiceGroupForm input,'+
+    '#masterServiceGroupForm button,#masterServiceGroupsList button,'+
+    '#masterServiceGroupsList input,#masterServicesList button'
+  ));
+  const disabled=controls.map(el=>el.disabled);
+  controls.forEach(el=>el.disabled=true);
+
+  try{
+    const {data:row,error}=await cloud
+      .from('nailora_master_schedule')
+      .select('schedule_data,updated_at')
+      .eq('master_id',id).maybeSingle();
+
+    if(error)throw error;
+    if(!current())return false;
+    if(!row?.schedule_data)
+      throw new Error('Расписание не найдено на сервере');
+
+    const remote=row.schedule_data;
+    const items=ruServiceFields(remote.services||[]);
+    const groups=ruGroupFields(remote.serviceGroups||[]);
+
+    if(!ruSameServices(owner.services,items)||
+       !ruSameGroups(owner.serviceGroups||[],groups))
+      throw new Error('Каталог изменился. Обнови страницу.');
+
+    const draft=transform({
+      items:structuredClone(items),
+      groups:structuredClone(groups)
+    });
+
+    if(!draft)throw new Error('Услуга или группа не найдена');
+
+    const services=ruServiceFields(draft.items);
+    const serviceGroups=ruGroupFields(draft.groups);
+
+    const updated={...remote,services,serviceGroups};
+
+    let query=cloud.from('nailora_master_schedule')
+      .update({
+        schedule_data:updated,
+        updated_at:new Date().toISOString()
+      }).eq('master_id',id);
+
+    query=row.updated_at
+      ?query.eq('updated_at',row.updated_at)
+      :query.is('updated_at',null);
+
+    const result=await query
+      .select('schedule_data').maybeSingle();
+
+    if(result.error)throw result.error;
+    if(!current())return false;
+
+    const saved=result.data?.schedule_data;
+
+    if(!saved||
+       !ruSameServices(saved.services,services)||
+       !ruSameGroups(saved.serviceGroups,serviceGroups))
+      throw new Error('Сервер не подтвердил сохранение');
+
+    owner.services=ruServiceFields(saved.services);
+    owner.serviceGroups=ruGroupFields(saved.serviceGroups);
+
+    try{localStorage.setItem(KEY,JSON.stringify(owner));}
+    catch(_){}
+
+    renderAll();
+    showAppToast(successMessage);
+    return true;
+
+  }catch(err){
+    if(current())showAppToast(
+      'Не удалось сохранить каталог: '+err.message
+    );
+    return false;
+  }finally{
+    controls.forEach((el,i)=>el.disabled=disabled[i]);
+    ruCalendarSavePending=false;
+  }
+}
+
 async function ruSaveCatalogChange(transform,successMessage){
+  if(!ruIsAccount())
+    return cloudSaveCatalogChange(transform,successMessage);
+
   if(!ruMasterReadOnly()||!ruSdk().isAuthenticated())return false;
   if(ruCalendarSavePending){showAppToast('Расписание уже сохраняется на сервере.');return false;}
   const owner=data, ownerId=String(profiles.master?.profileId||''), sdk=ruSdk();
@@ -7122,8 +7230,13 @@ function renderMasterGroupPicker(g){
   }
   panel.append(actions);return panel;
 }
+function masterCatalogEnabled(){
+  return ruMasterReadOnly()||
+    (!ruIsAccount()&&activeRole==='master'&&cloudReady());
+}
+
 function renderMasterServiceGroups(){
-  const enabled=ruMasterReadOnly();
+  const enabled=masterCatalogEnabled();
   $('masterServiceGroupsPanel').classList.toggle('hidden',!enabled);
   $('masterServiceGroupField').classList.toggle('hidden',!enabled);
   if(!enabled){masterGroupPicker=null;return;}
@@ -7154,7 +7267,7 @@ function renderMasterServiceGroups(){
 }
 $('cancelMasterServiceGroupEdit').onclick=resetMasterServiceGroupForm;
 $('masterServiceGroupsList').addEventListener('click',async e=>{
-  const b=e.target.closest('button[data-group-action]');if(!b||!ruMasterReadOnly()||ruCalendarSavePending)return;
+  const b=e.target.closest('button[data-group-action]');if(!b||!masterCatalogEnabled()||ruCalendarSavePending)return;
   const g=(data.serviceGroups||[]).find(x=>x.id===b.dataset.groupId);if(!g)return;
   if(b.dataset.groupAction==='pick'){
     masterGroupPicker=masterGroupPicker?.id===g.id?null:{owner:data,id:g.id,selected:new Set(data.services.filter(s=>s.groupId===g.id).map(s=>s.id)),before:JSON.stringify(ruServiceFields(data.services)),beforeGroups:JSON.stringify(ruGroupFields(data.serviceGroups||[]))};
@@ -7185,7 +7298,7 @@ $('masterServiceGroupsList').addEventListener('click',async e=>{
   }
 });
 $('masterServiceGroupForm').onsubmit=async e=>{
-  e.preventDefault();if(!ruMasterReadOnly()||ruCalendarSavePending)return;
+  e.preventDefault();if(!masterCatalogEnabled()||ruCalendarSavePending)return;
   const id=$('masterServiceGroupId').value,name=$('masterServiceGroupName').value.trim();if(!name||name.length>100)return;
   if((data.serviceGroups||[]).some(g=>g.id!==id&&g.name.trim().toLocaleLowerCase()===name.toLocaleLowerCase())){showAppToast('Группа с таким названием уже есть.');return;}
   const newId=id||crypto.randomUUID();
@@ -7194,21 +7307,21 @@ $('masterServiceGroupForm').onsubmit=async e=>{
     else c.groups.push({id:newId,name});return c;
   },'Группа сохранена.'))resetMasterServiceGroupForm();
 };
-function renderMasterServices(){renderMasterServiceGroups();const list=$('masterServicesList');if(!list)return;const services=Array.isArray(data.services)?data.services:[];list.innerHTML=services.length?services.map(s=>`<div class="service-row"><div class="service-description"><strong>${escapeHtml(s.name)}</strong><span>${Math.max(15,Math.min(480,Number(s.durationMinutes)||60))} ${escapeHtml(t('мин.'))}${Number(s.price)>0?' · '+escapeHtml(startingPrice(s.price)):''}</span>${ruMasterReadOnly()?`<span>${escapeHtml((data.serviceGroups||[]).find(g=>g.id===s.groupId)?.name||'Без группы')}</span>`:''}</div><div class="service-actions"><button class="btn fixed" type="button" onclick="editMasterService('${escapeHtml(s.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="deleteMasterService('${escapeHtml(s.id)}')">${escapeHtml(t('Удалить'))}</button></div></div>`).join(''):`<p class="muted">${escapeHtml(t('Услуг пока нет. Добавь первую услугу.'))}</p>`}
+function renderMasterServices(){renderMasterServiceGroups();const list=$('masterServicesList');if(!list)return;const services=Array.isArray(data.services)?data.services:[];list.innerHTML=services.length?services.map(s=>`<div class="service-row"><div class="service-description"><strong>${escapeHtml(s.name)}</strong><span>${Math.max(15,Math.min(480,Number(s.durationMinutes)||60))} ${escapeHtml(t('мин.'))}${Number(s.price)>0?' · '+escapeHtml(startingPrice(s.price)):''}</span>${masterCatalogEnabled()?`<span>${escapeHtml((data.serviceGroups||[]).find(g=>g.id===s.groupId)?.name||'Без группы')}</span>`:''}</div><div class="service-actions"><button class="btn fixed" type="button" onclick="editMasterService('${escapeHtml(s.id)}')">${escapeHtml(t('Изменить'))}</button><button class="btn danger fixed" type="button" onclick="deleteMasterService('${escapeHtml(s.id)}')">${escapeHtml(t('Удалить'))}</button></div></div>`).join(''):`<p class="muted">${escapeHtml(t('Услуг пока нет. Добавь первую услугу.'))}</p>`}
 function resetMasterServiceForm(){ $('masterServiceGroupSelect').value='';$('masterServiceId').value='';$('masterServiceName').value='';$('masterServiceDuration').value='90';$('masterServicePrice').value='0';$('masterServiceEditorSummary').textContent=t('+ Добавить услугу');$('cancelMasterServiceEdit').classList.add('hidden') }
 function editMasterService(id){if(ruMasterReadOnly()&&ruCalendarSavePending){showAppToast('Дождись сохранения расписания.');return;}const s=data.services.find(x=>String(x.id)===String(id));if(!s)return;$('masterServiceId').value=s.id;$('masterServiceName').value=s.name;$('masterServiceDuration').value=appointmentDurationMinutes({durationMinutes:s.durationMinutes});$('masterServicePrice').value=Number(s.price)||0; $('masterServiceGroupSelect').value=s.groupId||'';$('masterServiceEditorSummary').textContent=t('Изменить услугу');$('cancelMasterServiceEdit').classList.remove('hidden');$('masterServiceEditor').open=true;$('masterServiceName').focus()}
 async function deleteMasterService(id){
   const s=data.services.find(x=>String(x.id)===String(id));if(!s)return;
   if(ruMasterReadOnly()&&ruCalendarSavePending){showAppToast('Дождись сохранения расписания.');return;}
   if(!confirm(t('Удалить услугу из каталога? Уже созданные записи сохранят свою длительность.')))return;
-  if(ruMasterReadOnly()){
+  if(masterCatalogEnabled()){
     if(await ruSaveServiceChange(items=>items.filter(x=>String(x.id)!==String(id)),'Услуга удалена.'))resetMasterServiceForm();
     return;
   }
   data.services=data.services.filter(x=>String(x.id)!==String(id));save();resetMasterServiceForm();renderMasterServices();
 }
 $('cancelMasterServiceEdit').onclick=()=>{resetMasterServiceForm();$('masterServiceEditor').open=false};
-$('masterServiceForm').onsubmit=async e=>{e.preventDefault();const id=$('masterServiceId').value,name=$('masterServiceName').value.trim(),durationMinutes=Number($('masterServiceDuration').value),price=Math.max(0,Number($('masterServicePrice').value)||0);if(!name){alert(t('Укажи название услуги.'));return}if(!Number.isFinite(durationMinutes)||durationMinutes<15||durationMinutes>480||durationMinutes%15!==0){alert(t('Длительность должна быть от 15 до 480 минут с шагом 15 минут.'));return}if(data.services.some(x=>x.name.trim().toLocaleLowerCase()===name.toLocaleLowerCase()&&String(x.id)!==String(id))){alert(t('Услуга с таким названием уже есть.'));return}if(ruMasterReadOnly()){
+$('masterServiceForm').onsubmit=async e=>{e.preventDefault();const id=$('masterServiceId').value,name=$('masterServiceName').value.trim(),durationMinutes=Number($('masterServiceDuration').value),price=Math.max(0,Number($('masterServicePrice').value)||0);if(!name){alert(t('Укажи название услуги.'));return}if(!Number.isFinite(durationMinutes)||durationMinutes<15||durationMinutes>480||durationMinutes%15!==0){alert(t('Длительность должна быть от 15 до 480 минут с шагом 15 минут.'));return}if(data.services.some(x=>x.name.trim().toLocaleLowerCase()===name.toLocaleLowerCase()&&String(x.id)!==String(id))){alert(t('Услуга с таким названием уже есть.'));return}if(masterCatalogEnabled()){
   const newId=id||crypto.randomUUID(),groupId=$('masterServiceGroupSelect').value||null;
   const ok=await ruSaveServiceChange(items=>{
     if(id){const service=items.find(x=>String(x.id)===String(id));if(!service)return null;Object.assign(service,{name,durationMinutes,price,groupId});}
