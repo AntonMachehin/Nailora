@@ -1472,6 +1472,71 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
 #bmTrustEditor summary,#bmTrustSettings summary{cursor:pointer;font-weight:600}
 #bmTrustSettings details p{line-height:1.5}
 </style>
+
+<style>
+.bm-profile-toggle {
+  display:flex;
+  align-items:center;
+  gap:14px;
+  width:100%;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:inherit;
+  text-align:left;
+  font:inherit;
+  cursor:pointer;
+}
+.bm-profile-main {
+  flex:1;
+  min-width:0;
+}
+.bm-profile-main h3 {
+  margin:0 0 4px;
+}
+.bm-profile-details {
+  display:grid;
+  grid-template-rows:0fr;
+  transition:grid-template-rows .38s ease;
+}
+.bm-profile-card.is-expanded .bm-profile-details {
+  grid-template-rows:1fr;
+}
+.bm-profile-inner {
+  min-height:0;
+  overflow:hidden;
+}
+.bm-profile-step {
+  opacity:0;
+  transform:translateY(9px);
+  transition:opacity .18s ease, transform .25s ease;
+  margin-top:10px;
+}
+.bm-profile-card.is-expanded .bm-profile-step {
+  opacity:1;
+  transform:translateY(0);
+  transition-delay:calc(var(--step, 0) * 65ms);
+}
+.bm-profile-actions {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  padding-bottom:3px;
+}
+.bm-profile-actions .primary {
+  flex:1;
+}
+.bm-profile-actions .bm-icon-action {
+  min-width:44px;
+  text-align:center;
+}
+@media(prefers-reduced-motion:reduce) {
+  .bm-profile-details,.bm-profile-step {
+    transition:none!important;
+  }
+}
+</style>
+
 </head>
 <body class="auth-pending">
 <script>window.__nailoraClearLoadGuard&&window.__nailoraClearLoadGuard();</script>
@@ -5844,6 +5909,113 @@ function closeReviewDialog(){const dialog=$('reviewDialog');if(dialog?.open&&typ
 document.querySelectorAll('#reviewStarControl [data-rating]').forEach(button=>button.addEventListener('click',()=>setReviewRating(button.dataset.rating)));
 $('closeReviewDialog').onclick=closeReviewDialog;$('cancelReviewDialog').onclick=closeReviewDialog;$('reviewDialog').addEventListener('click',e=>{if(e.target===$('reviewDialog'))closeReviewDialog()});
 $('reviewForm').onsubmit=e=>{e.preventDefault();const appointmentId=String($('reviewAppointmentId').value||''),appointment=data.appointments.find(a=>String(a.id)===appointmentId);if(activeRole!=='client'||!appointment||!clientOwnsAppointment(appointment)||!appointmentHasPassed(appointment)){alert(t('Эту запись нельзя оценить.'));return}if(!profiles.master){alert(t('Профиль мастера не найден.'));return}const pid=getClientProfileId(true),reviews=getMasterReviews().slice(),oldIndex=reviews.findIndex(r=>String(r.appointmentId)===appointmentId&&String(r.clientProfileId||'')===String(pid));const review={id:oldIndex>=0?reviews[oldIndex].id:((crypto.randomUUID&&crypto.randomUUID())||String(Date.now()+Math.random())),appointmentId,clientProfileId:pid,clientNickname:profileNickname('client'),rating:Math.max(1,Math.min(5,Number($('reviewRating').value)||5)),comment:String($('reviewComment').value||'').trim(),createdAt:oldIndex>=0&&reviews[oldIndex].createdAt?reviews[oldIndex].createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};if(oldIndex>=0)reviews[oldIndex]=review;else reviews.push(review);profiles.master={...profiles.master,reviews};if(!persistProfilesSafely(profiles))return;closeReviewDialog();renderMasterReviews();renderMasterSearch();renderClientCalendar();showAppToast(t(oldIndex>=0?'Отзыв обновлён.':'Спасибо за отзыв!'))};
+
+let bmExpandedProfileId='';
+
+function renderCompactMasterCards(box, masters, russian){
+ box.innerHTML=masters.map(m=>{
+  const id=String(m.masterId||m.profileId||m.cloudId||'');
+  const expanded=bmExpandedProfileId===id;
+  const avatar=isAvatarImage(m.avatar)
+    ? `<img class="master-card-avatar" src="${escapeHtml(m.avatar)}" alt="Аватар мастера">`
+    : '<div class="master-card-avatar-placeholder">👤</div>';
+
+  const direction=m.activityDirection||m.specialty||'Направление не указано';
+  const chosen=selectedClientMasterKey===masterSelectionKey(m);
+  const reviews=getMasterReviews(m);
+  const phone=String(m.phone||'').trim().replace(/[ ()\-.]/g,'');
+  const callable=m.publicPhoneConsent===true && /^\+?\d{7,15}$/.test(phone);
+
+  const favoriteAvailable=!russian&&!ruIsAccount()&&!!cloud&&!!cloudUser;
+
+  return `<article class="card bm-profile-card ${expanded?'is-expanded':''}" data-profile-id="${escapeHtml(id)}">
+
+    <button type="button" class="bm-profile-toggle" aria-expanded="${expanded}">
+      ${avatar}
+      <div class="bm-profile-main">
+        <h3>${escapeHtml(m.name)}</h3>
+        <div class="muted small">${escapeHtml(direction)}</div>
+        <div class="rating-summary">
+          ${reviews.length?ratingSummaryHtml(m):'<span class="muted small">☆ Рейтинг пока недоступен</span>'}
+        </div>
+      </div>
+    </button>
+
+    <div class="bm-profile-details" ${expanded?'':'inert'} aria-hidden="${!expanded}">
+      <div class="bm-profile-inner">
+
+        ${m.specialty&&m.specialty!==direction
+          ? `<div class="bm-profile-step" style="--step:0">${escapeHtml(m.specialty)}</div>`:''}
+
+        <div class="bm-profile-step" style="--step:1">
+          📍 ${escapeHtml([m.city,m.country].filter(Boolean).join(', '))}
+        </div>
+
+        ${m.address?`<div class="bm-profile-step" style="--step:2">
+          <strong>Адрес:</strong> ${escapeHtml(m.address)}
+        </div>`:''}
+
+        ${m.area?`<div class="bm-profile-step muted small" style="--step:3">
+          Ориентир: ${escapeHtml(m.area)}
+        </div>`:''}
+
+        ${reviews.length?`<div class="bm-profile-step" style="--step:4">
+          ${renderReviewCards(m,2)}
+        </div>`:''}
+
+        <div class="bm-profile-step bm-profile-actions" style="--step:5">
+          <button class="btn primary" type="button" data-profile-action="choose">
+            ${escapeHtml(t(chosen?'Снять выбор':'Выбрать мастера'))}
+          </button>
+
+          ${callable?`<a class="btn bm-icon-action"
+            aria-label="Позвонить" title="Позвонить"
+            href="tel:${escapeHtml(phone)}">☎</a>`:''}
+
+          ${favoriteAvailable?`<button type="button"
+            class="btn bm-icon-action"
+            data-profile-action="favorite"
+            aria-label="Мои мастера">
+            ${isFavoriteMaster(m)?'♥':'♡'}
+          </button>`:''}
+        </div>
+
+      </div>
+    </div>
+  </article>`;
+ }).join('');
+
+ box.onclick=event=>{
+  const card=event.target.closest('.bm-profile-card');
+  if(!card||!box.contains(card))return;
+
+  const id=card.dataset.profileId;
+  const action=event.target.closest('[data-profile-action]');
+
+  if(action){
+    if(action.dataset.profileAction==='choose')
+      chooseMasterForBooking(id);
+    if(action.dataset.profileAction==='favorite')
+      toggleFavoriteMaster(id);
+    return;
+  }
+
+  if(event.target.closest('a,button:not(.bm-profile-toggle)'))return;
+
+  bmExpandedProfileId=bmExpandedProfileId===id?'':id;
+
+  box.querySelectorAll('.bm-profile-card').forEach(item=>{
+    const open=item.dataset.profileId===bmExpandedProfileId;
+    item.classList.toggle('is-expanded',open);
+    item.querySelector('.bm-profile-toggle')
+      .setAttribute('aria-expanded',String(open));
+    const details=item.querySelector('.bm-profile-details');
+    details.inert=!open;
+    details.setAttribute('aria-hidden',String(!open));
+  });
+ };
+}
+
 async function renderMasterSearch(){
  const country=String($('searchCountry')?.value||'').trim(),city=String($('searchCity')?.value||'').trim(),box=$('masterSearchResults');if(!box)return;
    if(nailoraIsRussianCountry(country)){
@@ -5856,16 +6028,17 @@ async function renderMasterSearch(){
         cloudId:String(m.id),profileId:String(m.id),masterId:String(m.id),
         name:String(m.name||''),city:String(m.city||''),area:String(m.area||''),country:String(m.country||'Россия'),
         specialty:String(m.specialty||''),activityDirection:String(m.activity_direction||''),
+        address:String(m.address||''),
+        publicPhoneConsent:m.phone_publication_consent===true,
+        phone:m.phone_publication_consent===true?String(m.public_phone||''):'',
+
         avatar:String(m.avatar_url||''),avatarUrl:String(m.avatar_url||''),reviews:[]
       }));
       const direction=String($('searchActivityDirection')?.value||'').trim();
       if(direction)found=found.filter(m=>m.activityDirection===direction);
       cloudMasterDirectory=found;
       if(!found.length){box.innerHTML='<p class="muted">В этом городе пока нет опубликованных мастеров по выбранным условиям.</p>';return;}
-      box.innerHTML=found.map(m=>{
-        const id=escapeHtml(m.masterId),avatar=isAvatarImage(m.avatar)?`<img class="master-card-avatar" src="${escapeHtml(m.avatar)}" alt="Аватар мастера">`:'<div class="master-card-avatar-placeholder" aria-hidden="true">👤</div>';
-        return `<article class="card"><div class="master-card-head">${avatar}<div style="flex:1;min-width:0"><h3>${escapeHtml(m.name)}</h3><div class="muted small">${escapeHtml(m.activityDirection||'Направление не указано')}</div><div>${escapeHtml(m.specialty)}</div><div class="muted">📍 ${escapeHtml(m.city)}, ${escapeHtml(m.country)}</div></div></div><div class="row" style="margin-top:10px"><button class="btn primary fixed" type="button" onclick="chooseMasterForBooking('${id}')">${escapeHtml(t('Выбрать мастера'))}</button></div></article>`;
-      }).join('');
+      renderCompactMasterCards(box,found,true);
       translatePage();
     }catch(err){box.innerHTML=`<p class="muted">Не удалось загрузить российских мастеров: ${escapeHtml(err?.message||'ошибка соединения')}</p>`;}
     return;
@@ -5881,7 +6054,7 @@ async function renderMasterSearch(){
  cloudMasterDirectory=found;
  if(selectedClientMasterKey&&!found.some(m=>masterSelectionKey(m)===selectedClientMasterKey)&&!cloudFavoriteMasters.some(m=>masterSelectionKey(m)===selectedClientMasterKey)){selectedClientMasterKey='';selectedCloudMasterId='';cloudBookedSlots=[];cloudScheduleData=null;renderClientCalendar()}
  if(!found.length){const msg=directoryFound.length&&selectedDirection?'В этом городе пока нет мастеров с выбранным направлением.':'Мастеров в выбранном городе пока нет.';box.innerHTML=`<p class="muted">${escapeHtml(t(msg))}</p><p class="muted small">${cloudUser?'В этом городе пока нет опубликованных профилей мастеров с таким направлением.':'Для общего каталога между устройствами войди в аккаунт My Beauty Master.'}</p>`;translatePage();return}
- box.innerHTML=found.map(m=>{const avatar=isAvatarImage(m.avatar)?`<img class="master-card-avatar" src="${escapeHtml(m.avatar)}" alt="Аватар мастера">`:`<div class="master-card-avatar-placeholder" aria-hidden="true">👤</div>`;const chosen=selectedClientMasterKey===masterSelectionKey(m),favorite=isFavoriteMaster(m),masterId=String(m.cloudId||m.profileId||'');return `<article class="card"><div class="master-card-head">${avatar}<div style="flex:1;min-width:0"><h3>${escapeHtml(profileNicknameFor(m,'master'))}</h3><div class="muted small">${escapeHtml(m.activityDirection||'Направление не указано')}</div><div>${escapeHtml(m.specialty||t('Специализация не указана'))}</div><div class="muted" style="margin-top:6px">📍 ${escapeHtml([m.city||m.area,m.country].filter(Boolean).join(', '))}</div><div style="margin-top:5px"><strong>${escapeHtml(t('Адрес оказания услуг'))}:</strong> ${escapeHtml(m.address||t('Адрес не указан'))}</div>${m.area?`<div class="muted small">${escapeHtml(t('Район / ориентир'))}: ${escapeHtml(m.area)}</div>`:''}</div></div><div class="rating-summary">${ratingSummaryHtml(m)}</div><div class="review-list master-card-reviews">${renderReviewCards(m,2)}</div><div class="row" style="margin-top:10px"><button class="btn primary fixed" type="button" onclick="chooseMasterForBooking('${escapeHtml(masterId)}')">${escapeHtml(t(chosen?'Снять выбор':'Выбрать мастера'))}</button><button class="btn fixed" type="button" onclick="toggleFavoriteMaster('${escapeHtml(masterId)}')">${escapeHtml(t(favorite?'Убрать из моих мастеров':'Добавить мастера'))}</button>${String(m.phone||'').trim()?`<a class="btn fixed" href="tel:${escapeHtml(String(m.phone).replace(/[^0-9+*#,;]/g,''))}">${escapeHtml(t('Позвонить'))}</a>`:`<button class="btn fixed" type="button" disabled>${escapeHtml(t('Позвонить'))}</button>`}</div></article>`}).join('');translatePage();
+ renderCompactMasterCards(box,found,false);translatePage();
 }
 
 function favoriteMasterIds(){const ids=profiles.client?.favoriteMasterIds;return Array.isArray(ids)?Array.from(new Set(ids.map(x=>String(x||'').trim()).filter(Boolean))):[]}
