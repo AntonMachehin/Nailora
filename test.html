@@ -1328,6 +1328,12 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
           ...(x.details === undefined ? {} : {details:x.details})
         }});
       },
+      updateMasterProfile(fields){
+        return request('POST','/v1/me/profiles',{
+          auth:true,
+          body:{...fields,action:'update_master_profile'}
+        });
+      },
       updateMe(fields){return request('PATCH','/v1/me',{body:fields,auth:true})},
       reminderPreferences(){return request('GET','/v1/me/reminders/preferences',{auth:true})},
       saveReminderPreferences(prefs){return request('PUT','/v1/me/reminders/preferences',{auth:true,body:prefs})},
@@ -5485,7 +5491,58 @@ $('masterCurrencyChoice').onchange=async()=>{
 };
 $('accountEditForm').onsubmit=async e=>{
  e.preventDefault();if(!activeRole)return;
- if(ruIsAccount()){alert('Изменение российского профиля пока не подключено к серверу. Ничего не сохранено.');return;}
+ if(ruIsAccount()){
+  if(activeRole!=='master'){
+    alert('Редактирование российского профиля клиента пока недоступно.');
+    return;
+  }
+
+  const owner=profiles.master;
+  const btn=$('accountEditForm').querySelector('[type=submit]');
+
+  const fields={
+    name:$('settingsName').value.trim(),
+    phone:$('settingsPhone').value.trim(),
+    country:$('settingsCountry').value.trim(),
+    city:$('settingsCity').value.trim(),
+    area:$('settingsArea').value.trim(),
+    address:$('settingsAddress').value.trim(),
+    specialty:$('settingsSpecialty').value.trim(),
+    activityDirection:$('settingsActivityDirection').value,
+    publicPhoneConsent:$('settingsPublicPhoneConsent').checked===true
+  };
+
+  if(btn)btn.disabled=true;
+
+  try{
+    const saved=await ruSdk().updateMasterProfile(fields);
+
+    if(saved?.success!==true ||
+       String(saved.profile_id)!==String(owner.profileId) ||
+       saved.publicPhoneConsent!==fields.publicPhoneConsent)
+      throw new Error('Сервер не подтвердил сохранение');
+
+    if(activeRole!=='master'||profiles.master!==owner)return;
+
+    profiles.master={...owner,...fields,country:'Россия'};
+
+    refreshRoleGreetings();
+    renderProfileAvatar('master');
+    updateNailoraPhoneConsentStatus();
+
+    showAppToast('Профиль успешно сохранён.');
+  }catch(err){
+    if(profiles.master===owner){
+      $('settingsPublicPhoneConsent').checked=
+        owner.publicPhoneConsent===true;
+      updateNailoraPhoneConsentStatus();
+    }
+    alert('Не удалось сохранить профиль: '+err.message);
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+  return;
+ }
  if(nailoraIsRussianCountry($('settingsCountry').value)){alert('Для России предназначен отдельный сервер. Изменение региона аккаунта будет возможно после миграции.');return;}
  const role=activeRole,old=profiles[role]||{};
  const updated={...old,name:$('settingsName').value.trim(),phone:$('settingsPhone').value.trim(),country:$('settingsCountry').value.trim(),city:$('settingsCity').value.trim(),area:role==='master' ? $('settingsArea').value.trim():(old.area||''),address:role==='master'? $('settingsAddress').value.trim():(old.address||''),specialty:role==='master'? $('settingsSpecialty').value.trim():(old.specialty||''),activityDirection:role==='master'? $('settingsActivityDirection').value:(old.activityDirection||''),publicPhoneConsent:role==='master'?$('settingsPublicPhoneConsent').checked===true:false};
