@@ -6013,8 +6013,9 @@ function renderCompactMasterCards(box, masters, russian){
         </div>`:''}
 
         <div class="bm-profile-step bm-profile-actions" style="--step:5">
-          <button class="btn primary" type="button" data-profile-action="choose">
-            ${escapeHtml(t(chosen?'Снять выбор':'Выбрать мастера'))}
+          <button class="btn primary" type="button" data-profile-action="choose"
+            data-master-key="${escapeHtml(masterSelectionKey(m))}">
+            ${escapeHtml(t(chosen?'Свернуть расписание':'Выбрать мастера'))}
           </button>
 
           ${callable?`<a class="btn bm-icon-action"
@@ -6344,6 +6345,22 @@ $('resetMasterSearch').onclick=()=>{$('searchCountry').value=profiles.client?.co
 function selectClientScheduleDay(ds){if(!ds)return;clientSelectedDate=ds;clientCursor=new Date(ds+'T12:00:00');clientCursor.setDate(1);renderClientCalendar();const target=$('clientDaySchedule');if(target)target.scrollIntoView({behavior:'smooth',block:'start'})}
 function clientDayLabel(ds){const d=new Date(ds+'T12:00:00');return new Intl.DateTimeFormat(LOCALES[currentLanguage]||currentLanguage,{weekday:'short',day:'numeric',month:'short'}).format(d)}
 function setClientSchedulePanelsVisible(visible){
+ document.querySelectorAll(
+   '.bm-profile-card [data-profile-action="choose"]'
+ ).forEach(button=>{
+   const opened=!!visible &&
+     button.dataset.masterKey===selectedClientMasterKey;
+
+   const label=t(opened
+     ?'Свернуть расписание'
+     :'Выбрать мастера');
+
+   if(button.textContent.trim()!==label)
+     button.textContent=label;
+
+   button.setAttribute('aria-expanded',String(opened));
+ });
+
  for(const id of ['clientCalendarGrid','clientDaySchedule']) $(id)?.closest('.panel')?.classList.toggle('hidden',!visible);
 }
 function renderClientCalendar(){
