@@ -5698,14 +5698,34 @@ function toggleDayOff(ds){if(ruMasterReadOnly()){
  data.daysOff.push(ds);save();
 }
 function renderMasterDashboard(){
- const box=$('masterDashboard');if(!box)return;
- const appointments=Array.isArray(data.appointments)?data.appointments:[];
- const selected=appointments.filter(a=>a.date===selectedDate).sort((a,b)=>String(a.time||'').localeCompare(String(b.time||'')));
- const today=iso(new Date());const todays=appointments.filter(a=>a.date===today);
- const upcoming=appointments.filter(a=>{const dt=appointmentDateTime(a);return dt&&dt.getTime()>=Date.now()}).sort((a,b)=>appointmentDateTime(a)-appointmentDateTime(b))[0];
+ const box=$('masterDashboard');
+ if(!box)return;
+
+ const appointments=(Array.isArray(data.appointments)
+   ? data.appointments : []).filter(a=>
+   normalizeAppointmentStatus(a.status)!=='cancelled'
+ );
+
+ const today=iso(new Date());
+ const now=Date.now();
+
+ const todays=appointments.filter(a=>a.date===today);
+
+ const upcoming=appointments
+   .filter(a=>{
+     if(normalizeAppointmentStatus(a.status)!=='booked')
+       return false;
+     const dt=appointmentDateTime(a);
+     return dt && dt.getTime()>=now;
+   })
+   .sort((a,b)=>appointmentDateTime(a)-appointmentDateTime(b))[0];
+
  $('dashTodayCount').textContent=String(todays.length);
- $('dashNextTime').textContent=upcoming?(upcoming.time||'—'):'—';
- $('dashNextName').textContent=upcoming?`${upcoming.name||t('Клиент')} · ${formatDate(new Date(upcoming.date+'T12:00:00'))}`:t('Предстоящих записей нет');
+ $('dashNextTime').textContent=upcoming
+   ? upcoming.time : '—';
+ $('dashNextName').textContent=upcoming
+   ? `${upcoming.name||t('Клиент')} · ${formatDate(new Date(upcoming.date+'T12:00:00'))}`
+   : t('Предстоящих записей нет');
 }
 
 
@@ -7393,6 +7413,14 @@ function readSentReminders(){try{return JSON.parse(localStorage.getItem(REMINDER
 function showMasterReminder(message,key){const toast=$('reminderToast');toast.replaceChildren();const heading=document.createElement('strong');heading.textContent='🔔 '+t('Напоминание о записи');const body=document.createElement('div');body.textContent=message;const actions=document.createElement('div');actions.className='toast-actions';const open=document.createElement('button');open.type='button';open.textContent=t('Открыть календарь');open.onclick=()=>{toast.hidden=true;const tab=document.querySelector('[data-tab="calendar"]');if(tab)tab.click()};const dismiss=document.createElement('button');dismiss.type='button';dismiss.textContent=t('Закрыть');dismiss.onclick=()=>{toast.hidden=true};actions.append(open,dismiss);toast.append(heading,body,actions);toast.hidden=false;if('Notification' in window&&Notification.permission==='granted'){try{const notification=new Notification('My Beauty Master · '+t('Напоминание о записи'),{body:message,tag:'nailora-'+key});notification.onclick=()=>{window.focus();const tab=document.querySelector('[data-tab="calendar"]');if(tab)tab.click();notification.close()}}catch(e){/* internal reminder still appears */}}}
 function checkMasterReminders(){if(activeRole!=='master'||!profiles.master)return;const prefs=getMasterReminderPrefs();if(!prefs.enabled)return;const now=new Date(),lead=Math.max(1,Number(prefs.minutes)||60)*60*1000,sent=readSentReminders();let changed=false;for(const a of data.appointments){const dt=appointmentDateTime(a);if(!dt||dt<=now)continue;const key=String(a.id||`${a.date}-${a.time}-${a.name}`)+'|'+a.date+'|'+a.time;if(sent[key])continue;const left=dt-now;if(left<=lead&&left>0){sent[key]=Date.now();changed=true;const when=formatDate(new Date(a.date+'T12:00:00'))+' в '+(a.time||'');const detail=[a.name,a.service].filter(Boolean).join(' · ');showMasterReminder(`${detail} — ${when}`,key)}}if(changed){const cutoff=Date.now()-90*24*60*60*1000;for(const k of Object.keys(sent)){if(Number(sent[k])<cutoff)delete sent[k]}try{localStorage.setItem(REMINDER_SENT_KEY,JSON.stringify(sent))}catch(e){}}}
 setInterval(checkMasterReminders,30000);
+setInterval(()=>{
+ if(activeRole==='master')renderMasterDashboard();
+},15000);
+
+window.addEventListener('focus',()=>{
+ if(activeRole==='master')renderMasterDashboard();
+});
+
 </script>
 
 <script>
