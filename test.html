@@ -1501,12 +1501,13 @@ window.NAILORA_RU_API_BASE = 'https://beautymaster-ru.duckdns.org'; // Read-only
   margin:0 0 4px;
 }
 .bm-profile-details {
-  display:grid;
-  grid-template-rows:0fr;
-  transition:grid-template-rows .38s ease;
+  display:block;
+  height:0;
+  overflow:hidden;
+  transition:height .38s ease;
 }
 .bm-profile-card.is-expanded .bm-profile-details {
-  grid-template-rows:1fr;
+  height:auto;
 }
 .bm-profile-inner {
   min-height:0;
@@ -6091,10 +6092,39 @@ a5.5 5.5 0 0 0-.1-7.8z"/>
 
   box.querySelectorAll('.bm-profile-card').forEach(item=>{
     const open=item.dataset.profileId===bmExpandedProfileId;
-    item.classList.toggle('is-expanded',open);
+    const details=item.querySelector('.bm-profile-details');
+    const wasOpen=item.classList.contains('is-expanded');
+
+    if(wasOpen!==open){
+      const start=details.getBoundingClientRect().height;
+      details.ontransitionend=null;
+      details.style.height=start+'px';
+
+      void details.offsetHeight;
+
+      item.classList.toggle('is-expanded',open);
+
+      const target=open
+        ?details.firstElementChild.getBoundingClientRect().height
+        :0;
+
+      details.ontransitionend=e=>{
+        if(e.target!==details||e.propertyName!=='height')return;
+        details.style.height='';
+        details.ontransitionend=null;
+      };
+
+      details.style.height=target+'px';
+
+      if(Math.abs(start-target)<1||
+         window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+        details.style.height='';
+        details.ontransitionend=null;
+      }
+    }
+
     item.querySelector('.bm-profile-toggle')
       .setAttribute('aria-expanded',String(open));
-    const details=item.querySelector('.bm-profile-details');
     details.inert=!open;
     details.setAttribute('aria-hidden',String(!open));
   });
