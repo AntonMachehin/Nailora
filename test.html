@@ -4781,7 +4781,7 @@ $('notificationList').addEventListener('click',e=>{const button=e.target.closest
 $('markAllNotificationsRead').onclick=markAllCloudNotificationsRead;$('deleteReadNotifications').onclick=deleteReadCloudNotifications;
 $('closeNotifications').onclick=()=>$('notificationsDialog').close();$('notificationsDialog').addEventListener('click',e=>{if(e.target===$('notificationsDialog'))$('notificationsDialog').close()});
 function openCloudNotifications(){refreshCloudNotifications(false).then(()=>{if(typeof $('notificationsDialog').showModal==='function')$('notificationsDialog').showModal();else $('notificationsDialog').setAttribute('open','')})}
-const _masterAccountOriginal=$('masterAccount').innerHTML,_clientAccountOriginal=$('clientAccount').innerHTML;const masterNotifButton=document.createElement('button');masterNotifButton.type='button';masterNotifButton.className='btn fixed';masterNotifButton.dataset.nailoraNotificationsButton='true';masterNotifButton.onclick=openCloudNotifications;$('masterAccount').parentElement.insertBefore(masterNotifButton,$('masterAccount'));const clientNotifButton=masterNotifButton.cloneNode(true);clientNotifButton.onclick=openCloudNotifications;$('clientAccount').parentElement.insertBefore(clientNotifButton,$('clientAccount'));updateNotificationEntryButtons();
+const _masterAccountOriginal=$('masterAccount').innerHTML,_clientAccountOriginal=$('clientAccount').innerHTML;
 function startCloudPolling(){if(cloudPollTimer)clearInterval(cloudPollTimer);cloudPollTimer=setInterval(()=>{if(cloudReady())refreshCloudNotifications(true)},30000)}
 // Initialize calendar state before any asynchronous auth restoration can render the app.
 let cursor=new Date();cursor.setDate(1);
