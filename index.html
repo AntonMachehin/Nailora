@@ -5910,8 +5910,14 @@ function renderMasterDashboard(){
  $('dashTodayCount').textContent=String(todays.length);
  $('dashNextTime').textContent=upcoming
    ? upcoming.time : '—';
+ const nextDate=upcoming?new Date(upcoming.date+'T12:00:00'):null;
+ const nextWeekday=nextDate
+   ? (String(currentLanguage).startsWith('ru')
+      ? ['вс','пн','вт','ср','чт','пт','сб'][nextDate.getDay()]
+      : new Intl.DateTimeFormat(LOCALES[currentLanguage]||currentLanguage,{weekday:'short'}).format(nextDate).replace(/\.$/,''))
+   : '';
  $('dashNextName').textContent=upcoming
-   ? `${upcoming.name||t('Клиент')} · ${formatDate(new Date(upcoming.date+'T12:00:00'))}`
+   ? `${upcoming.name||t('Клиент')} · ${nextWeekday}, ${formatDate(nextDate)}`
    : t('Предстоящих записей нет');
 }
 
