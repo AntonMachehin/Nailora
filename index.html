@@ -4494,7 +4494,12 @@ $('loginForm').onsubmit=async e=>{
      cache:'no-store',redirect:'error',signal:controller.signal
    });
    const answer=await res.json();
-   if(!res.ok)throw new Error(res.status===401?'Неверные данные для входа':res.status===429?'Слишком много попыток. Повтори позже.':'Сервис входа временно недоступен.');
+   if(res.status===403&&answer?.code==='ACCOUNT_BLOCKED'){
+     $('loginPassword').value='';
+     status.textContent='Ваш аккаунт заблокирован администрацией сервиса. Для восстановления доступа обратитесь в службу поддержки.';
+     return;
+   }
+   if(!res.ok)throw new Error(res.status===401?'Неверные данные для входа. Если данные верны, обратитесь в службу поддержки.':res.status===429?'Слишком много попыток. Повтори позже.':'Сервис входа временно недоступен.');
    if(answer?.success!==true||!['ru','global'].includes(answer.region)||
       typeof answer.access_token!=='string'||!answer.access_token||
       (answer.region==='global'&&(typeof answer.refresh_token!=='string'||!answer.refresh_token)))
